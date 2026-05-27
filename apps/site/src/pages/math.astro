@@ -1,0 +1,119 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Simple math — open-rgs"
+  description="Write a single-call math module in Lua for open-rgs. Used by slots, instant-win, dice, plinko, scratchers — any round that resolves in one response."
+>
+  <main>
+    <h1>Math · simple</h1>
+
+    <p class="lede">
+      A simple round resolves in one math call. Use it for slots,
+      instant-win, dice, plinko, and any game where the outcome is
+      determined by a single roll.
+    </p>
+
+    <h2 data-section="§ 1">Module shape</h2>
+
+    <pre><code>{`-- maths/spin.lua
+return {
+  kind    = "simple",
+  name    = "hello",
+  version = "0.1.0",
+  rtp     = 0.95,
+
+  play = function(prev, ctx)
+    local r = host.rng_next()
+    local m = (r < 0.30 and 0.5) or (r < 0.40 and 2) or (r < 0.41 and 50) or 0
+    return {
+      multiplier = m,
+      ops        = { { kind = "result", multiplier = m } },
+      type       = m > 0 and "win" or "loss",
+      -- carry?    = "<opaque string>",  -- threaded into next play()'s prev
+      -- next_mode? = "freespins",       -- routes the next round
+    }
+  end,
+}`}</code></pre>
+
+    <h2 data-section="§ 2">Return shape</h2>
+
+    <table>
+      <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>multiplier</code></td><td>dimensionless win multiplier; 0 = loss. Core computes <code>win = multiplier × bet</code></td></tr>
+        <tr><td><code>ops</code></td><td>opaque visual instructions; the client replays them. Core forwards verbatim</td></tr>
+        <tr><td><code>type</code></td><td>game-defined tag (e.g. <code>"win"</code>, <code>"loss"</code>, <code>"trigger_fs"</code>)</td></tr>
+        <tr><td><code>carry</code></td><td>opaque string threaded into the <em>next</em> round's <code>prev</code> on this session</td></tr>
+        <tr><td><code>next_mode</code></td><td>routes the next round into a specific mode id</td></tr>
+      </tbody>
+    </table>
+
+    <h2 data-section="§ 3">Context (<code>ctx</code>)</h2>
+
+    <pre><code>{`ctx = {
+  mode    = "default",      -- resolved mode id (after promo / next_mode override)
+  cheat?  = { force_win = true, force_coeff = 5 },   -- dev-only, stripped in prod
+  params? = { mines = 3 },  -- free-form game params from the SPIN request
+}`}</code></pre>
+
+    <h2 data-section="§ 4">Host helpers</h2>
+
+    <p>
+      Two helpers are injected into every math VM. Extensions registered
+      via <code>loadLuaMath(path, &#123; extensions: […] &#125;)</code> add more.
+    </p>
+
+    <table>
+      <thead><tr><th>Helper</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>host.rng_next()</code></td><td>returns a float in <code>[0, 1)</code> from the orchestrator's RNG</td></tr>
+        <tr><td><code>host.log_debug(msg)</code></td><td>writes a debug line tagged with the math file path</td></tr>
+        <tr><td><code>host.mark.count(name)</code></td><td>increments a named counter — inert in production, recorded by the simulator</td></tr>
+        <tr><td><code>host.mark.observe(name, v)</code></td><td>appends a value to a named histogram</td></tr>
+        <tr><td><code>host.mark.tag(name)</code></td><td>tags the current spin under <code>name</code></td></tr>
+        <tr><td><code>host.mark.contribute(name, m)</code></td><td>adds a multiplier to a named RTP-attribution bucket</td></tr>
+      </tbody>
+    </table>
+
+    <h2 data-section="§ 5">Currency-blindness</h2>
+
+    <p class="mute">
+      Math never sees balance, bet, or currency. The orchestrator
+      multiplies the returned <code>multiplier</code> by the resolved bet
+      (<code>allowedBets[betIndex] × priceMultiplier × stakeMultiplier</code>)
+      and applies the manifest's max-win cap before settling.
+    </p>
+
+    <h2 data-section="§ 6">Loading</h2>
+
+    <pre><code>{`import { loadLuaMath } from "@open-rgs/core";
+import reels from "@open-rgs-ext/reels";
+
+const math = await loadLuaMath("./maths/spin.lua", {
+  extensions: [reels],   // optional native + Lua helpers, see open-rgs-ext-*
+  marks:      false,     // true to wire the simulator's mark collector
+});`}</code></pre>
+
+    <p class="mute">
+      The loader computes the math's SHA-256 and stamps it on every
+      round (visible in <code>/healthz</code>). Math version mismatch
+      against stored session carry triggers the
+      <code>manifest.recovery</code> policy.
+    </p>
+
+    <nav class="related" aria-label="Related">
+      → <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/complex">Math · complex</a> &middot;
+      <a href="/adapter">Adapter</a> &middot;
+      <a href="/admin">Admin</a> &middot;
+      <a href="/errors">Errors</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

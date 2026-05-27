@@ -1,0 +1,79 @@
+name: npm-publish
+
+# Publishes the eight @open-rgs/* packages to npm in topological order.
+# Triggered on push of a tag matching `v*` (e.g. v0.5.0). The contract
+# bump cascades: anything that depends on @open-rgs/contract must
+# already advertise the new version in its own dependency pin.
+#
+# Authentication is npm OIDC trusted publishing — no NPM_TOKEN secret.
+# Each package's npmjs.com/package/<name>/access page must have a
+# Trusted Publisher entry pointing at:
+#   org/user:    open-rgs
+#   repository:  open-rgs
+#   workflow:    npm-publish.yml
+#   environment: npm-publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      # Required for npm OIDC trusted publishing + provenance attestation.
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node (without registry-url — OIDC requires that)
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          # Do NOT set registry-url. setup-node would auto-write
+          # ~/.npmrc with `_authToken=${NODE_AUTH_TOKEN}` AND export
+          # NODE_AUTH_TOKEN=XXXXX-XXXXX-XXXXX-XXXXX as a placeholder.
+          # The npm CLI then treats the placeholder as a real token,
+          # skips OIDC trusted publishing, and 404s.
+
+      - name: Upgrade npm to a version that supports OIDC trusted publishing
+        # Node 22 LTS ships with npm 10.x. Trusted publishing was added
+        # in npm 11.5.1. Without this step npm bails with ENEEDAUTH
+        # because the older CLI doesn't even attempt the OIDC handshake.
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Install workspace
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
+
+      - name: Publish packages in dependency order
+        # Order matters: dependents pin exact versions of their @open-rgs
+        # deps, so publishing out of order makes the dependent's install
+        # fail (the version it expects doesn't exist yet on npm).
+        run: |
+          set -euo pipefail
+          for pkg in contract log core platform-mock adapter-kit adapter-test-kit simulator client; do
+            echo "── Publishing @open-rgs/$pkg ─────────────────────────────"
+            (cd "packages/$pkg" && npm publish --access public --provenance)
+          done

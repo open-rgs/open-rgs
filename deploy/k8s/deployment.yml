@@ -1,0 +1,79 @@
+# Reference K8s Deployment + Service for an open-rgs game server.
+#
+# Replace <game-id>, <registry>, <sha>, and the wallet env vars.
+# The image is built via deploy/docker/Dockerfile from your game repo.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rgs-<game-id>
+  labels:
+    app: rgs-<game-id>
+spec:
+  replicas: 3                       # stateless — scale freely
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: rgs-<game-id>
+  template:
+    metadata:
+      labels:
+        app: rgs-<game-id>
+    spec:
+      containers:
+        - name: rgs
+          image: <registry>/rgs-<game-id>:<sha>
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: ws, containerPort: 80 }
+            - { name: admin, containerPort: 81 }
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: PORT, value: "80" }
+            - { name: ADMIN_PORT, value: "81" }
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rgs-<game-id>-secrets
+                  key: api-key
+            - name: PLATFORM_WS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: rgs-<game-id>-config
+                  key: platform-ws-url
+          # /livez is process-up only — never restart the pod for wallet flapping.
+          livenessProbe:
+            httpGet: { path: /livez, port: admin }
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # /healthz reflects wallet connectivity — pull pod from rotation when
+          # the wallet is down, but don't restart the process.
+          readinessProbe:
+            httpGet: { path: /healthz, port: admin }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 256Mi
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rgs-<game-id>
+spec:
+  selector:
+    app: rgs-<game-id>
+  ports:
+    - { name: ws,    port: 80, targetPort: ws }
+    - { name: admin, port: 81, targetPort: admin }

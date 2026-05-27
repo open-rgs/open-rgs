@@ -1,0 +1,107 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Wire protocol — open-rgs"
+  description="open-rgs binary-msgpack WebSocket protocol: frame format, message codes, and full request/response payload shapes."
+>
+  <main>
+    <h1>Wire</h1>
+
+    <p class="lede">
+      Binary WebSocket. Each frame is
+      <code>[type_byte][msgpack_payload]</code>. One byte selects the
+      message; the body is whatever the payload decodes to.
+    </p>
+
+    <h2 data-section="§ 1">Frame codes</h2>
+
+    <table>
+      <thead>
+        <tr><th class="mono">Code</th><th class="mono">Dir</th><th>Message</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">0x01</td><td class="dir">C → S</td><td>INIT_REQUEST</td></tr>
+        <tr><td class="mono">0x02</td><td class="dir">S → C</td><td>INIT_RESPONSE</td></tr>
+        <tr><td class="mono">0x03</td><td class="dir">C → S</td><td>SPIN_REQUEST</td></tr>
+        <tr><td class="mono">0x04</td><td class="dir">S → C</td><td>SPIN_RESPONSE</td></tr>
+        <tr><td class="mono">0x05</td><td class="dir">C → S</td><td>OPEN_REQUEST</td></tr>
+        <tr><td class="mono">0x06</td><td class="dir">S → C</td><td>OPEN_RESPONSE</td></tr>
+        <tr><td class="mono">0x07</td><td class="dir">C → S</td><td>STEP_REQUEST</td></tr>
+        <tr><td class="mono">0x08</td><td class="dir">S → C</td><td>STEP_RESPONSE</td></tr>
+        <tr><td class="mono">0x09</td><td class="dir">C → S</td><td>CLOSE_REQUEST</td></tr>
+        <tr><td class="mono">0x0a</td><td class="dir">S → C</td><td>CLOSE_RESPONSE</td></tr>
+        <tr><td class="mono">0x0b</td><td class="dir">C → S</td><td>PROMO_ACCEPT</td></tr>
+        <tr><td class="mono">0x0c</td><td class="dir">S → C</td><td>PROMO_ACCEPT_RESPONSE</td></tr>
+        <tr><td class="mono">0xfe</td><td class="dir">C → S</td><td>PING</td></tr>
+        <tr><td class="mono">0xfd</td><td class="dir">S → C</td><td>PONG</td></tr>
+        <tr><td class="mono">0xff</td><td class="dir">S → C</td><td>ERROR</td></tr>
+      </tbody>
+    </table>
+
+    <h2 data-section="§ 2">Request payloads</h2>
+
+    <pre><code>{`init:   { sid }
+spin:   { sid?, mode?, betIndex?, priceMultiplier?, params? }
+open:   { sid?, mode?, betIndex?, priceMultiplier?, params? }
+step:   { sid?, action: { type, ... } }
+close:  { sid?  }
+promo:  { sid?, accept: bool }`}</code></pre>
+
+    <h2 data-section="§ 3">Response payloads</h2>
+
+    <pre><code>{`init:   { sid, balance, currency, currencyDecimals, allowedBets, defaultBetIndex,
+          modes: [{ id, label?, stakeMultiplier, declaredRtp? }],
+          promo?:  { id, bet, remaining, total?, label?, validTo? },
+          resume?: { roundId, modeId, bet, ops, actionLog, awaiting?, openedAt? },
+          demo? }
+
+spin:   { roundId, ops, balance, bet, win, multiplier, type,
+          promo?: { remaining, done } }
+
+open:   { roundId, ops, balance, bet, awaiting? }
+step:   { ops, awaiting? }                  // no money moves
+close:  { roundId, ops, balance, win, multiplier, type }
+
+promo:  { ok, promo?: { id, bet, remaining, total? } }
+error:  { code, message }                   // see /errors`}</code></pre>
+
+    <h2 data-section="§ 4">Awaiting hint</h2>
+
+    <p>
+      <code>awaiting</code> is the pause signal on a complex round.
+      Present after open / step → the orchestrator stays open and the
+      client must send STEP. Absent → the round is terminal and the
+      client must send CLOSE.
+    </p>
+
+    <pre><code>{`awaiting = {
+  type:     "pick_cell",        // enforced; mismatched STEP → INVALID_ACTION
+  options?: [0, 1, 2, ... 24],  // optional whitelist
+  deadline?: 30000,             // optional ms before autoclose
+  prompt?:   "Pick a tile",
+}`}</code></pre>
+
+    <h2 data-section="§ 5">Ops</h2>
+
+    <p class="mute">
+      <code>ops</code> is an opaque list of visual instructions. Math
+      authors define the shape; the client replays them. The
+      orchestrator never inspects ops — it forwards them verbatim.
+    </p>
+
+    <nav class="related" aria-label="Related">
+      → <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/math">Math · simple</a> &middot;
+      <a href="/complex">Math · complex</a> &middot;
+      <a href="/adapter">Adapter</a> &middot;
+      <a href="/admin">Admin</a> &middot;
+      <a href="/errors">Errors</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

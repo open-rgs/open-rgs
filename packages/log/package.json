@@ -1,0 +1,27 @@
+{
+  "name": "@open-rgs/log",
+  "version": "0.1.0",
+  "description": "Structured JSON logger for open-rgs. ECS-aligned fields, ring buffer, child loggers, redaction, sampling. Zero deps.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/log"
+  },
+  "homepage": "https://github.com/open-rgs/open-rgs",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": ["src", "README.md"],
+  "keywords": ["open-rgs", "logger", "json", "ecs", "structured-logging"],
+  "scripts": {
+    "test": "bun test"
+  }
+}

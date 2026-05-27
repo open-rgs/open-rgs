@@ -1,0 +1,25 @@
+# Local dev stack — runs the game server against the mock wallet.
+# Adjust API_KEY / PLATFORM_WS_URL when pointing at a real provider.
+
+services:
+  rgs:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: open-rgs-game:dev
+    ports:
+      - "8080:80"   # client transport (binary-msgpack WS)
+      - "8081:81"   # admin / health
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      PORT: "80"
+      ADMIN_PORT: "81"
+      # When pointing at a real provider, set these:
+      # API_KEY: "..."
+      # PLATFORM_WS_URL: "wss://..."
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:81/livez"]
+      interval: 5s
+      timeout: 2s
+      retries: 6

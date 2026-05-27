@@ -1,0 +1,231 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Complex rounds (Mines, Chicken Road, crash) — open-rgs"
+  description="Write open / step / close Lua math for instant games with mid-round player input: Mines, Chicken Road, gamble, hold-and-spin, crash. Full Mines reference."
+>
+  <main>
+    <h1>Math · complex</h1>
+
+    <p class="lede">
+      A complex round opens, then waits for player input one or more
+      times before closing. Use it for Mines, Chicken Road, gamble /
+      double-or-take, hold-and-spin, pick bonuses, and crash games.
+    </p>
+
+    <h2 data-section="§ 1">Lifecycle</h2>
+
+    <pre class="diagram"><code>{`         openRound                         closeRound
+    ──────────────────►                ──────────────────►
+   client    debit    math.open      math.close   credit    client
+            wallet  → state, ops     state →     wallet
+                       awaiting?     mult, ops
+
+                          stepRound (×N, in-process, no wallet)
+                       ◄────────────────────────────────►
+                       client → action → math.step → state, ops, awaiting?`}</code></pre>
+
+    <p>
+      Money moves twice at most: <code>openComplex</code> at open,
+      <code>closeComplex</code> at close. Every STEP is pure in-process —
+      no wallet calls. State is held in-memory on the RGS as an opaque
+      <code>RoundState</code> string; math owns its shape.
+    </p>
+
+    <h2 data-section="§ 2">Module shape</h2>
+
+    <pre><code>{`return {
+  kind = "complex", name = "mines", version = "0.1.0", rtp = 0.97,
+
+  open  = function(prev, ctx)        return { state, ops, awaiting? } end,
+  step  = function(state, action)    return { state, ops, awaiting? } end,
+  close = function(state)            return { multiplier, ops, type, carry?, next_mode? } end,
+  is_terminal = function(state)      return boolean end,
+  -- autoclose? = function(state) ... end   -- optional resolver
+}`}</code></pre>
+
+    <h2 data-section="§ 3">Awaiting hint</h2>
+
+    <p>
+      Present → orchestrator stays open, client must STEP.
+      Absent → <code>is_terminal</code> must return <code>true</code>
+      and the client must CLOSE.
+    </p>
+
+    <pre><code>{`awaiting = {
+  type     = "pick_cell",          -- enforced; mismatched STEP → INVALID_ACTION
+  options  = { 0, 1, 2, ..., 24 }, -- optional whitelist
+  deadline = 30000,                -- optional ms before autoclose fires
+  prompt   = "Pick a tile",
+}`}</code></pre>
+
+    <h2 data-section="§ 4">Mines (full reference)</h2>
+
+    <p>
+      25 cells, N mines, RTP-tuned multiplier ladder. <code>open</code>
+      rolls the bomb grid and commits it to <code>state</code>. Each
+      <code>step</code> reveals one cell; a bomb ends the round, a safe
+      pick grows the multiplier. <code>close</code> cashes out the
+      current ladder value. The grid is committed once, so every pick is
+      provably-fair against a single roll.
+    </p>
+
+    <pre><code>{`-- maths/mines.lua
+local cjson = require("cjson")
+
+local LADDER = {                 -- multipliers[mines_count][picks_safe]
+  [3] = { 1.06, 1.18, 1.32, 1.49, 1.69, 1.94, 2.25, 2.62, --[[ ... ]] },
+  [5] = { 1.13, 1.34, 1.61, 1.95, 2.39, 2.97, 3.74, 4.78, --[[ ... ]] },
+}
+
+local function roll_bombs(n_mines)
+  local cells, bombs = {}, {}
+  for i = 0, 24 do cells[#cells+1] = i end
+  -- Fisher-Yates with the orchestrator's RNG
+  for i = 25, 2, -1 do
+    local j = 1 + math.floor(host.rng_next() * i)
+    cells[i], cells[j] = cells[j], cells[i]
+  end
+  for i = 1, n_mines do bombs[cells[i]] = true end
+  return bombs
+end
+
+return {
+  kind = "complex", name = "mines", version = "0.1.0", rtp = 0.97,
+
+  open = function(_prev, ctx)
+    local mines = (ctx.params and ctx.params.mines) or 3
+    if not LADDER[mines] then mines = 3 end
+    local bombs = roll_bombs(mines)
+    local state = cjson.encode({ mines = mines, bombs = bombs, picks = {}, busted = false })
+    return {
+      state    = state,
+      ops      = { { kind = "open", mines = mines, grid = 25 } },
+      awaiting = { type = "pick_cell", prompt = "Pick a tile" },
+    }
+  end,
+
+  step = function(state_json, action)
+    local s = cjson.decode(state_json)
+    local cell = action.cell
+    if type(cell) ~= "number" or cell < 0 or cell > 24 then
+      error("INVALID_ACTION: bad cell")
+    end
+    s.picks[#s.picks + 1] = cell
+    if s.bombs[tostring(cell)] or s.bombs[cell] then
+      s.busted = true
+      return {
+        state = cjson.encode(s),
+        ops   = { { kind = "reveal", cell = cell, bomb = true } },
+        -- no awaiting → round terminal; client must CLOSE
+      }
+    end
+    local safe_picks = #s.picks
+    local m = LADDER[s.mines][safe_picks] or 0
+    return {
+      state    = cjson.encode(s),
+      ops      = { { kind = "reveal", cell = cell, bomb = false, multiplier = m } },
+      awaiting = { type = "pick_cell", prompt = "Pick again or cash out" },
+      -- The client signals "cash out" by sending CLOSE instead of STEP.
+    }
+  end,
+
+  is_terminal = function(state_json)
+    local s = cjson.decode(state_json)
+    return s.busted or #s.picks >= (25 - s.mines)
+  end,
+
+  close = function(state_json)
+    local s = cjson.decode(state_json)
+    local m = s.busted and 0 or (LADDER[s.mines][#s.picks] or 0)
+    return {
+      multiplier = m,
+      type       = m > 0 and "cashout" or "bust",
+      ops        = { { kind = "settle", multiplier = m } },
+    }
+  end,
+}`}</code></pre>
+
+    <h2 data-section="§ 5">Other instant-game patterns</h2>
+
+    <table>
+      <thead><tr><th>Game</th><th>Open</th><th>Step</th><th>Close</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Chicken Road</td>
+          <td>roll bomb-lane sequence</td>
+          <td><code>&#123; type = "cross" &#125;</code> advances one lane</td>
+          <td>cash out current multiplier</td>
+        </tr>
+        <tr>
+          <td>Tower / Limbo</td>
+          <td>roll safe column per row</td>
+          <td><code>&#123; type = "pick", col = N &#125;</code></td>
+          <td>cash out current row</td>
+        </tr>
+        <tr>
+          <td>Crash (Aviator-style)</td>
+          <td>roll crash multiplier, emit tick stream as ops</td>
+          <td>—</td>
+          <td>cash out at current tick</td>
+        </tr>
+        <tr>
+          <td>Gamble / double-or-take</td>
+          <td>seed with previous win</td>
+          <td><code>&#123; type = "gamble" | "take" &#125;</code></td>
+          <td>settle final multiplier</td>
+        </tr>
+        <tr>
+          <td>Pick bonus (slot feature)</td>
+          <td>roll prize pool</td>
+          <td><code>&#123; type = "pick", idx = N &#125;</code></td>
+          <td>sum revealed prizes</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="mute">
+      Crash games skip STEP entirely: one OPEN, the client streams the
+      tick visual, then sends CLOSE the instant the player taps "cash
+      out". If the player never taps, the wallet (or admin) fires an
+      external autoclose — see <a href="/admin">Admin</a>.
+    </p>
+
+    <h2 data-section="§ 6">Reconnect &amp; resume</h2>
+
+    <p>
+      If a player drops mid-round and reconnects with the same session,
+      the next <code>INIT_RESPONSE</code> carries a <code>resume</code>
+      payload: full cumulative <code>ops</code>, the player's
+      <code>actionLog</code>, and the current <code>awaiting</code>
+      hint. The client replays ops to rebuild visuals, then renders the
+      awaiting prompt.
+    </p>
+
+    <h2 data-section="§ 7">Autoclose</h2>
+
+    <p class="mute">
+      RGS-side autoclose is <strong>never timer-driven</strong>. It is
+      always initiated by an external signal: a
+      <code>autocloseRequested</code> platform event from the wallet, or
+      a POST to <code>/admin/autoclose</code>. The resolver is
+      <code>math.autoclose(state)</code> if defined, otherwise the
+      manifest's <code>autoclose.policy</code>.
+    </p>
+
+    <nav class="related" aria-label="Related">
+      → <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/math">Math · simple</a> &middot;
+      <a href="/adapter">Adapter</a> &middot;
+      <a href="/admin">Admin</a> &middot;
+      <a href="/errors">Errors</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

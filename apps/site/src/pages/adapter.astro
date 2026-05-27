@@ -1,0 +1,168 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Platform adapter — open-rgs"
+  description="open-rgs PlatformAdapter interface: session lifecycle, simple + complex round settlement, promo free-rounds, and event stream."
+>
+  <main>
+    <h1>Platform adapter</h1>
+
+    <p class="lede">
+      One interface — <code>PlatformAdapter</code> — covers everything
+      upstream of the RGS: session lifecycle, money movement, free-round
+      promo free-rounds, and platform events. How it talks to the operator (one
+      WS, three microservices, REST + polling) is the integrator's call.
+    </p>
+
+    <h2 data-section="§ 1">Interface</h2>
+
+    <pre><code>{`interface PlatformAdapter {
+  connect(): Promise<void>;
+  disconnect(): void;
+  readonly isHealthy: boolean;
+  readonly diagnostics: Record<string, unknown>;
+
+  openSession(sessionId, connectionId): Promise<SessionInfo>;
+
+  settleSimple(req):    Promise<RoundReceipt>;   // simple round = 1 RPC
+  openComplex(req):     Promise<RoundReceipt>;   // complex = 2 RPCs
+  updateComplex?(req):  Promise<void>;           // optional audit, no money
+  closeComplex(req):    Promise<RoundReceipt>;
+
+  onEvent(handler: (e: PlatformEvent) => void): void;
+}`}</code></pre>
+
+    <h2 data-section="§ 2">Money flow</h2>
+
+    <table>
+      <thead><tr><th>Round shape</th><th>Wallet calls</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>simple (slot spin)</td><td><code>settleSimple(bet, win)</code></td><td>once per <code>SPIN_REQUEST</code></td></tr>
+        <tr><td>complex (Mines, Road)</td><td><code>openComplex(bet)</code></td><td>at <code>OPEN_REQUEST</code></td></tr>
+        <tr><td>complex (Mines, Road)</td><td><code>closeComplex(win)</code></td><td>at <code>CLOSE_REQUEST</code></td></tr>
+        <tr><td>complex — STEP</td><td><em>none</em></td><td>STEP is pure in-process</td></tr>
+      </tbody>
+    </table>
+
+    <p class="mute">
+      Two transactions per round, no exceptions. Mid-round
+      <code>step</code> calls never touch the wallet. If you need an
+      audit trail for in-flight state, implement the optional
+      <code>updateComplex</code> — the orchestrator calls it
+      fire-and-forget after each step; failures are logged, never
+      surfaced to the player.
+    </p>
+
+    <h2 data-section="§ 3">SessionInfo</h2>
+
+    <pre><code>{`{
+  sessionId, currency,
+  currencyDecimals,               // 2 = EUR/USD, 0 = JPY, 8 = BTC. Adapter sources it.
+  balance,                        // integer minor units (× 10^currencyDecimals)
+  allowedBets: number[],          // integer minor units
+  defaultBetIndex,
+  promo?:    PromoFreeRounds,
+  openRound?: OpenRoundResume,    // round in flight from a prior connection
+  carry?:     string,             // math's cross-round opaque blob (you stored it)
+  nextMode?:  string,             // math's hint, you stored it
+  mathVersion?: string,           // version that produced carry — discard on mismatch
+}`}</code></pre>
+
+    <p>
+      The adapter is the <em>source of truth</em> for cross-round state.
+      RGS stores nothing durable: it asks <code>openSession</code> for
+      <code>carry</code> / <code>nextMode</code> / <code>mathVersion</code>
+      and threads them into the next round's <code>math.play</code> or
+      <code>math.open</code>.
+    </p>
+
+    <h2 data-section="§ 4">Settle requests</h2>
+
+    <pre><code>{`SettleSimple = {
+  sessionId, bet, betIndex, priceMultiplier, win, multiplier, type,
+  roundState,            // this round's final math state, also the carry
+  nextMode?, mathVersion?, promoId?, idempotencyKey?,
+}
+
+OpenComplex = {
+  sessionId, bet, betIndex, priceMultiplier,
+  initialState,          // math's opening state blob
+  mathVersion?, promoId?, idempotencyKey?,
+}
+
+CloseComplex = {
+  sessionId, roundId,
+  finalState,            // THIS round's final math state
+  carry?,                // NEXT round's seed — adapter stores for return on openSession
+  nextMode?, mathVersion?,
+  win, multiplier, type, idempotencyKey?,
+}
+
+RoundReceipt = { roundId, balance, promo?: { remaining } }`}</code></pre>
+
+    <h2 data-section="§ 5">Event stream</h2>
+
+    <p>
+      The adapter pushes platform-originating events into the
+      orchestrator via the handler installed by <code>onEvent</code>.
+    </p>
+
+    <pre><code>{`type PlatformEvent =
+  | { type: "balanceChanged",    sessionId, balance, reason }
+  | { type: "sessionClosed",     sessionId, reason }
+  | { type: "promoGranted",      sessionId, promo }
+  | { type: "autocloseRequested", sessionId, roundId?, reason };`}</code></pre>
+
+    <p class="mute">
+      <code>autocloseRequested</code> is the wallet's way to tell RGS
+      to settle an in-flight complex round (e.g. session-end policy,
+      compliance trigger). RGS-side autoclose is never timer-driven —
+      always external.
+    </p>
+
+    <h2 data-section="§ 6">Numerics &amp; idempotency</h2>
+
+    <p>
+      All currency amounts are <strong>integers in the currency's
+      minimal unit</strong>. The unit is scaled by
+      <code>SessionInfo.currencyDecimals</code>: USD/EUR 1.00 → 100 when
+      decimals = 2, BTC 0.00000001 → 1 when decimals = 8, JPY 100 →
+      100 when decimals = 0. Adapters facing platforms that expect
+      decimal strings or floats convert at the boundary with
+      <code>toWireAmount</code> / <code>fromWireAmount</code> from
+      <code>@open-rgs/adapter-kit</code> — pick an explicit
+      <code>RoundingMode</code> (default <code>half_even</code>,
+      banker's rounding).
+    </p>
+    <p class="mute">
+      Every state-changing wallet RPC carries an
+      <code>idempotencyKey</code> (default: uuid-v4, 5 min TTL). Forward
+      it to the wallet if upstream supports dedupe; otherwise ignore it.
+      Configure via <code>createServer(&#123; idempotency &#125;)</code>.
+    </p>
+
+    <h2 data-section="§ 7">Authoring resources</h2>
+
+    <ul>
+      <li><code>@open-rgs/adapter-kit</code> — helpers for WS / HTTP RPC, error mapping, diagnostics</li>
+      <li><code>@open-rgs/adapter-test-kit</code> — conformance suite (run live or fixtures)</li>
+      <li><code>@open-rgs/platform-mock</code> — in-memory dev/test wallet with promo + autoclose helpers</li>
+      <li><a href="https://github.com/open-rgs/open-rgs/blob/main/specs/12-adapter-cookbook.md">specs/12 — adapter cookbook</a></li>
+    </ul>
+
+    <nav class="related" aria-label="Related">
+      → <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/math">Math · simple</a> &middot;
+      <a href="/complex">Math · complex</a> &middot;
+      <a href="/admin">Admin</a> &middot;
+      <a href="/errors">Errors</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

@@ -1,0 +1,33 @@
+{
+  "name": "@open-rgs/adapter-test-kit",
+  "version": "0.2.0",
+  "description": "Conformance test suite for PlatformAdapter implementations. Hand it any adapter; get back a checklist of what works.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/adapter-test-kit"
+  },
+  "homepage": "https://github.com/open-rgs/open-rgs",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": ["src", "README.md"],
+  "keywords": ["open-rgs", "adapter", "conformance", "testing"],
+  "bin": {
+    "open-rgs-adapter-conform": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@open-rgs/contract": "0.3.0"
+  }
+}

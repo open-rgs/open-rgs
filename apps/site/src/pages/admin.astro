@@ -1,0 +1,92 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Admin endpoints & probes — open-rgs"
+  description="open-rgs HTTP endpoints: /livez, /readyz, /healthz, /admin/logs, /admin/metrics, /admin/sessions, /admin/manifest, /admin/modes, /admin/autoclose."
+>
+  <main>
+    <h1>Admin &amp; probes</h1>
+
+    <p class="lede">
+      HTTP endpoints share the WS port by default (single-port mode).
+      Set <code>adminPort</code> on <code>createServer</code> to split
+      them onto a private listener.
+    </p>
+
+    <h2 data-section="§ 1">Routes</h2>
+
+    <table>
+      <thead><tr><th class="mono">Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">GET /livez</td><td>process alive — always 200</td></tr>
+        <tr><td class="mono">GET /readyz</td><td>200 if the platform adapter is connected, else 503</td></tr>
+        <tr><td class="mono">GET /healthz</td><td>JSON diagnostics: core / game version, math identity per mode, platform diagnostics. 503 if unhealthy</td></tr>
+        <tr><td class="mono">GET /admin/logs</td><td>ring buffer of recent log lines. Query <code>?level=&amp;limit=</code></td></tr>
+        <tr><td class="mono">GET /admin/metrics</td><td>Prometheus exposition (text format)</td></tr>
+        <tr><td class="mono">GET /admin/sessions</td><td>active session list</td></tr>
+        <tr><td class="mono">GET /admin/manifest</td><td>serialised <code>GameManifest</code></td></tr>
+        <tr><td class="mono">GET /admin/modes</td><td>client-visible mode catalog (excludes <code>internal: true</code>)</td></tr>
+        <tr><td class="mono">POST /admin/autoclose</td><td>external autoclose trigger: <code>&#123; sessionId, roundId?, reason &#125;</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2 data-section="§ 2">Suffix matching</h2>
+
+    <p>
+      Every route is <em>suffix-matched</em>. That means
+      <code>/healthz</code>, <code>/api/healthz</code>, and
+      <code>/api/&lt;gameId&gt;/healthz</code> all hit the same handler.
+      Works behind any ingress rewrite without configuration.
+    </p>
+
+    <h2 data-section="§ 3">/healthz shape</h2>
+
+    <pre><code>{`{
+  "status":        "ok" | "degraded",
+  "core_version":  "0.3.0",
+  "game_version":  "1.4.2",
+  "game_id":       "hello-spin",
+  "declared_rtp":  0.95,
+  "modes": {
+    "default": { "name": "hello", "version": "0.1.0", "kind": "simple",
+                 "rtp": 0.95, "hash": "<sha256>" }
+  },
+  "platform": { "healthy": true, "diagnostics": { ... } },
+  "uptime_s":   12345
+}`}</code></pre>
+
+    <h2 data-section="§ 4">POST /admin/autoclose</h2>
+
+    <pre><code>{`curl -X POST https://game.example.com/admin/autoclose \\
+  -H 'content-type: application/json' \\
+  -d '{ "sessionId": "abc-123", "reason": "ops-close" }'
+
+# 200 OK
+{ "closed": true, "roundId": "r_842" }
+
+# 200 OK (no round to close)
+{ "closed": false, "reason": "no_round_open" }`}</code></pre>
+
+    <p class="mute">
+      Autoclose is never timer-driven inside the RGS — every autoclose
+      is initiated by an external signal (this endpoint, or a wallet
+      <code>autocloseRequested</code> event). Keeps policy decisions
+      where they belong: upstream.
+    </p>
+
+    <nav class="related" aria-label="Related">
+      → <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/math">Math · simple</a> &middot;
+      <a href="/complex">Math · complex</a> &middot;
+      <a href="/adapter">Adapter</a> &middot;
+      <a href="/errors">Errors</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

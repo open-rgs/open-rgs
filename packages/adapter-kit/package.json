@@ -1,0 +1,35 @@
+{
+  "name": "@open-rgs/adapter-kit",
+  "version": "0.4.0",
+  "description": "Toolkit for building PlatformAdapter implementations. WS / HTTP RPC clients, error mapping, diagnostics scaffolding.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/adapter-kit"
+  },
+  "homepage": "https://github.com/open-rgs/open-rgs",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": ["src", "README.md"],
+  "keywords": ["open-rgs", "adapter", "platform-adapter", "websocket", "rpc"],
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@open-rgs/contract": "0.3.0",
+    "@open-rgs/log": "0.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
+  }
+}
