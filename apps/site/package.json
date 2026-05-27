@@ -1,0 +1,16 @@
+{
+  "name": "@open-rgs/site",
+  "type": "module",
+  "version": "0.2.0",
+  "private": true,
+  "description": "open-rgs.schmooky.dev  - docs and landing site",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^4.16.0"
+  }
+}

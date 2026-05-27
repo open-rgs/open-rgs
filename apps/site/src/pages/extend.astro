@@ -1,0 +1,216 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="You can extend (Lua, wallet, transport, metrics)  - open-rgs"
+  description="Extension points in open-rgs: plug your own wallet adapter, transport, Lua VM helpers, metrics registry, log formatter. Every plug point is one interface."
+>
+  <main>
+    <h1>You can extend...</h1>
+
+    <p class="lede">
+      Five plug points. Each is one interface in
+      <code>@open-rgs/contract</code>; pick the smallest one that
+      covers the change you want.
+    </p>
+
+    <h2 data-section="§ 1">The Lua VM (helpers, DSLs, native fast paths)</h2>
+
+    <p>
+      A <code>LuaExtension</code> is one of three things, often
+      combined: a pure-Lua module returned by
+      <code>require("&lt;name&gt;")</code>, a table of native (TS)
+      helpers merged into that module, or a pre-evaluation source
+      transform applied to every loaded file.
+    </p>
+
+    <pre><code>{`// boot file  - install an extension
+import { loadLuaMath } from "@open-rgs/core";
+import reels from "@open-rgs-ext/reels";
+
+const math = await loadLuaMath("./maths/spin.lua", { extensions: [reels] });`}</code></pre>
+
+    <pre><code>{`// write your own extension
+import type { LuaExtension } from "@open-rgs/contract";
+
+export default {
+  name:    "easing",
+  version: "0.1.0",
+  lua: \`
+    local M = {}
+    function M.lerp(a, b, t) return a + (b - a) * t end
+    return M
+  \`,
+  host: () => ({
+    fast_pow: (x: number, n: number) => x ** n,   // native, hot-path
+  }),
+} satisfies LuaExtension;`}</code></pre>
+
+    <pre><code>{`-- maths/spin.lua  - math sees the extension via require
+local easing = require("easing")
+local y = easing.lerp(0, 100, host.rng_next())
+local p = easing.fast_pow(1.05, 7)`}</code></pre>
+
+    <p class="mute">
+      Reference extension:
+      <a href="https://github.com/open-rgs/ext-reels"><code>@open-rgs-ext/reels</code></a>
+       - strip generation, payline evaluation, book-of utilities.
+      Deeper: <a href="/math">math reference</a>.
+    </p>
+
+    <h2 data-section="§ 2">The wallet</h2>
+
+    <p>
+      Implement <code>PlatformAdapter</code>. How you talk to the
+      operator (one WS, three microservices, REST + polling, gRPC) is
+      your call  - the orchestrator only sees the interface.
+    </p>
+
+    <pre><code>{`import type { PlatformAdapter } from "@open-rgs/contract";
+
+export class MyAdapter implements PlatformAdapter {
+  isHealthy   = false;
+  diagnostics = {};
+  async connect()    { /* open WS / dial / login */ this.isHealthy = true; }
+  disconnect()       { /* tear down */ }
+
+  async openSession(sid, conn)   { /* GET /sessions/:sid -> SessionInfo */ }
+  async settleSimple(req)        { /* POST /play  -> RoundReceipt */ }
+  async openComplex(req)         { /* POST /open  -> RoundReceipt */ }
+  async closeComplex(req)        { /* POST /close -> RoundReceipt */ }
+  onEvent(handler)               { /* wire WS push -> handler(event) */ }
+}`}</code></pre>
+
+    <p class="mute">
+      Helpers: <code>@open-rgs/adapter-kit</code> for WS/HTTP RPC
+      scaffolding, error mapping, diagnostics.
+      Conformance: <code>@open-rgs/adapter-test-kit</code> runs the
+      seven RPCs + event stream against your adapter.
+      Deeper: <a href="/adapter">adapter reference</a>.
+    </p>
+
+    <h2 data-section="§ 3">The transport</h2>
+
+    <p>
+      Implement <code>ClientTransport</code>. The default is
+      <code>binaryTransport</code>  - binary-msgpack over WebSocket. You
+      could write a JSON transport, HTTP long-poll, gRPC, anything
+      that produces typed <code>OrchestratorAPI</code> calls.
+    </p>
+
+    <pre><code>{`import type { ClientTransport, OrchestratorAPI } from "@open-rgs/contract";
+
+export function jsonTransport(opts: { port: number }): ClientTransport {
+  return {
+    async start(api: OrchestratorAPI) {
+      // dispatch incoming JSON frames into api.init / api.spin / api.openRound / ...
+      return { port: opts.port };
+    },
+    stop(o) { /* drain + close */ },
+    setExtraFetch(fn) { /* mount admin handler on the same Bun.serve */ },
+  };
+}`}</code></pre>
+
+    <p class="mute">
+      Implementing <code>setExtraFetch</code> lets
+      <code>createServer</code> mount <code>/admin/*</code> and probes
+      on your transport's port (single-port mode). Skip it and the
+      caller passes <code>adminPort</code> to get a separate listener.
+      Deeper: <a href="/wire">wire reference</a>.
+    </p>
+
+    <h2 data-section="§ 4">Metrics &amp; logs</h2>
+
+    <p>
+      Bring your own <code>RgsMetrics</code> registry, or use the
+      standard Prometheus one. Bring your own log formatter via
+      <code>@open-rgs/log</code> (bundled: <code>json</code>,
+      <code>console</code>, <code>server-core</code>).
+    </p>
+
+    <pre><code>{`import { createRgsMetrics } from "@open-rgs/core";
+import { log } from "@open-rgs/log";
+
+log.setFormat("json");                 // or "console" / "server-core" / a custom fn
+
+await createServer({
+  metrics: createRgsMetrics({ prefix: "myco_" }),
+  manifest, platform, transport,
+});`}</code></pre>
+
+    <p class="mute">
+      Metrics surface at <code>GET /admin/metrics</code>. Ring-buffered
+      logs at <code>GET /admin/logs?level=&limit=</code>.
+      Deeper: <a href="/admin">admin reference</a>.
+    </p>
+
+    <h2 data-section="§ 5">Simulator marks &amp; expectations</h2>
+
+    <p>
+      Annotate the math with <code>host.mark.*</code> calls and a
+      <code>expected</code> block. The orchestrator ignores both; the
+      simulator records them and reports deviations vs target.
+    </p>
+
+    <pre><code>{`return {
+  kind = "simple", name = "spin", version = "0.1.0", rtp = 0.95,
+  expected = {
+    hitRate         = { target = 0.32, tolerance = 0.01 },
+    rtpContribution = {
+      scatter   = { target = 0.18 },
+      paylines  = { target = 0.77 },
+    },
+  },
+  play = function(prev, ctx)
+    local m = roll()
+    if m > 0 then host.mark.tag("win") end
+    host.mark.contribute("paylines", m * 0.9)
+    host.mark.contribute("scatter",  m * 0.1)
+    return { multiplier = m, ops = { ... }, type = m > 0 and "win" or "loss" }
+  end,
+}`}</code></pre>
+
+    <p class="mute">
+      Marks are inert in production  - zero cost. Run a sim:
+      <code>bunx open-rgs-sim ./maths/spin.lua --spins 1e8</code>.
+      Reports: per-mode JSON, Markdown, HTML.
+    </p>
+
+    <h2 data-section="§ 6">Modes (ante, buy, freespins)</h2>
+
+    <p>
+      Multi-mode games are a manifest concern, not a math concern. Add
+      a mode with a <code>stakeMultiplier</code>, mark it
+      <code>internal: true</code> if only reachable via
+      <code>next_mode</code>, give it its own <code>declaredRtp</code>
+      and optional <code>maxWinMultiplier</code>.
+      Deeper: <a href="/boot">boot reference</a>.
+    </p>
+
+    <h2 data-section="§ 7">Idempotency</h2>
+
+    <p>
+      Configure the key generator + TTL at boot. Default is uuid-v4
+      with a 5-minute dedupe window. The key is forwarded to every
+      state-changing wallet RPC; the wallet may dedupe.
+    </p>
+
+    <pre><code>{`import { cuidV2 } from "@open-rgs/core/idempotency";
+
+await createServer({
+  idempotency: { generate: cuidV2, ttlMs: 600_000 },
+  manifest, platform, transport,
+});`}</code></pre>
+
+    <nav class="related" aria-label="Related">
+      -> <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build something</a> &middot;
+      <a href="/math">Math . simple</a> &middot;
+      <a href="/adapter">Adapter</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/admin">Admin</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

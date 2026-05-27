@@ -1,0 +1,20 @@
+{
+  "name": "hello-spin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal open-rgs game: one Lua spin math + MockPlatform. Boots in ~50 ms.",
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@open-rgs/core":          "0.5.0",
+    "@open-rgs/contract":      "0.3.0",
+    "@open-rgs/platform-mock": "0.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/bun": "latest"
+  }
+}

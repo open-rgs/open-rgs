@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>open-rgs simulation  - {{game.id}}</title>
+<meta name="color-scheme" content="light dark" />
+<script>
+  (function () {
+    try {
+      var pref = localStorage.getItem("orgs-sim-theme");
+      var sys = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = pref || sys;
+    } catch (e) { document.documentElement.dataset.theme = "light"; }
+  })();
+</script>
+<style>
+  :root {
+    --serif: ui-serif, Charter, "Iowan Old Style", "Source Serif 4", "Source Serif Pro", Georgia, serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  :root[data-theme="light"] {
+    --bg: #fbf9f3; --bg-soft: #f3f0e6; --bg-code: #f1ede0;
+    --fg: #1a1a1a; --fg-mute: #5a5650; --fg-faint: #8a857c;
+    --rule: #d8d3c4; --rule-soft: #ebe6d6;
+    --accent: #7a2f2f; --accent-soft: #b56b4a;
+    --ok: #4a6b3a; --warn: #b58040; --fail: #a93838;
+  }
+  :root[data-theme="dark"] {
+    --bg: #16140f; --bg-soft: #1d1b16; --bg-code: #1f1d17;
+    --fg: #e6e0d0; --fg-mute: #a09a8a; --fg-faint: #706a5e;
+    --rule: #2f2c24; --rule-soft: #25221c;
+    --accent: #d59879; --accent-soft: #c5775a;
+    --ok: #8db876; --warn: #d6a55c; --fail: #d6736e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.55;
+    font-feature-settings: "kern", "liga", "onum";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  main { max-width: 56rem; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+  .bar {
+    max-width: 56rem; margin: 0 auto; padding: 1.25rem 1.5rem;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--sans); font-size: 0.8125rem; color: var(--fg-mute);
+  }
+  .wordmark { font-family: var(--mono); font-size: 0.875rem; color: var(--fg); }
+  #theme-toggle {
+    background: none; border: 1px solid var(--rule); color: var(--fg-mute);
+    font-family: var(--sans); font-size: 0.75rem; padding: 0.25rem 0.625rem;
+    cursor: pointer; border-radius: 2px;
+  }
+  #theme-toggle:hover { color: var(--fg); border-color: var(--fg-mute); }
+  :root[data-theme="dark"] #theme-toggle .theme-dark,
+  :root[data-theme="light"] #theme-toggle .theme-light { display: none; }
+
+  h1 {
+    font-family: var(--serif); font-size: 2.25rem; line-height: 1.15;
+    margin: 0 0 0.5rem; font-weight: 600; letter-spacing: -0.015em;
+  }
+  h2 {
+    font-family: var(--serif); font-size: 1rem; font-weight: 700;
+    margin: 3rem 0 0.5rem; font-variant: small-caps; letter-spacing: 0.08em;
+    color: var(--fg); display: flex; align-items: baseline; gap: 0.625rem;
+  }
+  h2 .num {
+    font-family: var(--mono); font-size: 0.75rem; font-variant: normal;
+    letter-spacing: 0; color: var(--accent); font-weight: 400;
+  }
+  h3 {
+    font-family: var(--serif); font-size: 1.5rem; line-height: 1.2;
+    margin: 4rem 0 0.5rem; font-weight: 600; letter-spacing: -0.01em;
+    padding-top: 2rem; border-top: 1px solid var(--rule-soft);
+  }
+  h3:first-of-type { border-top: none; padding-top: 0; }
+  h3 .mode-label { color: var(--fg-mute); font-style: italic; font-weight: 400; font-size: 1rem; margin-left: 0.5rem; }
+  p { margin: 0 0 1rem; color: var(--fg); }
+  p.tagline { color: var(--fg-mute); font-size: 1rem; }
+  p.narrative {
+    font-style: italic; color: var(--fg);
+    border-left: 2px solid var(--accent); padding: 0.5rem 0 0.5rem 1rem;
+    margin: 1.25rem 0;
+  }
+  .meta {
+    font-family: var(--mono); font-size: 0.8125rem; color: var(--fg-mute);
+    margin: 0.5rem 0 1.5rem;
+  }
+  .meta .sep { color: var(--fg-faint); margin: 0 0.5rem; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1rem 1.5rem;
+    margin: 1.5rem 0 2rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .stat { display: flex; flex-direction: column; gap: 0.125rem; }
+  .stat .label {
+    font-family: var(--sans); font-size: 0.6875rem; color: var(--fg-mute);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .stat .value {
+    font-family: var(--serif); font-size: 1.25rem; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--fg);
+  }
+  .stat .value.muted { color: var(--fg-mute); font-weight: 400; font-size: 1rem; }
+
+  table {
+    border-collapse: collapse; width: 100%;
+    font-size: 0.9rem; margin: 1rem 0 2rem;
+  }
+  th, td {
+    text-align: left; padding: 0.5rem 0.75rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule-soft); vertical-align: top;
+  }
+  th {
+    font-family: var(--sans); font-weight: 600; font-size: 0.75rem;
+    color: var(--fg-mute); text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--rule);
+  }
+  td.mono, th.mono { font-family: var(--mono); font-size: 0.8125rem; }
+  td.num { font-family: var(--mono); font-size: 0.8125rem; text-align: right; }
+  th.num { text-align: right; }
+
+  .status {
+    display: inline-block; font-family: var(--mono); font-size: 0.7rem;
+    padding: 0.125rem 0.5rem; border-radius: 2px;
+    font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .status-ok   { color: var(--ok);   border: 1px solid var(--ok); }
+  .status-warn { color: var(--warn); border: 1px solid var(--warn); }
+  .status-fail { color: var(--fail); border: 1px solid var(--fail); }
+
+  .delta-pos { color: var(--ok); }
+  .delta-neg { color: var(--fail); }
+
+  .empty { color: var(--fg-faint); font-style: italic; font-size: 0.875rem; }
+
+  .footer {
+    margin-top: 4rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--rule-soft);
+    font-family: var(--sans); font-size: 0.75rem;
+    color: var(--fg-mute);
+    display: flex; justify-content: space-between;
+  }
+
+  details summary {
+    cursor: pointer; font-family: var(--sans); font-size: 0.8125rem;
+    color: var(--fg-mute); padding: 0.5rem 0;
+  }
+  details[open] summary { color: var(--fg); }
+
+  @media (max-width: 40rem) {
+    main { padding: 1.5rem 1rem 3rem; }
+    h1 { font-size: 1.75rem; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="wordmark">open-rgs . simulator</span>
+  <button id="theme-toggle" type="button" aria-label="Toggle theme">
+    <span class="theme-light">☉ light</span>
+    <span class="theme-dark">☽ dark</span>
+  </button>
+</header>
+
+<main>
+  <h1>Simulation  - {{game.id}}</h1>
+  <p class="tagline">
+    Declared game RTP <strong>{{pct game.declaredRtp}}</strong> . default mode <code>{{game.defaultMode}}</code>
+  </p>
+  <p class="meta">
+    generated <span title="{{generatedAt}}">{{generatedAt}}</span>
+    <span class="sep">.</span> {{generator}}
+    <span class="sep">.</span> {{reports.length}} mode{{#unless (eq reports.length 1)}}s{{/unless}}
+  </p>
+
+  <h2><span class="num">§</span>Summary</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>mode</th>
+        <th class="num">spins</th>
+        <th class="num">measured RTP</th>
+        <th class="num">declared</th>
+        <th class="num">delta</th>
+        <th class="num">hit rate</th>
+        <th>targets</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each reports}}
+      <tr>
+        <td class="mono">{{mode.id}}</td>
+        <td class="num">{{numLocale spins}}</td>
+        <td class="num">{{pct rtp.measured}}</td>
+        <td class="num">{{pct rtp.declared}}</td>
+        <td class="num {{#if (gt rtp.delta 0)}}delta-pos{{else}}delta-neg{{/if}}">{{pctSigned rtp.delta}}</td>
+        <td class="num">{{pct hitRate}}</td>
+        <td>{{> targetsBadge}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  {{#each reports}}
+    <h3>
+      {{mode.id}}
+      {{#if mode.label}}<span class="mode-label"> - {{mode.label}}</span>{{/if}}
+    </h3>
+    <p class="meta">
+      math <code>{{math.name}}@{{math.version}}</code> ({{math.kind}})
+      <span class="sep">.</span> stake x {{mode.stakeMultiplier}}
+      {{#if mode.internal}}<span class="sep">.</span> internal{{/if}}
+      <span class="sep">.</span> {{elapsedMs}}ms
+    </p>
+
+    <p class="narrative">{{narrative}}</p>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <span class="label">Measured RTP</span>
+        <span class="value">{{pct rtp.measured}}</span>
+      </div>
+      <div class="stat">
+        <span class="label">Declared RTP</span>
+        <span class="value muted">{{pct rtp.declared}}</span>
+      </div>
+      <div class="stat">
+        <span class="label">delta</span>
+        <span class="value {{#if (gt rtp.delta 0)}}delta-pos{{else}}delta-neg{{/if}}">{{pctSigned rtp.delta}}</span>
+      </div>
+      <div class="stat">
+        <span class="label">Hit Rate</span>
+        <span class="value">{{pct hitRate}}</span>
+      </div>
+      <div class="stat">
+        <span class="label">Spins</span>
+        <span class="value muted">{{numLocale spins}}</span>
+      </div>
+      <div class="stat">
+        <span class="label">Bet / Spin</span>
+        <span class="value muted">{{bet.unitsPerSpin}}u</span>
+      </div>
+      <div class="stat">
+        <span class="label">Max Multiplier</span>
+        <span class="value muted">{{fixed win.maxMultiplier 2}}x</span>
+      </div>
+      <div class="stat">
+        <span class="label">Stake x</span>
+        <span class="value muted">{{mode.stakeMultiplier}}</span>
+      </div>
+    </div>
+
+    {{#if deviations.length}}
+    <h2><span class="num">§</span>Targets vs measured</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>metric</th>
+          <th class="num">target</th>
+          <th class="num">measured</th>
+          <th class="num">delta</th>
+          <th class="num">tolerance</th>
+          <th>status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each deviations}}
+        <tr>
+          <td class="mono">{{key}}</td>
+          <td class="num">{{fixed target 4}}</td>
+          <td class="num">{{fixed measured 4}}</td>
+          <td class="num {{#if (gt delta 0)}}delta-pos{{else}}delta-neg{{/if}}">{{fixedSigned delta 4}}</td>
+          <td class="num">+/-{{fixed tolerance 4}}</td>
+          <td><span class="status status-{{status}}">{{status}}</span></td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    <h2><span class="num">§</span>Multiplier distribution</h2>
+    <table>
+      <thead><tr><th>stat</th><th class="num">value</th></tr></thead>
+      <tbody>
+        <tr><td>min</td><td class="num">{{fixed multiplier.min 4}}</td></tr>
+        <tr><td>mean</td><td class="num">{{fixed multiplier.mean 4}}</td></tr>
+        <tr><td>stddev</td><td class="num">{{fixed multiplier.stdDev 4}}</td></tr>
+        <tr><td>p50</td><td class="num">{{fixed multiplier.p50 4}}</td></tr>
+        <tr><td>p90</td><td class="num">{{fixed multiplier.p90 4}}</td></tr>
+        <tr><td>p95</td><td class="num">{{fixed multiplier.p95 4}}</td></tr>
+        <tr><td>p99</td><td class="num">{{fixed multiplier.p99 4}}</td></tr>
+        <tr><td>max</td><td class="num">{{fixed multiplier.max 4}}</td></tr>
+      </tbody>
+    </table>
+
+    {{#if (anyEntries outcomeTypes)}}
+    <h2><span class="num">§</span>Outcome types</h2>
+    <table>
+      <thead><tr><th>type</th><th class="num">count</th><th class="num">share</th></tr></thead>
+      <tbody>
+        {{#each (sortEntries outcomeTypes)}}
+        <tr><td class="mono">{{key}}</td><td class="num">{{numLocale value}}</td><td class="num">{{pct (div value ../spins)}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if (anyEntries nextModeRoutes)}}
+    <h2><span class="num">§</span>Next-mode routes</h2>
+    <table>
+      <thead><tr><th>target mode</th><th class="num">count</th><th class="num">share</th></tr></thead>
+      <tbody>
+        {{#each (sortEntries nextModeRoutes)}}
+        <tr><td class="mono">{{key}}</td><td class="num">{{numLocale value}}</td><td class="num">{{pct (div value ../spins)}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if (anyEntries counters)}}
+    <h2><span class="num">§</span>Counters <code>host.mark.count</code></h2>
+    <table>
+      <thead><tr><th>name</th><th class="num">total</th><th class="num">per spin</th></tr></thead>
+      <tbody>
+        {{#each (sortCounters counters)}}
+        <tr><td class="mono">{{key}}</td><td class="num">{{numLocale value.total}}</td><td class="num">{{fixed value.perSpin 5}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if (anyEntries observations)}}
+    <h2><span class="num">§</span>Observations <code>host.mark.observe</code></h2>
+    <table>
+      <thead><tr>
+        <th>name</th>
+        <th class="num">count</th>
+        <th class="num">mean</th>
+        <th class="num">stddev</th>
+        <th class="num">p50</th>
+        <th class="num">p90</th>
+        <th class="num">p99</th>
+        <th class="num">max</th>
+      </tr></thead>
+      <tbody>
+        {{#each (entries observations)}}
+        <tr>
+          <td class="mono">{{key}}</td>
+          <td class="num">{{numLocale value.count}}</td>
+          <td class="num">{{fixed value.mean 4}}</td>
+          <td class="num">{{fixed value.stdDev 4}}</td>
+          <td class="num">{{fixed value.p50 4}}</td>
+          <td class="num">{{fixed value.p90 4}}</td>
+          <td class="num">{{fixed value.p99 4}}</td>
+          <td class="num">{{fixed value.max 4}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if (anyEntries tagShares)}}
+    <h2><span class="num">§</span>Tag shares <code>host.mark.tag</code></h2>
+    <table>
+      <thead><tr><th>tag</th><th class="num">spins</th><th class="num">share</th></tr></thead>
+      <tbody>
+        {{#each (sortTags tagShares)}}
+        <tr><td class="mono">{{key}}</td><td class="num">{{numLocale value.spins}}</td><td class="num">{{pct value.share}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if (anyEntries rtpContributions)}}
+    <h2><span class="num">§</span>RTP contributions <code>host.mark.contribute</code></h2>
+    <table>
+      <thead><tr><th>bucket</th><th class="num">sum multiplier</th><th class="num">RTP share</th></tr></thead>
+      <tbody>
+        {{#each (sortContributions rtpContributions)}}
+        <tr><td class="mono">{{key}}</td><td class="num">{{fixed value.sumMultiplier 2}}</td><td class="num">{{pct value.rtpShare}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if complex}}
+    <h2><span class="num">§</span>Complex-round stats</h2>
+    <p>Average steps per round: <strong>{{fixed complex.averageStepsPerRound 2}}</strong></p>
+    {{/if}}
+
+  {{/each}}
+
+  <div class="footer">
+    <span>{{generator}}</span>
+    <span>{{generatedAt}}</span>
+  </div>
+</main>
+
+<script>
+  (function () {
+    var btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var cur = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+      var next = cur === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("orgs-sim-theme", next); } catch (e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>
+
+{{!-- Handlebars partial: targets summary badge for the summary table --}}
+{{#*inline "targetsBadge"}}
+{{#if deviations.length}}
+  {{#each (statusCounts deviations)}}<span class="status status-{{key}}">{{value}} {{key}}</span> {{/each}}
+{{else}}<span class="empty"> -</span>{{/if}}
+{{/inline}}

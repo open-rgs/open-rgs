@@ -1,0 +1,29 @@
+# HorizontalPodAutoscaler  - scale on CPU.
+#
+# RGS is CPU-bound under load (Lua math is the dominant cost). Memory is
+# bounded by session count which scales with concurrent connections, not
+# linearly with CPU. CPU is the right metric.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rgs-<game-id>
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rgs-<game-id>
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300

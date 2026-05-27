@@ -1,0 +1,27 @@
+{
+  "name": "open-rgs-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-rgs/open-rgs.git"
+  },
+  "homepage": "https://open-rgs.schmooky.dev",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p packages/contract && tsc --noEmit -p packages/log && tsc --noEmit -p packages/core && tsc --noEmit -p packages/platform-mock && tsc --noEmit -p packages/simulator && tsc --noEmit -p packages/adapter-kit && tsc --noEmit -p packages/adapter-test-kit && tsc --noEmit -p packages/client",
+    "test": "bun --filter '@open-rgs/simulator' test",
+    "site:dev": "npm --workspace apps/site run dev",
+    "site:build": "npm --workspace apps/site run build",
+    "site:preview": "npm --workspace apps/site run preview"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}

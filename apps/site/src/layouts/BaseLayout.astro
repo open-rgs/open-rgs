@@ -1,0 +1,362 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+  /** Optional schema.org @type  - "TechArticle" for doc pages, "WebSite" for landing. */
+  ogType?: string;
+}
+
+const {
+  title = "open-rgs",
+  description = "MIT-licensed Remote Game Server. Bun-native orchestrator, snap-in Lua maths, pluggable wallets, binary-msgpack transport.",
+  ogType = "article",
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://open-rgs.schmooky.dev").toString();
+const isLanding = Astro.url.pathname === "/" || Astro.url.pathname === "";
+
+// JSON-LD: SoftwareSourceCode on landing, TechArticle on doc pages.
+const jsonLd = isLanding
+  ? {
+      "@context": "https://schema.org",
+      "@type":    "SoftwareSourceCode",
+      "name":     "open-rgs",
+      "description": description,
+      "url":      canonical,
+      "codeRepository": "https://github.com/open-rgs/open-rgs",
+      "programmingLanguage": ["TypeScript", "Lua"],
+      "license":  "https://opensource.org/licenses/MIT",
+      "runtimePlatform": "Bun",
+      "applicationCategory": "DeveloperTool",
+    }
+  : {
+      "@context": "https://schema.org",
+      "@type":    "TechArticle",
+      "headline": title,
+      "description": description,
+      "url":      canonical,
+      "inLanguage": "en",
+      "isPartOf": { "@type": "WebSite", "name": "open-rgs", "url": "https://open-rgs.schmooky.dev/" },
+    };
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    {/* Open Graph */}
+    <meta property="og:type"        content={ogType} />
+    <meta property="og:site_name"   content="open-rgs" />
+    <meta property="og:title"       content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url"         content={canonical} />
+
+    {/* Twitter */}
+    <meta name="twitter:card"        content="summary" />
+    <meta name="twitter:title"       content={title} />
+    <meta name="twitter:description" content={description} />
+
+    {/* Structured data  - helps SEO and LLM/GEO indexing. */}
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <script is:inline>
+      // Pre-paint theme assignment to avoid flash. Default follows OS;
+      // a per-user choice persists via localStorage.
+      (function () {
+        try {
+          var pref = localStorage.getItem("theme");
+          var sys = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.theme = pref || sys;
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <slot />
+    <footer class="bar foot">
+      <span><a href="/" class="footmark">open-rgs</a> &middot; MIT</span>
+      <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+        <span class="theme-light" aria-hidden="true">☉ light</span>
+        <span class="theme-dark" aria-hidden="true">☽ dark</span>
+      </button>
+    </footer>
+
+    <script is:inline>
+      (function () {
+        var btn = document.getElementById("theme-toggle");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          var cur = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+          var next = cur === "dark" ? "light" : "dark";
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("theme", next); } catch (e) {}
+        });
+      })();
+    </script>
+
+    <style is:global>
+      :root {
+        --serif: ui-serif, Charter, "Iowan Old Style", "Source Serif 4", "Source Serif Pro", Georgia, serif;
+        --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+        --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+
+      /* Light theme  - warm paper, oxblood accent. */
+      :root[data-theme="light"] {
+        --bg:        #fbf9f3;
+        --bg-soft:   #f3f0e6;
+        --bg-code:   #f1ede0;
+        --fg:        #1a1a1a;
+        --fg-mute:   #5a5650;
+        --fg-faint:  #8a857c;
+        --rule:      #d8d3c4;
+        --rule-soft: #ebe6d6;
+        --accent:    #7a2f2f;
+        --accent-soft: #b56b4a;
+      }
+
+      /* Dark theme  - warm charcoal, terracotta accent. */
+      :root[data-theme="dark"] {
+        --bg:        #16140f;
+        --bg-soft:   #1d1b16;
+        --bg-code:   #1f1d17;
+        --fg:        #e6e0d0;
+        --fg-mute:   #a09a8a;
+        --fg-faint:  #706a5e;
+        --rule:      #2f2c24;
+        --rule-soft: #25221c;
+        --accent:    #d59879;
+        --accent-soft: #c5775a;
+      }
+
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      body {
+        font-family: var(--serif);
+        font-size: 17px;
+        line-height: 1.6;
+        font-feature-settings: "kern", "liga", "onum";
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      ::selection { background: var(--accent); color: var(--bg); }
+
+      /* Layout */
+      main {
+        max-width: 36rem;       /* ~600px reading column */
+        margin: 0 auto;
+        padding: 4rem 1.5rem 2rem;
+      }
+
+      /* Footer bar (no header  - landing + page link lists do navigation). */
+      .bar {
+        max-width: 36rem;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-family: var(--sans);
+        font-size: 0.8125rem;
+        color: var(--fg-mute);
+      }
+      .bar.foot {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+        border-top: 1px solid var(--rule-soft);
+        margin-top: 4rem;
+      }
+      .footmark {
+        font-family: var(--mono);
+        font-size: 0.875rem;
+        letter-spacing: -0.01em;
+        color: var(--fg-mute);
+        border-bottom: none;
+      }
+      .footmark:hover { color: var(--fg); }
+      #theme-toggle {
+        background: none;
+        border: 1px solid var(--rule);
+        color: var(--fg-mute);
+        font-family: var(--sans);
+        font-size: 0.75rem;
+        padding: 0.25rem 0.625rem;
+        cursor: pointer;
+        border-radius: 2px;
+      }
+      #theme-toggle:hover {
+        color: var(--fg);
+        border-color: var(--fg-mute);
+      }
+      :root[data-theme="dark"] #theme-toggle .theme-dark,
+      :root[data-theme="light"] #theme-toggle .theme-light { display: none; }
+
+      .dim { color: var(--fg-faint); }
+
+      /* Typography */
+      .lede {
+        font-size: 1.375rem;
+        line-height: 1.45;
+        color: var(--fg);
+        margin: 0 0 2rem;
+        font-style: italic;
+        font-feature-settings: "kern", "liga", "onum";
+      }
+      h1 {
+        font-family: var(--serif);
+        font-size: 2.25rem;
+        line-height: 1.15;
+        margin: 0 0 1rem;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+      }
+      h2 {
+        font-family: var(--serif);
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 3.5rem 0 0.75rem;
+        font-variant: small-caps;
+        letter-spacing: 0.08em;
+        color: var(--fg);
+        display: flex;
+        align-items: baseline;
+        gap: 0.625rem;
+      }
+      h2::before {
+        content: attr(data-section);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-variant: normal;
+        letter-spacing: 0;
+        color: var(--accent);
+        font-weight: 400;
+      }
+      p {
+        margin: 0 0 1rem;
+        color: var(--fg);
+      }
+      p.mute { color: var(--fg-mute); }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid var(--rule);
+      }
+      a:hover {
+        border-bottom-color: var(--accent);
+      }
+
+      /* Inline + block code */
+      code {
+        font-family: var(--mono);
+        font-size: 0.875em;
+        font-feature-settings: normal;
+      }
+      :not(pre) > code {
+        background: var(--bg-code);
+        padding: 0.05rem 0.3rem;
+        border-radius: 2px;
+        font-size: 0.825em;
+      }
+      pre {
+        font-family: var(--mono);
+        font-size: 0.8125rem;
+        line-height: 1.55;
+        background: var(--bg-code);
+        color: var(--fg);
+        padding: 1rem 1.125rem;
+        margin: 1.25rem 0;
+        overflow-x: auto;
+        border-radius: 2px;
+        border: 1px solid var(--rule-soft);
+      }
+      pre.diagram {
+        font-size: 0.6875rem;
+        line-height: 1.35;
+        background: var(--bg-soft);
+      }
+      pre.diagram .accent { color: var(--accent); }
+
+      /* Table */
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.9375rem;
+        margin: 1.25rem 0;
+      }
+      th, td {
+        text-align: left;
+        padding: 0.5rem 0.75rem 0.5rem 0;
+        border-bottom: 1px solid var(--rule-soft);
+        vertical-align: top;
+      }
+      th {
+        font-weight: 600;
+        font-size: 0.8125rem;
+        font-variant: small-caps;
+        letter-spacing: 0.06em;
+        color: var(--fg-mute);
+        border-bottom: 1px solid var(--rule);
+      }
+      td.mono, th.mono { font-family: var(--mono); font-size: 0.825rem; }
+      td.dir { color: var(--accent); font-family: var(--mono); font-size: 0.825rem; }
+
+      /* Lists */
+      ul, ol {
+        padding-left: 1.25rem;
+        margin: 0.75rem 0 1.25rem;
+      }
+      li { margin: 0.25rem 0; }
+
+      /* Topic-list on landing  - link + dim one-line description per row. */
+      ul.topics { list-style: none; padding-left: 0; }
+      ul.topics li { margin: 0.5rem 0; }
+      ul.topics .dim { color: var(--fg-faint); font-size: 0.9rem; }
+
+      /* Related-pages footer block on doc pages. */
+      nav.related {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--rule-soft);
+        font-family: var(--sans);
+        font-size: 0.8125rem;
+        color: var(--fg-mute);
+        line-height: 1.9;
+      }
+      nav.related a { color: var(--fg-mute); border-bottom: 1px solid var(--rule-soft); }
+      nav.related a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+      /* Subtle separator dingbat */
+      hr.ding {
+        border: 0;
+        text-align: center;
+        margin: 3rem 0;
+      }
+      hr.ding::after {
+        content: "❦";
+        color: var(--fg-faint);
+        font-size: 0.875rem;
+      }
+
+      @media (max-width: 32rem) {
+        main { padding: 2rem 1.25rem 2rem; }
+        h1 { font-size: 1.875rem; }
+        .lede { font-size: 1.1875rem; }
+        pre.diagram { font-size: 0.625rem; }
+      }
+    </style>
+  </body>
+</html>

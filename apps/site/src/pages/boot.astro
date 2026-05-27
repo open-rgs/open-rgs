@@ -1,0 +1,126 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Boot  - open-rgs"
+  description="Boot an open-rgs game server in one file: createServer config, GameManifest, ports, and graceful shutdown."
+>
+  <main>
+    <h1>Boot</h1>
+
+    <p class="lede">
+      A game server is one TypeScript file. It composes a
+      <code>GameManifest</code>, a <code>PlatformAdapter</code>, and a
+      <code>ClientTransport</code> and hands them to <code>createServer</code>.
+    </p>
+
+    <h2 data-section="§ 1">Minimum boot</h2>
+
+    <pre><code>{`import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
+import { defineGame } from "@open-rgs/contract";
+import { MockPlatform } from "@open-rgs/platform-mock";
+import pkg from "../package.json" with { type: "json" };
+
+const math = await loadLuaMath("./maths/spin.lua");
+
+const manifest = defineGame({
+  id:               "hello-spin",
+  declaredRtp:      0.95,
+  defaultMode:      "default",
+  maxWinMultiplier: 5000,
+  modes: {
+    default: { math, stakeMultiplier: 1 },
+  },
+});
+
+await createServer({
+  manifest,
+  platform:  new MockPlatform({ startingBalance: 100_00 }),
+  transport: binaryTransport({ port: Number(process.env.PORT ?? 80) }),
+  version:   pkg.version,
+  shutdownDrainMs: 30_000,
+});`}</code></pre>
+
+    <h2 data-section="§ 2">ServerConfig</h2>
+
+    <table>
+      <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>manifest</code></td><td>frozen <code>GameManifest</code> from <code>defineGame</code></td></tr>
+        <tr><td><code>platform</code></td><td>any <code>PlatformAdapter</code> implementation</td></tr>
+        <tr><td><code>transport</code></td><td>any <code>ClientTransport</code> implementation (use <code>binaryTransport</code>)</td></tr>
+        <tr><td><code>version</code></td><td>game version string, surfaced in <code>/healthz</code></td></tr>
+        <tr><td><code>adminPort</code></td><td>omit for single-port (admin on transport's port); set to split</td></tr>
+        <tr><td><code>idempotency</code></td><td><code>&#123; generate?, ttlMs? &#125;</code>  - default uuid-v4, 5 min TTL</td></tr>
+        <tr><td><code>shutdownDrainMs</code></td><td>drain window on SIGTERM/SIGINT, default 30 000</td></tr>
+        <tr><td><code>installSignalHandlers</code></td><td>default <code>true</code>; set <code>false</code> in tests</td></tr>
+        <tr><td><code>metrics</code></td><td>bring your own registry, else the standard one is created</td></tr>
+        <tr><td><code>isDev</code></td><td>override env-detected dev flag</td></tr>
+      </tbody>
+    </table>
+
+    <p class="mute">
+      <code>createServer</code> returns <code>&#123; stop, metrics &#125;</code>.
+      <code>stop()</code> drains in-flight requests, disconnects the
+      platform, and shuts admin + transport. Called automatically on
+      SIGTERM / SIGINT unless <code>installSignalHandlers: false</code>.
+    </p>
+
+    <h2 data-section="§ 3">GameManifest</h2>
+
+    <table>
+      <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>game identifier, lowercased URL-safe</td></tr>
+        <tr><td><code>declaredRtp</code></td><td>overall RTP for the certification record</td></tr>
+        <tr><td><code>modes</code></td><td><code>Record&lt;string, GameMode&gt;</code>  - see below</td></tr>
+        <tr><td><code>defaultMode</code></td><td>fallback mode when the client doesn't specify one</td></tr>
+        <tr><td><code>maxWinMultiplier</code></td><td>game-wide cap (x bet). Per-mode overrides supported</td></tr>
+        <tr><td><code>autoclose</code></td><td><code>&#123; idleMs, policy &#125;</code>  - settle-at-current / as-loss / hold / math-decides</td></tr>
+        <tr><td><code>recovery</code></td><td><code>&#123; onRestart: "resume" | "forfeit" | "autoclose" &#125;</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2 data-section="§ 4">GameMode</h2>
+
+    <pre><code>{`modes: {
+  default: { math, stakeMultiplier: 1,    declaredRtp: 0.95 },
+  ante:    { math, stakeMultiplier: 1.25, declaredRtp: 0.96, label: "Ante" },
+  buy:     { math, stakeMultiplier: 60,   declaredRtp: 0.96, label: "Buy bonus" },
+  freespins: { math: fsMath, stakeMultiplier: 0, internal: true }, // not client-requestable
+}`}</code></pre>
+
+    <p class="mute">
+      <code>stakeMultiplier</code> multiplies the bet ladder
+      (<code>allowedBets[betIndex] x priceMultiplier x stakeMultiplier</code>).
+      <code>internal: true</code> hides the mode from the client catalog  -
+      reachable only via another mode's <code>nextMode</code>.
+      <code>maxWinMultiplier</code> per mode overrides the manifest cap.
+    </p>
+
+    <h2 data-section="§ 5">Ports</h2>
+
+    <p>
+      Default (recommended): <strong>one port</strong>. The transport's
+      <code>Bun.serve</code> handles WS upgrade <em>and</em> mounts
+      <code>/livez</code>, <code>/readyz</code>, <code>/healthz</code>,
+      <code>/admin/*</code> on the same listener. Set
+      <code>adminPort</code> to split admin onto a private interface
+      (useful when ingress only exposes the public port).
+    </p>
+
+    <nav class="related" aria-label="Related">
+      -> <a href="/overview">How it works</a> &middot;
+      <a href="/build">Build</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/math">Math . simple</a> &middot;
+      <a href="/complex">Math . complex</a> &middot;
+      <a href="/adapter">Adapter</a> &middot;
+      <a href="/admin">Admin</a> &middot;
+      <a href="/errors">Errors</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

@@ -1,0 +1,189 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="You can build (slot, Mines, Chicken Road, crash, gamble)  - open-rgs"
+  description="Recipes for each common game shape: slots, instant-win, Mines, Chicken Road, Tower, crash games, gamble features, feature buys. The math file changes; the boot file stays."
+>
+  <main>
+    <h1>You can build...</h1>
+
+    <p class="lede">
+      Each game shape is one Lua file with a different return shape.
+      The boot file, transport, adapter, and admin stay the same.
+    </p>
+
+    <h2 data-section="§ 1">A slot, instant-win, dice, plinko (simple)</h2>
+
+    <p>
+      One math call per spin. Return a multiplier and ops. Core
+      multiplies by bet, settles via wallet in one RPC. Use this for
+      anything where the outcome is decided by a single roll.
+    </p>
+
+    <pre><code>{`-- maths/spin.lua
+return {
+  kind = "simple", name = "spin", version = "0.1.0", rtp = 0.95,
+  play = function(prev, ctx)
+    local r = host.rng_next()
+    local m = (r < 0.30 and 0.5) or (r < 0.40 and 2) or (r < 0.41 and 50) or 0
+    return {
+      multiplier = m,
+      ops        = { { kind = "result", multiplier = m } },
+      type       = m > 0 and "win" or "loss",
+    }
+  end,
+}`}</code></pre>
+
+    <p class="mute">
+      Reel-based slots? Add the <code>@open-rgs-ext/reels</code>
+      extension for strip / payline / book-of helpers.
+      Deeper: <a href="/math">simple math reference</a>.
+    </p>
+
+    <h2 data-section="§ 2">Mines, Chicken Road, Tower (complex, pick-style)</h2>
+
+    <p>
+      The bomb layout is rolled at <code>open</code> and committed to
+      state. Each <code>step</code> reveals one cell or advances one
+      lane. <code>close</code> cashes out the current multiplier. A
+      bomb hit makes the round terminal  - the client then sends CLOSE
+      to settle the bust.
+    </p>
+
+    <pre><code>{`return {
+  kind = "complex", name = "mines", version = "0.1.0", rtp = 0.97,
+
+  open = function(_prev, ctx)
+    -- roll bomb grid using host.rng_next(), commit to state
+    return { state = json_encode({ bombs = ..., picks = {} }),
+             ops      = { { kind = "open", grid = 25 } },
+             awaiting = { type = "pick_cell", prompt = "Pick a tile" } }
+  end,
+
+  step = function(state, action)
+    -- decode state, reveal action.cell, grow multiplier or bust
+    -- absent awaiting -> terminal -> client must CLOSE
+  end,
+
+  is_terminal = function(state) return ... end,
+  close       = function(state) return { multiplier, ops, type = "cashout" } end,
+}`}</code></pre>
+
+    <p class="mute">
+      Cash-out is a CLOSE, not a STEP. STEP is reserved for actions
+      that change game state; CLOSE settles. Full working Mines:
+      <a href="/complex">complex math reference</a>.
+    </p>
+
+    <h2 data-section="§ 3">Crash (Aviator-style)</h2>
+
+    <p>
+      Single OPEN. Math rolls the crash multiplier, then streams a
+      tick sequence as <code>ops</code>. No STEP at all. The client
+      sends CLOSE the instant the player taps "cash out". If the player
+      never taps, an external <code>autocloseRequested</code> event
+      (from the wallet) or POST to <code>/admin/autoclose</code> fires
+      the close at the crash point.
+    </p>
+
+    <pre><code>{`open = function(_prev, _ctx)
+  local crash_at = roll_crash_curve()              -- e.g. 1.00 .. inf
+  local ticks = {}
+  for t = 1.00, crash_at, 0.01 do ticks[#ticks+1] = { kind = "tick", x = t } end
+  return {
+    state    = json_encode({ crash_at = crash_at, settled = false }),
+    ops      = ticks,                              -- client animates them
+    awaiting = { type = "cash_out", prompt = "Cash out before crash" },
+  }
+end,
+
+is_terminal = function(s) return json_decode(s).settled end,
+close       = function(s) return { multiplier = read_current_tick(s), ... } end,
+autoclose   = function(s) return { multiplier = 0, type = "crash", ... } end,`}</code></pre>
+
+    <h2 data-section="§ 4">Gamble / double-or-take (inside a slot)</h2>
+
+    <p>
+      A complex round seeded with the previous win. STEP carries
+      <code>&#123; type = "gamble" | "take" &#125;</code>. "take" closes
+      immediately at the current multiplier; "gamble" rolls and either
+      doubles or busts. Use it as a follow-up round after a normal slot
+      spin (<code>next_mode = "gamble"</code> on the slot's win).
+    </p>
+
+    <pre><code>{`return {
+  kind = "complex", name = "gamble", version = "0.1.0", rtp = 1.0,
+
+  open = function(prev, _ctx)
+    local seed = tonumber(prev) or 0
+    return {
+      state = json_encode({ mult = 1, base_win = seed }),
+      ops   = { { kind = "gamble_open", base_win = seed } },
+      awaiting = { type = "gamble_action", options = { "gamble", "take" } },
+    }
+  end,
+
+  step = function(state, action)
+    local s = json_decode(state)
+    if action.type == "gamble_action" and action.choice == "take" then
+      return { state = json_encode(s) }            -- terminal (no awaiting)
+    end
+    if host.rng_next() < 0.5 then s.mult = s.mult * 2
+    else                          s.mult = 0; s.busted = true end
+    return {
+      state    = json_encode(s),
+      ops      = { { kind = "gamble_step", mult = s.mult } },
+      awaiting = not s.busted and { type = "gamble_action", options = { "gamble", "take" } } or nil,
+    }
+  end,
+  is_terminal = function(s) local d = json_decode(s); return d.busted or d.taken end,
+  close       = function(s) local d = json_decode(s); return { multiplier = d.mult, ... } end,
+}`}</code></pre>
+
+    <h2 data-section="§ 5">Feature buys (ante, buy bonus)</h2>
+
+    <p>
+      Buys are just another mode in the manifest with a higher
+      <code>stakeMultiplier</code>. The math can branch on
+      <code>ctx.mode</code>, or route into an internal "freespins" mode
+      via <code>next_mode</code> on the trigger round.
+    </p>
+
+    <pre><code>{`defineGame({
+  id: "scarlet-pact", declaredRtp: 0.96, defaultMode: "default",
+  modes: {
+    default:   { math, stakeMultiplier: 1,    declaredRtp: 0.959 },
+    ante:      { math, stakeMultiplier: 1.25, declaredRtp: 0.966, label: "Ante" },
+    buy:       { math, stakeMultiplier: 59,   declaredRtp: 0.958, label: "Buy FS" },
+    freespins: { math: fsMath, stakeMultiplier: 0, internal: true },
+  },
+});`}</code></pre>
+
+    <p class="mute">
+      <code>internal: true</code> hides the mode from the client's mode
+      catalog  - it's only reachable when another math returns
+      <code>next_mode = "freespins"</code>. Deeper:
+      <a href="/boot">boot reference</a>.
+    </p>
+
+    <h2 data-section="§ 6">What stays the same</h2>
+
+    <ul>
+      <li>The boot file (<code>createServer</code> + <code>defineGame</code>) is identical regardless of game shape.</li>
+      <li>The wire protocol is the same set of frame codes for every game.</li>
+      <li>The wallet adapter is unchanged  - it doesn't care what the math does.</li>
+      <li>Admin, probes, metrics, logs, autoclose: all wired by core.</li>
+    </ul>
+
+    <nav class="related" aria-label="Related">
+      -> <a href="/overview">How it works</a> &middot;
+      <a href="/extend">Extend</a> &middot;
+      <a href="/math">Math . simple</a> &middot;
+      <a href="/complex">Math . complex</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

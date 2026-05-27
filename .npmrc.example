@@ -1,0 +1,12 @@
+# GitLab npm registry  - project 80565772.
+#
+# Reads ${GITLAB_TOKEN} from environment. Locally:
+#   export GITLAB_TOKEN=glpat-xxxxxxxxxx
+# In GitLab CI, CI_JOB_TOKEN works automatically  - switch the auth line
+# to use ${CI_JOB_TOKEN} when running in pipelines.
+#
+# Don't commit a real token here. .gitignore should already exclude
+# anything that looks like one.
+
+@open-rgs:registry=https://gitlab.com/api/v4/projects/80565772/packages/npm/
+//gitlab.com/api/v4/projects/80565772/packages/npm/:_authToken=${GITLAB_TOKEN}

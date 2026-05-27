@@ -1,0 +1,129 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="How it works (mile-high)  - open-rgs"
+  description="Mile-high overview of open-rgs: client transport, orchestrator, Lua math, platform adapter. One Bun process, one port, four interchangeable parts."
+>
+  <main>
+    <h1>How it works</h1>
+
+    <p class="lede">
+      One Bun process. One port. Four parts. Each part is one interface
+      in <code>@open-rgs/contract</code>  - swap any of them without
+      touching the others.
+    </p>
+
+    <h2 data-section="§ 1">The picture</h2>
+
+    <pre class="diagram"><code>{`            +-------------------------------+
+            |             CLIENT            |
+            +----------------+--------------+
+                             |
+                             |  binary-msgpack over ws
+                             |  frame = [type][msgpack]
+                             v
+            +-------------------------------+
+            |           TRANSPORT           |
+            +-------------------------------+
+            |         ORCHESTRATOR          | ◀---- admin http
+            |   +-----------------------+   |       /livez /healthz
+            |   |   Lua math (wasmoon)  |   |       /admin/manifest
+            |   +-----------------------+   |       /admin/autoclose
+            +----------------+--------------+
+                             |
+                             |  PlatformAdapter
+                             |  openSession . settleSimple
+                             |  openComplex . closeComplex
+                             v
+            +-------------------------------+
+            |       PLATFORM ADAPTER        |
+            +----------------+--------------+
+                             |  operator wire  - one WS, or
+                             |  three services, your call
+                             |  (ws . rest . grpc . ...)
+                             v
+                          OPERATOR`}</code></pre>
+
+    <h2 data-section="§ 2">The four parts</h2>
+
+    <table>
+      <thead><tr><th>Part</th><th>Owns</th><th>You usually</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Transport</strong></td>
+          <td>WS upgrade, frame decode, admin HTTP on the same port</td>
+          <td>use the bundled <code>binaryTransport</code></td>
+        </tr>
+        <tr>
+          <td><strong>Orchestrator</strong></td>
+          <td>round lifecycle, mode resolution, bet computation, promo free-rounds, max-win cap, autoclose, metrics</td>
+          <td>never touch  - that's the framework</td>
+        </tr>
+        <tr>
+          <td><strong>Math</strong></td>
+          <td>RTP, ops, awaiting hints. Currency-blind. RNG injected via <code>host</code></td>
+          <td>write one Lua file per game shape</td>
+        </tr>
+        <tr>
+          <td><strong>Adapter</strong></td>
+          <td>session lifecycle, money movement, promo free-rounds, event stream</td>
+          <td>pick one (<code>platform-mock</code> dev, <code>adapter-your-provider</code> prod, or write your own)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 data-section="§ 3">A round, end to end</h2>
+
+    <table>
+      <thead><tr><th>Phase</th><th>Wire frame</th><th>Wallet RPC</th><th>Math call</th></tr></thead>
+      <tbody>
+        <tr><td>connect</td><td> -</td><td> -</td><td> -</td></tr>
+        <tr><td>init</td><td>INIT</td><td><code>openSession</code></td><td> -</td></tr>
+        <tr><td>simple spin</td><td>SPIN</td><td><code>settleSimple</code></td><td><code>play</code></td></tr>
+        <tr><td>complex open</td><td>OPEN</td><td><code>openComplex</code></td><td><code>open</code></td></tr>
+        <tr><td>complex step (x N)</td><td>STEP</td><td> -</td><td><code>step</code></td></tr>
+        <tr><td>complex close</td><td>CLOSE</td><td><code>closeComplex</code></td><td><code>close</code></td></tr>
+        <tr><td>autoclose (external)</td><td> -</td><td><code>closeComplex</code></td><td><code>autoclose</code> | policy</td></tr>
+        <tr><td>resume</td><td>INIT (with resume payload)</td><td><code>openSession</code></td><td> -</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Money moves <strong>once per simple round</strong> and
+      <strong>twice per complex round</strong>  - never more. STEP is
+      pure in-process: the math computes the next visual + state, no
+      wallet is touched. Cash-out on a Mines / Chicken-Road style round
+      is a client-initiated CLOSE, not a special STEP.
+    </p>
+
+    <h2 data-section="§ 4">State boundary</h2>
+
+    <p>
+      RGS owns nothing durable. The wallet adapter is the source of
+      truth for balance, sessions, and cross-round carry. Math state
+      lives in-memory and rebuilds on reconnect from the adapter's
+      stored <code>carry</code> blob. Sessions evaporate on restart and
+      reappear on the next <code>INIT</code>.
+    </p>
+
+    <h2 data-section="§ 5">What's on disk</h2>
+
+    <pre><code>{`hello-spin/
++-- package.json          # @open-rgs/core + @open-rgs/contract + your adapter
++-- src/index.ts          # one file  - boots createServer
++-- maths/spin.lua        # one file  - your math
++-- Dockerfile            # bun, one port, HEALTHCHECK on /readyz
++-- .env                  # adapter creds (never committed)`}</code></pre>
+
+    <nav class="related" aria-label="Related">
+      -> <a href="/build">Build something</a> &middot;
+      <a href="/extend">Extend something</a> &middot;
+      <a href="/boot">Boot</a> &middot;
+      <a href="/wire">Wire</a> &middot;
+      <a href="/complex">Complex rounds</a> &middot;
+      <a href="/">Home</a>
+    </nav>
+  </main>
+</BaseLayout>

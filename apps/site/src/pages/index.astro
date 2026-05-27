@@ -1,0 +1,61 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="open-rgs  - MIT Remote Game Server in one Bun file"
+  description="MIT Remote Game Server. Bun runtime, snap-in Lua maths, pluggable wallet adapters, binary-msgpack on the wire. Slots, Mines, Chicken-Road, crash  - one boot file each."
+  ogType="website"
+>
+  <main>
+    <h1>open-rgs</h1>
+
+    <p class="lede">
+      A small, MIT-licensed Remote Game Server. One Bun file boots a
+      WebSocket, a Lua math module, and a wallet adapter.
+    </p>
+
+    <pre><code>bun add @open-rgs/core @open-rgs/contract @open-rgs/platform-mock</code></pre>
+
+    <pre><code>{`import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
+import { defineGame } from "@open-rgs/contract";
+import { MockPlatform } from "@open-rgs/platform-mock";
+
+await createServer({
+  manifest: defineGame({
+    id: "hello", declaredRtp: 0.95, defaultMode: "default",
+    modes: { default: { math: await loadLuaMath("./maths/spin.lua"), stakeMultiplier: 1 } },
+  }),
+  platform:  new MockPlatform({ startingBalance: 100_00 }),
+  transport: binaryTransport({ port: 80 }),
+});`}</code></pre>
+
+    <h2 data-section="§ start">Start here</h2>
+
+    <ul class="topics">
+      <li><a href="/overview">How it works</a>  - <span class="dim">mile-high: the four parts and how a round flows through them</span></li>
+      <li><a href="/build">You can build...</a>  - <span class="dim">slot, Mines, Chicken-Road, crash, gamble, feature buys  - the math file changes, everything else stays</span></li>
+      <li><a href="/extend">You can extend...</a>  - <span class="dim">plug your own wallet, transport, Lua VM helpers, metrics, log formatter</span></li>
+    </ul>
+
+    <h2 data-section="§ docs">Reference</h2>
+
+    <ul class="topics">
+      <li><a href="/boot">Boot</a>  - <span class="dim">createServer config, manifest, ports, shutdown</span></li>
+      <li><a href="/wire">Wire</a>  - <span class="dim">binary-msgpack frames and payload shapes</span></li>
+      <li><a href="/math">Math . simple</a>  - <span class="dim">single-call rounds: slots, instant-win, dice, plinko</span></li>
+      <li><a href="/complex">Math . complex</a>  - <span class="dim">open / step / close: Mines, Chicken-Road, gamble, crash</span></li>
+      <li><a href="/adapter">Platform adapter</a>  - <span class="dim">wallet, sessions, money flow</span></li>
+      <li><a href="/admin">Admin &amp; probes</a>  - <span class="dim">/livez, /readyz, /healthz, /admin/*, metrics</span></li>
+      <li><a href="/errors">Errors</a>  - <span class="dim">canonical error vocabulary</span></li>
+    </ul>
+
+    <h2 data-section="§ source">Source</h2>
+
+    <ul class="topics">
+      <li><a href="https://github.com/open-rgs/open-rgs">GitHub</a>  - <span class="dim">code, issues, releases</span></li>
+      <li><a href="https://github.com/open-rgs/open-rgs/tree/main/specs">Spec corpus</a>  - <span class="dim">design corpus and ADRs</span></li>
+      <li><a href="https://github.com/open-rgs/open-rgs/blob/main/LICENSE">MIT License</a></li>
+    </ul>
+  </main>
+</BaseLayout>
