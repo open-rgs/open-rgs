@@ -9,9 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@open-rgs/core": "0.5.0",
-    "@open-rgs/contract": "0.3.1",
-    "@open-rgs/platform-mock": "0.3.0"
+    "@open-rgs/core":          "^0.5.1",
+    "@open-rgs/contract":      "^0.3.1",
+    "@open-rgs/platform-mock": "^0.3.1"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
