@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/adapter-test-kit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Conformance test suite for PlatformAdapter implementations. Hand it any adapter; get back a checklist of what works.",
   "license": "MIT",
   "repository": {
@@ -19,8 +19,16 @@
     "access": "public",
     "provenance": true
   },
-  "files": ["src", "README.md"],
-  "keywords": ["open-rgs", "adapter", "conformance", "testing"],
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "adapter",
+    "conformance",
+    "testing"
+  ],
   "bin": {
     "open-rgs-adapter-conform": "src/cli.ts"
   },
