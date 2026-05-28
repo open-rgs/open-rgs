@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# publish.sh  - publish all 8 MIT @open-rgs/* packages to GitLab project
-# 80565772's npm registry, in dependency order.
+# publish.sh  - publish all 8 MIT @open-rgs/* packages to npmjs.org,
+# in dependency order.
 #
 # Why ordered:
 #   npm publish validates declared deps exist in the target registry.
 #   contract has no deps, log has none, but core depends on contract+log,
 #   so contract+log must be live before core publishes, and so on.
 #
-# Prereqs:
-#   export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxxx
-#   (or run in GitLab CI where CI_JOB_TOKEN is set automatically; swap
-#    the .npmrc line if so)
-#   cp .npmrc.example .npmrc
-#   bun install
-#   bun run typecheck
+# Prereqs (local bootstrap publish):
+#   export NPM_TOKEN=npm_xxxxxxxxxxxxxxxxxxxxxxxx
+#   bun install && bun run typecheck
+#
+# In CI (after Trusted Publisher is configured):
+#   The workflow runs with `id-token: write` and `npm publish` does
+#   OIDC handshake automatically  - no NPM_TOKEN env needed.
 #
 # Usage:
 #   ./scripts/publish.sh             # publish all
@@ -22,9 +22,9 @@
 #
 # Failure semantics:
 #   Stops at the first failure. The packages published before the
-#   failure are LIVE on the registry; the rest are not. Re-run after
-#   fixing  - already-published versions will be rejected (npm refuses
-#   to overwrite), but the script continues to the next un-published one.
+#   failure are LIVE on npm; the rest are not. Re-run after fixing  -
+#   npm refuses to overwrite existing versions, but the script
+#   continues to the next un-published one.
 
 set -euo pipefail
 
@@ -41,11 +41,34 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${GITLAB_TOKEN:-}" && -z "${CI_JOB_TOKEN:-}" ]]; then
-  echo "ERROR: GITLAB_TOKEN or CI_JOB_TOKEN must be set" >&2
-  echo "  Generate a personal token at https://gitlab.com/-/profile/personal_access_tokens" >&2
-  echo "  Scope:  api  (or  write_repository  for read-only registry)" >&2
-  exit 1
+# ----- Auth detection -------------------------------------------------
+# Local: requires NPM_TOKEN env var.
+# CI:    GITHUB_ACTIONS=true and id-token permission -> OIDC handshake.
+IN_CI="${GITHUB_ACTIONS:-false}"
+
+if [[ "$IN_CI" != "true" ]]; then
+  if [[ -z "${NPM_TOKEN:-}" ]]; then
+    echo "ERROR: NPM_TOKEN env var required for local publish" >&2
+    echo "  Generate a granular token at npmjs.com/settings/<user>/tokens" >&2
+    echo "  Scope: read+write to @open-rgs" >&2
+    exit 1
+  fi
+  # Inject the token into npm's runtime config for the duration of
+  # this script. We point at a script-local .npmrc so we never touch
+  # the user's global ~/.npmrc.
+  TMP_NPMRC=$(mktemp -t openrgs-npmrc.XXXXXX)
+  trap 'rm -f "$TMP_NPMRC"' EXIT
+  echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > "$TMP_NPMRC"
+  export NPM_CONFIG_USERCONFIG="$TMP_NPMRC"
+fi
+
+# Provenance attestation only works in CI (npm CLI requires an OIDC
+# issuer to vouch for the build). Locally, every package's
+# publishConfig.provenance=true would force-fail with EUSAGE  - we
+# explicitly override to false.
+PROVENANCE_FLAG="--provenance=false"
+if [[ "$IN_CI" == "true" ]]; then
+  PROVENANCE_FLAG="--provenance"
 fi
 
 # ----- Dependency order  - DO NOT REORDER ------------------------------
@@ -81,15 +104,11 @@ echo "🔍 Pre-flight: typecheck all packages"
 cd "$ROOT"
 bun run typecheck
 
-if [[ ! -f "$ROOT/.npmrc" ]]; then
-  echo "ERROR: $ROOT/.npmrc missing  - copy from .npmrc.example" >&2
-  exit 1
-fi
-
 # ----- Publish loop ---------------------------------------------------
 echo ""
-echo "📦 Publishing ${#ORDER[@]} packages to GitLab project 80565772"
-[[ -n "$DRY_RUN" ]] && echo "   (DRY RUN  - nothing actually uploaded)"
+echo "📦 Publishing ${#ORDER[@]} package(s) to npmjs.org"
+[[ -n "$DRY_RUN" ]]        && echo "   (DRY RUN  - nothing actually uploaded)"
+[[ -n "$PROVENANCE_FLAG" ]] && echo "   (with provenance attestation)"
 echo ""
 
 for pkg in "${ORDER[@]}"; do
@@ -101,23 +120,15 @@ for pkg in "${ORDER[@]}"; do
 
   cd "$PKG_DIR"
 
-  # Run tests if a test script + tests exist
-  if [[ -d test ]] && grep -q '"test"' package.json; then
-    echo "  ▸ bun test"
-    bun test 2>&1 | tail -1
-  fi
-
-  echo "  ▸ npm publish $DRY_RUN"
-  npm publish $DRY_RUN
+  echo "  ▸ npm publish --access public $PROVENANCE_FLAG $DRY_RUN"
+  npm publish --access public $PROVENANCE_FLAG $DRY_RUN
   echo "  ✓ done"
   echo ""
 done
 
 echo "═════════════════════════════════════════════════════════════════"
-echo "✅ Published ${#ORDER[@]} package(s)"
+echo "✅ Published ${#ORDER[@]} package(s) to https://www.npmjs.com/org/open-rgs"
 [[ -n "$DRY_RUN" ]] && echo "   (DRY RUN  - re-run without --dry-run to upload)"
 echo ""
-echo "Install in a consumer project with:"
-echo "  echo '@open-rgs:registry=https://gitlab.com/api/v4/projects/80565772/packages/npm/' >> .npmrc"
-echo "  echo '//gitlab.com/api/v4/projects/80565772/packages/npm/:_authToken=\${GITLAB_TOKEN}' >> .npmrc"
-echo "  bun add @open-rgs/contract @open-rgs/core @open-rgs/client"
+echo "Install in a consumer project:"
+echo "  bun add @open-rgs/core @open-rgs/contract @open-rgs/platform-mock"

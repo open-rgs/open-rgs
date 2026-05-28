@@ -44,7 +44,7 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 - Real wallet adapter (use `MockPlatform` for dev; implement
   `PlatformAdapter` for a real platform)
 - Reel-based math (this is a single-roll RNG; use the
-  [`@open-rgs-ext/reels`](https://github.com/open-rgs/ext-reels)
+  [`@open-rgs/ext-reels`](https://github.com/open-rgs/ext-reels)
   extension for strip + payline + book-of helpers)
 - Complex rounds (Mines, Chicken-Road, crash)  - see the docs at
   <https://open-rgs.schmooky.dev/build>

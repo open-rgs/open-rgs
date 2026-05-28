@@ -117,7 +117,7 @@ Plug points (each is one interface):
 - **Metrics / logs** -> bring your own registry / formatter
 - **Idempotency** -> configurable per RPC
 
-Reference extension: [`@open-rgs-ext/reels`](https://github.com/open-rgs/ext-reels)  - strip generation, payline evaluation, book-of utilities.
+Reference extension: [`@open-rgs/ext-reels`](https://github.com/open-rgs/ext-reels)  - strip generation, payline evaluation, book-of utilities.
 
 How-to recipes: <https://open-rgs.schmooky.dev/extend>
 
