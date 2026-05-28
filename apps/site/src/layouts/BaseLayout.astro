@@ -103,6 +103,145 @@ const jsonLd = isLanding
       })();
     </script>
 
+    {/* Mermaid loader  - lazy-imports the lib from a CDN only when the
+        page actually has a diagram, then re-renders on theme toggle so
+        colors track the site palette. SVG output is unframed so
+        diagrams blend seamlessly into the reading column. */}
+    <script is:inline>
+      (function () {
+        var diagrams = document.querySelectorAll("[data-mermaid]");
+        if (diagrams.length === 0) return;
+
+        var sources = [];
+        for (var i = 0; i < diagrams.length; i++) {
+          var src = diagrams[i].querySelector(".mermaid-source");
+          sources.push(src ? src.textContent || "" : "");
+        }
+
+        function cssVar(name) {
+          return getComputedStyle(document.documentElement)
+            .getPropertyValue(name).trim();
+        }
+        function themeVars() {
+          return {
+            background:            cssVar("--bg"),
+            primaryColor:          cssVar("--bg-soft"),
+            primaryTextColor:      cssVar("--fg"),
+            primaryBorderColor:    cssVar("--rule"),
+            secondaryColor:        cssVar("--bg-code"),
+            secondaryBorderColor:  cssVar("--rule"),
+            secondaryTextColor:    cssVar("--fg"),
+            tertiaryColor:         cssVar("--bg"),
+            tertiaryBorderColor:   cssVar("--rule-soft"),
+            tertiaryTextColor:     cssVar("--fg-mute"),
+            lineColor:             cssVar("--fg-mute"),
+            textColor:             cssVar("--fg"),
+            mainBkg:               cssVar("--bg-soft"),
+            nodeBorder:            cssVar("--rule"),
+            clusterBkg:            cssVar("--bg"),
+            clusterBorder:         cssVar("--rule-soft"),
+            edgeLabelBackground:   cssVar("--bg"),
+            titleColor:            cssVar("--fg"),
+            /* sequence */
+            actorBkg:              cssVar("--bg-soft"),
+            actorBorder:           cssVar("--rule"),
+            actorTextColor:        cssVar("--fg"),
+            actorLineColor:        cssVar("--rule"),
+            signalColor:           cssVar("--fg-mute"),
+            signalTextColor:       cssVar("--fg"),
+            labelBoxBkgColor:      cssVar("--bg-soft"),
+            labelBoxBorderColor:   cssVar("--rule"),
+            labelTextColor:        cssVar("--fg"),
+            loopTextColor:         cssVar("--fg-mute"),
+            noteBkgColor:          cssVar("--bg-code"),
+            noteBorderColor:       cssVar("--rule"),
+            noteTextColor:         cssVar("--fg"),
+            activationBkgColor:    cssVar("--bg-code"),
+            activationBorderColor: cssVar("--rule"),
+            sequenceNumberColor:   cssVar("--bg"),
+            fontFamily:            cssVar("--sans"),
+            fontSize:              "14px",
+          };
+        }
+
+        var mermaidPromise = null;
+        function loadMermaid() {
+          if (mermaidPromise) return mermaidPromise;
+          mermaidPromise = import(
+            "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"
+          ).then(function (m) { return m.default; });
+          return mermaidPromise;
+        }
+
+        var renderToken = 0;
+        function renderAll() {
+          var myToken = ++renderToken;
+          return loadMermaid().then(function (mermaid) {
+            mermaid.initialize({
+              startOnLoad:   false,
+              theme:         "base",
+              themeVariables: themeVars(),
+              fontFamily:    cssVar("--sans"),
+              /* Diagram source is authored by us, never user input, so
+                 the looser DOMPurify profile (allows <br/>, span styles
+                 inside HTML labels) is safe and gives clean output. */
+              securityLevel: "loose",
+              flowchart:     { useMaxWidth: true, htmlLabels: true, curve: "basis", padding: 12 },
+              sequence:      { useMaxWidth: true, wrap: true, mirrorActors: false,
+                                messageFontSize: 13, actorFontSize: 14, noteFontSize: 12,
+                                boxMargin: 8, boxTextMargin: 4, noteMargin: 8 },
+            });
+            var chain = Promise.resolve();
+            diagrams.forEach(function (fig, idx) {
+              chain = chain.then(function () {
+                if (myToken !== renderToken) return;
+                var id = "mmd-r" + myToken + "-" + idx;
+                return mermaid.render(id, sources[idx]).then(
+                  function (out) {
+                    if (myToken !== renderToken) return;
+                    fig.innerHTML = out.svg;
+                    if (out.bindFunctions) out.bindFunctions(fig);
+                    fig.dataset.rendered = "1";
+                  },
+                  function (err) {
+                    console.error("mermaid render failed", err);
+                    fig.removeAttribute("data-rendered");
+                    fig.innerHTML =
+                      '<pre class="mermaid-source">' +
+                      escapeHTML(sources[idx]) +
+                      "</pre>";
+                  }
+                );
+              });
+            });
+            return chain;
+          }).catch(function (err) {
+            console.error("mermaid load failed", err);
+          });
+        }
+
+        function escapeHTML(s) {
+          return String(s).replace(/[&<>"']/g, function (c) {
+            return {
+              "&": "&amp;", "<": "&lt;", ">": "&gt;",
+              '"': "&quot;", "'": "&#39;",
+            }[c];
+          });
+        }
+
+        renderAll();
+
+        new MutationObserver(function (muts) {
+          for (var i = 0; i < muts.length; i++) {
+            if (muts[i].attributeName === "data-theme") {
+              renderAll();
+              break;
+            }
+          }
+        }).observe(document.documentElement, { attributes: true });
+      })();
+    </script>
+
     <style is:global>
       :root {
         --serif: ui-serif, Charter, "Iowan Old Style", "Source Serif 4", "Source Serif Pro", Georgia, serif;
@@ -290,6 +429,95 @@ const jsonLd = isLanding
       }
       pre.diagram .accent { color: var(--accent); }
 
+      /* Mermaid diagram  - seamless, no frame, blends into the page.
+         Source is shown briefly as a styled pre until the JS renderer
+         swaps in the SVG. If JS or the lib fails, the source remains
+         readable. */
+      figure.mermaid-diagram {
+        margin: 1.75rem 0;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        text-align: center;
+        overflow-x: auto;
+      }
+      figure.mermaid-diagram > pre.mermaid-source {
+        background: var(--bg-soft);
+        border: 0;
+        color: var(--fg-mute);
+        font-size: 0.75rem;
+        line-height: 1.45;
+        text-align: left;
+        margin: 0;
+        padding: 0.875rem 1rem;
+        border-radius: 2px;
+      }
+      figure.mermaid-diagram > svg {
+        max-width: 100%;
+        height: auto;
+        display: inline-block;
+      }
+      figure.mermaid-diagram[data-rendered] > pre.mermaid-source {
+        display: none;
+      }
+      figure.mermaid-diagram > figcaption {
+        margin-top: 0.5rem;
+        font-family: var(--sans);
+        font-size: 0.8125rem;
+        color: var(--fg-mute);
+        font-style: italic;
+      }
+      /* Force every text node inside Mermaid SVG to follow the site
+         typography + palette. Mermaid's inline styles sometimes pin
+         a font; the !important here is a deliberate override. */
+      figure.mermaid-diagram svg,
+      figure.mermaid-diagram svg foreignObject,
+      figure.mermaid-diagram svg foreignObject * {
+        font-family: var(--sans) !important;
+      }
+      figure.mermaid-diagram svg text,
+      figure.mermaid-diagram svg .nodeLabel,
+      figure.mermaid-diagram svg .edgeLabel,
+      figure.mermaid-diagram svg .messageText,
+      figure.mermaid-diagram svg .noteText,
+      figure.mermaid-diagram svg .labelText {
+        font-family: var(--sans) !important;
+        font-size: 13px;
+        fill: var(--fg);
+      }
+      /* Mermaid puts .actor on both the rect AND the text element, so
+         the rect's fill:actorBkg bleeds onto the text. Pin text fill
+         explicitly. */
+      figure.mermaid-diagram svg text.actor,
+      figure.mermaid-diagram svg .actor > text,
+      figure.mermaid-diagram svg text.actor-box,
+      figure.mermaid-diagram svg .actor-man text {
+        fill: var(--fg) !important;
+        font-family: var(--sans) !important;
+        font-size: 13px;
+      }
+      figure.mermaid-diagram svg .loopText,
+      figure.mermaid-diagram svg .loopText tspan {
+        fill: var(--fg-mute) !important;
+        font-family: var(--sans) !important;
+        font-size: 12px;
+      }
+      figure.mermaid-diagram svg .edgeLabel,
+      figure.mermaid-diagram svg .edgeLabel rect,
+      figure.mermaid-diagram svg .edgeLabel foreignObject div {
+        background-color: var(--bg) !important;
+        color: var(--fg) !important;
+      }
+      /* Code-style chunks inside labels  - for things like
+         openSession . settleSimple  - pick up the mono face. */
+      figure.mermaid-diagram svg .nodeLabel code,
+      figure.mermaid-diagram svg .edgeLabel code,
+      figure.mermaid-diagram svg .messageText code,
+      figure.mermaid-diagram svg foreignObject code {
+        font-family: var(--mono) !important;
+        font-size: 0.875em;
+      }
+
       /* Table */
       table {
         border-collapse: collapse;
@@ -356,6 +584,8 @@ const jsonLd = isLanding
         h1 { font-size: 1.875rem; }
         .lede { font-size: 1.1875rem; }
         pre.diagram { font-size: 0.625rem; }
+        figure.mermaid-diagram { margin: 1.25rem -0.25rem; }
+        figure.mermaid-diagram svg text { font-size: 12px; }
       }
     </style>
   </body>

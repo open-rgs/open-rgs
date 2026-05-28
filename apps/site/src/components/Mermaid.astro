@@ -1,0 +1,32 @@
+---
+/**
+ * Mermaid diagram, rendered client-side from CSS-variable-driven theme.
+ *
+ * The source ships as text inside a <pre>, so it stays visible/legible
+ * if JS fails, gets picked up by SEO + LLM crawlers, and degrades
+ * gracefully. The base layout includes a loader that lazy-imports
+ * mermaid (only on pages that actually use a diagram) and re-renders
+ * on theme toggle.
+ *
+ * Usage:
+ *   import Mermaid from "../components/Mermaid.astro";
+ *   <Mermaid code={`
+ *     flowchart TD
+ *       A --> B
+ *   `} />
+ */
+interface Props {
+  code: string;
+  /** Optional caption shown below the diagram. */
+  caption?: string;
+  /** Optional accessible label; falls back to "Diagram". */
+  label?: string;
+}
+const { code, caption, label = "Diagram" } = Astro.props;
+const trimmed = code.replace(/^\n+|\n+$/g, "");
+---
+
+<figure class="mermaid-diagram" data-mermaid aria-label={label}>
+  <pre class="mermaid-source">{trimmed}</pre>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
