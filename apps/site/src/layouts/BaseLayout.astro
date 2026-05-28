@@ -12,7 +12,7 @@ const {
   ogType = "article",
 } = Astro.props;
 
-const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://open-rgs.schmooky.dev").toString();
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://open-rgs.dev").toString();
 const isLanding = Astro.url.pathname === "/" || Astro.url.pathname === "";
 
 // JSON-LD: SoftwareSourceCode on landing, TechArticle on doc pages.
@@ -36,7 +36,7 @@ const jsonLd = isLanding
       "description": description,
       "url":      canonical,
       "inLanguage": "en",
-      "isPartOf": { "@type": "WebSite", "name": "open-rgs", "url": "https://open-rgs.schmooky.dev/" },
+      "isPartOf": { "@type": "WebSite", "name": "open-rgs", "url": "https://open-rgs.dev/" },
     };
 ---
 

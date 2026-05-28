@@ -7,19 +7,19 @@
 
 ## Start here
 
-- [How it works](https://open-rgs.schmooky.dev/overview): mile-high — the four parts (transport, orchestrator, Lua math, wallet adapter) and how a round flows through them
-- [You can build…](https://open-rgs.schmooky.dev/build): recipes per game shape — slot, Mines, Chicken Road, crash, gamble, feature buys. The math file changes, everything else stays
-- [You can extend…](https://open-rgs.schmooky.dev/extend): plug your own wallet, transport, Lua VM helpers, metrics, log formatter
+- [How it works](https://open-rgs.dev/overview): mile-high — the four parts (transport, orchestrator, Lua math, wallet adapter) and how a round flows through them
+- [You can build…](https://open-rgs.dev/build): recipes per game shape — slot, Mines, Chicken Road, crash, gamble, feature buys. The math file changes, everything else stays
+- [You can extend…](https://open-rgs.dev/extend): plug your own wallet, transport, Lua VM helpers, metrics, log formatter
 
 ## Reference
 
-- [Boot](https://open-rgs.schmooky.dev/boot): createServer config, GameManifest, ports, graceful shutdown
-- [Wire](https://open-rgs.schmooky.dev/wire): binary-msgpack frame format and full request/response payload shapes
-- [Math · simple](https://open-rgs.schmooky.dev/math): single-call Lua math for slots, instant-win, dice, plinko
-- [Math · complex](https://open-rgs.schmooky.dev/complex): open/step/close Lua math with a full Mines example; covers Chicken-Road, crash, gamble, hold-and-spin, pick bonuses
-- [Platform adapter](https://open-rgs.schmooky.dev/adapter): PlatformAdapter interface, money flow, session lifecycle, idempotency
-- [Admin & probes](https://open-rgs.schmooky.dev/admin): /livez, /readyz, /healthz, /admin/* endpoints, suffix-matched routes
-- [Errors](https://open-rgs.schmooky.dev/errors): canonical RGSErrorCode vocabulary
+- [Boot](https://open-rgs.dev/boot): createServer config, GameManifest, ports, graceful shutdown
+- [Wire](https://open-rgs.dev/wire): binary-msgpack frame format and full request/response payload shapes
+- [Math · simple](https://open-rgs.dev/math): single-call Lua math for slots, instant-win, dice, plinko
+- [Math · complex](https://open-rgs.dev/complex): open/step/close Lua math with a full Mines example; covers Chicken-Road, crash, gamble, hold-and-spin, pick bonuses
+- [Platform adapter](https://open-rgs.dev/adapter): PlatformAdapter interface, money flow, session lifecycle, idempotency
+- [Admin & probes](https://open-rgs.dev/admin): /livez, /readyz, /healthz, /admin/* endpoints, suffix-matched routes
+- [Errors](https://open-rgs.dev/errors): canonical RGSErrorCode vocabulary
 
 ## Source
 

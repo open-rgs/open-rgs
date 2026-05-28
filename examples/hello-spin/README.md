@@ -47,13 +47,13 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
   [`@open-rgs/ext-reels`](https://github.com/open-rgs/ext-reels)
   extension for strip + payline + book-of helpers)
 - Complex rounds (Mines, Chicken-Road, crash) — see the docs at
-  <https://open-rgs.schmooky.dev/build>
+  <https://open-rgs.dev/build>
 - Promo free-rounds, autoclose, FRC offers (supported by core; not
   exercised here)
 
 ## Next steps
 
-- Read [`apps/site` docs](https://open-rgs.schmooky.dev) for the full
+- Read [`apps/site` docs](https://open-rgs.dev) for the full
   picture
 - Run the `@open-rgs/simulator` against `maths/spin.lua` to validate
   RTP and hit rate

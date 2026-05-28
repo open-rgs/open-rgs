@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/open-rgs/open-rgs.git"
   },
-  "homepage": "https://open-rgs.schmooky.dev",
+  "homepage": "https://open-rgs.dev",
   "workspaces": [
     "packages/*",
     "apps/*",

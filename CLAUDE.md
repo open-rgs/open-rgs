@@ -37,7 +37,7 @@ open-rgs/
 │   ├── client/                @open-rgs/client — tiny WS client
 │   └── simulator/             @open-rgs/simulator — RTP simulator + reports
 └── apps/
-    └── site/                  Astro docs site → open-rgs.schmooky.dev
+    └── site/                  Astro docs site → open-rgs.dev
 ```
 
 ## What's shipped

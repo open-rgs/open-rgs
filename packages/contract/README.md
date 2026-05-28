@@ -20,7 +20,7 @@ bun add @open-rgs/contract
 
 ## Docs
 
-Full reference: <https://open-rgs.schmooky.dev>
+Full reference: <https://open-rgs.dev>
 
 ## License
 
