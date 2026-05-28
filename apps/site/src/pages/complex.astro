@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import Mermaid from "../components/Mermaid.astro";
 ---
 
 <BaseLayout
@@ -17,15 +18,35 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
     <h2 data-section="§ 1">Lifecycle</h2>
 
-    <pre class="diagram"><code>{`         openRound                         closeRound
-    ──────────────────►                ──────────────────►
-   client    debit    math.open      math.close   credit    client
-            wallet  → state, ops     state →     wallet
-                       awaiting?     mult, ops
+    <Mermaid code={`
+sequenceDiagram
+  autonumber
+  actor Client
+  participant RGS
+  participant Math as math.lua
+  participant Wallet
 
-                          stepRound (×N, in-process, no wallet)
-                       ◄────────────────────────────────►
-                       client → action → math.step → state, ops, awaiting?`}</code></pre>
+  Note over Client,Wallet: openRound — money moves
+  Client->>RGS: OPEN
+  RGS->>Wallet: debit
+  RGS->>Math: open(prev, ctx)
+  Math-->>RGS: state, ops, awaiting?
+  RGS-->>Client: opened
+
+  loop step (× N) — in-process, no wallet
+    Client->>RGS: STEP action
+    RGS->>Math: step(state, action)
+    Math-->>RGS: state, ops, awaiting?
+    RGS-->>Client: ack
+  end
+
+  Note over Client,Wallet: closeRound — money moves
+  Client->>RGS: CLOSE
+  RGS->>Math: close(state)
+  Math-->>RGS: multiplier, ops
+  RGS->>Wallet: credit
+  RGS-->>Client: closed
+`} label="complex round lifecycle: open, step (×N), close" />
 
     <p>
       Money moves twice at most: <code>openComplex</code> at open,
