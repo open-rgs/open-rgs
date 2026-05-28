@@ -7,7 +7,7 @@ wire. One Bun file boots a working server.
 Built for slots, instant games, Mines, Chicken-Road, crash, and any
 other casino round shape.
 
-**Docs:** <https://open-rgs.schmooky.dev>
+**Docs:** <https://open-rgs.dev>
 
 ## Install
 
@@ -105,7 +105,7 @@ The math file changes per game shape; the boot file stays the same:
 - **Gamble / pick bonus** -> complex math seeded from prior win
 - **Feature buys (ante, buy bonus)** -> another mode in the manifest
 
-Recipes with working code: <https://open-rgs.schmooky.dev/build>
+Recipes with working code: <https://open-rgs.dev/build>
 
 ## Extend
 
@@ -119,7 +119,7 @@ Plug points (each is one interface):
 
 Reference extension: [`@open-rgs/ext-reels`](https://github.com/open-rgs/ext-reels)  - strip generation, payline evaluation, book-of utilities.
 
-How-to recipes: <https://open-rgs.schmooky.dev/extend>
+How-to recipes: <https://open-rgs.dev/extend>
 
 ## What open-rgs does NOT do
 
