@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/platform-mock",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "In-memory PlatformAdapter for open-rgs development and testing. Includes FRC and autoclose-event helpers.",
   "license": "MIT",
   "repository": {
@@ -19,8 +19,18 @@
     "access": "public",
     "provenance": true
   },
-  "files": ["src", "README.md"],
-  "keywords": ["rgs", "remote-game-server", "open-rgs", "mock", "testing", "platform-adapter"],
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "rgs",
+    "remote-game-server",
+    "open-rgs",
+    "mock",
+    "testing",
+    "platform-adapter"
+  ],
   "dependencies": {
     "@open-rgs/contract": "0.3.1"
   }

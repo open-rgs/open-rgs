@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/core",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Open-RGS core: orchestrator, session, FRC, Lua/WASM math loader, binary-msgpack transport, admin endpoints. Bun-native.",
   "license": "MIT",
   "repository": {
@@ -19,8 +19,20 @@
     "access": "public",
     "provenance": true
   },
-  "files": ["src", "README.md"],
-  "keywords": ["rgs", "remote-game-server", "slot", "gambling", "open-rgs", "bun", "lua", "wasm"],
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "rgs",
+    "remote-game-server",
+    "slot",
+    "gambling",
+    "open-rgs",
+    "bun",
+    "lua",
+    "wasm"
+  ],
   "dependencies": {
     "@open-rgs/contract": "0.3.1",
     "@open-rgs/log": "0.1.0",

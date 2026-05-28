@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/simulator",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Per-mode RTP + hit-rate simulator and report generator for open-rgs games. Library; no CLI in v1.",
   "license": "MIT",
   "repository": {
@@ -23,8 +23,18 @@
     "access": "public",
     "provenance": true
   },
-  "files": ["src", "README.md"],
-  "keywords": ["open-rgs", "rgs", "simulator", "rtp", "slot", "math"],
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "rgs",
+    "simulator",
+    "rtp",
+    "slot",
+    "math"
+  ],
   "scripts": {
     "test": "bun test"
   },
