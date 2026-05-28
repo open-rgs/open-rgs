@@ -21,7 +21,7 @@
     "site:preview": "npm --workspace apps/site run preview"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.4.0"
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3"
   }
 }

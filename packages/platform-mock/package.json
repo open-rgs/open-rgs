@@ -22,6 +22,6 @@
   "files": ["src", "README.md"],
   "keywords": ["rgs", "remote-game-server", "open-rgs", "mock", "testing", "platform-adapter"],
   "dependencies": {
-    "@open-rgs/contract": "0.3.0"
+    "@open-rgs/contract": "0.3.1"
   }
 }

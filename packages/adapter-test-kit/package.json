@@ -28,6 +28,6 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@open-rgs/contract": "0.3.0"
+    "@open-rgs/contract": "0.3.1"
   }
 }

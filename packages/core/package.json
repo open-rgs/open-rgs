@@ -22,7 +22,7 @@
   "files": ["src", "README.md"],
   "keywords": ["rgs", "remote-game-server", "slot", "gambling", "open-rgs", "bun", "lua", "wasm"],
   "dependencies": {
-    "@open-rgs/contract": "0.3.0",
+    "@open-rgs/contract": "0.3.1",
     "@open-rgs/log": "0.1.0",
     "@msgpack/msgpack": "^3.1.3",
     "wasmoon": "^1.16.0"
