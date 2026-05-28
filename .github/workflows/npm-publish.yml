@@ -67,13 +67,26 @@ jobs:
       - name: Test
         run: bun test
 
-      - name: Publish packages in dependency order
+      - name: Publish packages (skip if version already on registry)
         # Order matters: dependents pin exact versions of their @open-rgs
         # deps, so publishing out of order makes the dependent's install
         # fail (the version it expects doesn't exist yet on npm).
+        #
+        # On tag pushes only some packages typically have a new version.
+        # We query npm before publishing each one  - if the exact version
+        # is already on the registry, skip it (npm publish would refuse
+        # with E403 "cannot publish over previously published versions"
+        # and the whole workflow would fail). This lets a tag bump a
+        # subset of packages without breaking on the unchanged ones.
         run: |
           set -euo pipefail
           for pkg in contract log core platform-mock adapter-kit adapter-test-kit simulator client; do
-            echo "-- Publishing @open-rgs/$pkg -----------------------------"
-            (cd "packages/$pkg" && npm publish --access public --provenance)
+            name="@open-rgs/$pkg"
+            version=$(node -p "require('./packages/$pkg/package.json').version")
+            if npm view "$name@$version" version > /dev/null 2>&1; then
+              echo "-- Skip:    $name@$version already on npm"
+            else
+              echo "-- Publish: $name@$version -----------------------------"
+              (cd "packages/$pkg" && npm publish --access public --provenance)
+            fi
           done
