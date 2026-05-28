@@ -33,4 +33,4 @@ jobs:
         run: bun test
 
       - name: Build site
-        run: bun --cwd apps/site run build
+        run: bun run --filter @open-rgs/site build
