@@ -66,7 +66,7 @@
     },
     "packages/contract": {
       "name": "@open-rgs/contract",
-      "version": "0.3.0",
+      "version": "0.3.1",
     },
     "packages/core": {
       "name": "@open-rgs/core",
@@ -916,11 +916,25 @@
 
     "@babel/helper-compilation-targets/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
+    "@open-rgs/adapter-kit/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
+
+    "@open-rgs/adapter-test-kit/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
+
+    "@open-rgs/client/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
+
+    "@open-rgs/core/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
+
+    "@open-rgs/platform-mock/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
+
+    "@open-rgs/simulator/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
+
     "@rollup/pluginutils/estree-walker": ["estree-walker@2.0.2", "", {}, "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="],
 
     "ansi-align/string-width": ["string-width@4.2.3", "", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g=="],
 
     "gray-matter/js-yaml": ["js-yaml@3.14.2", "", { "dependencies": { "argparse": "^1.0.7", "esprima": "^4.0.0" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg=="],
+
+    "hello-spin/@open-rgs/contract": ["@open-rgs/contract@0.3.0", "", {}, "sha512-tVMTq9k7xkTAeUu9ouuB+5xZ3BqV3UKQloMNiRLQD/AwY0x1yzUGOta755yfERqMLwot+6xlPu7+18of1gJ4DQ=="],
 
     "load-yaml-file/js-yaml": ["js-yaml@3.14.2", "", { "dependencies": { "argparse": "^1.0.7", "esprima": "^4.0.0" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg=="],
 
