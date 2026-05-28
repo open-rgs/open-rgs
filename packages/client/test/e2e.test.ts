@@ -142,7 +142,7 @@ describe("e2e: client <-> server full round-trip", () => {
   });
 
   test("admin /metrics shows round counts after the test spins", async () => {
-    const res = await fetch(`http://localhost:${ADMIN_PORT}/metrics`);
+    const res = await fetch(`http://localhost:${ADMIN_PORT}/admin/metrics`);
     const text = await res.text();
     expect(text).toContain("rgs_round_total");
     expect(text).toMatch(/rgs_round_total\{[^}]*kind="simple"[^}]*\} \d+/);
