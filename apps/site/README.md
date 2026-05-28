@@ -19,7 +19,7 @@ Hosted at <https://open-rgs.dev>. Auto-deploys on every push to `main`.
 | Framework | Static site |
 | Source | GitHub → `open-rgs/open-rgs` (branch `main`) |
 | Root directory | `/` (repo root) |
-| Build command | `npm install && npm install -g bun && bun install && bun --cwd apps/site run build` |
+| Build command | `npm install -g bun && bun install && bun run --filter @open-rgs/site build` |
 | Output directory | `apps/site/dist` |
 | Node.js version | 20 LTS |
 
