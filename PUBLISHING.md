@@ -50,23 +50,36 @@ matters because dependents pin exact versions:
 @open-rgs/client           ← contract (+ core/platform-mock/log as devDeps)
 ```
 
-A `publish.sh` helper at the repo root publishes in this order with
-`--dry-run` support.
+A `scripts/publish.sh` helper publishes in this order, with `--dry-run`
+and `--only <pkg…>` support.
 
 ## Manual local publish (bootstrap only)
 
-The FIRST publish of a brand-new package can only run from a logged-in
-local machine — npm's Trusted Publisher binding requires the package
-to exist before you can attach a trusted-publisher entry to it. Steps:
+The FIRST publish of a brand-new package can only run from a local
+machine — npm's Trusted Publisher binding requires the package to exist
+before you can attach a trusted-publisher entry to it. The script reads
+auth from `NPM_TOKEN` (it writes a throwaway `.npmrc` for the run and
+never touches your global `~/.npmrc`), so set that — `npm login` alone
+is not enough:
 
 ```bash
-npm login          # 2FA-protected account
-./publish.sh       # in-order publish; bumps deps as needed
+export NPM_TOKEN=npm_xxxxxxxxxxxxxxxxxxxxxxxx   # granular token, read+write @open-rgs
+bun install
+./scripts/publish.sh             # in-order publish
+./scripts/publish.sh --dry-run   # validate without uploading
 ```
+
+Provenance attestation is CI-only (it needs an OIDC issuer), so a local
+bootstrap publishes without it; CI re-runs add provenance.
 
 After the first publish, configure Trusted Publishers on every
 package's page (`npmjs.com/package/<name>/access`) and switch
 subsequent releases to the CI workflow.
+
+> There is intentionally **no committed `.npmrc`** (and none is needed
+> to *consume* the packages — they're public on `registry.npmjs.org`).
+> A real `.npmrc` is git-ignored; publish auth comes from OIDC in CI or
+> `NPM_TOKEN` locally, never a checked-in file.
 
 ## CI publish via OIDC
 
