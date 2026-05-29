@@ -22,7 +22,7 @@ open-rgs separates three concerns that have historically been tangled:
 - **Game math** — paytables, weights, RTP, feature triggers. Written by
   math designers, certified by math labs, owned by studios.
 - **Wallet integration** — Hello/Welcome handshakes, op_seq counters,
-  audit logs, FRC payloads. Operator-specific.
+  audit logs, promo payloads. Operator-specific.
 - **Orchestration** — session caching, mode resolution, bet computation,
   round lifecycle, observability. Universal.
 
@@ -46,7 +46,7 @@ This project owns the third. The first two plug in.
 - Pluggable client transports via `ClientTransport`.
 - Snap-in math modules via `MathModule`, default runtime Lua-on-wasmoon.
 - A reference binary-MessagePack WS transport.
-- Free-Round Campaign handling driven by wallet events.
+- Free-round promo handling driven by wallet events.
 - External-triggered autoclose (no in-process timers).
 - Resume-on-reconnect with full action history.
 - Admin/observability endpoints (`/livez`, `/healthz`, `/logs`,

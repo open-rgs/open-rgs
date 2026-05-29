@@ -173,16 +173,18 @@ connections; the orchestrator does NOT use it for autoclose decisions
 
 The protocol carries no explicit version field in frames. Version
 discovery happens out of band (HTTP `/api/manifest`, which exposes
-`schema: 1`). A breaking change increments the schema; old clients
-get `INVALID_FORMAT` on unknown message codes.
+`schema: 1`). A breaking change increments the schema; a frame with an
+unknown message code gets `0xff DECODE_ERROR`.
 
 ## Acceptance criteria
 
 - A frame with type byte `0x03` and a valid `ClientRequestSpin` payload
   produces a `0x04` response or `0xff` error within the latency budget
   in **Spec 06**.
-- A frame with type byte in `0x80`–`0xfc` is silently ignored by the
-  canonical orchestrator (no response, no error log above debug level).
+- A frame with an unknown type byte (including the reserved `0x80`–`0xfc`
+  range) is rejected with `0xff DECODE_ERROR` — matching Spec 08 and the
+  shipped transport. (A future schema may carve out a silently-ignored
+  forward-compat range; it does not exist yet.)
 - A text frame (string, not binary) is rejected with
   `0xff INVALID_FORMAT` immediately, without further processing.
 - A frame larger than 1 MiB is rejected at the transport layer.
