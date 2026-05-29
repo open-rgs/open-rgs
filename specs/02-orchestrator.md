@@ -200,6 +200,32 @@ Cross-process resume (after a server restart) requires a wallet
 inquiry endpoint not yet specified. Until then, restart-recovery
 operates per `manifest.recovery.onRestart` (planned).
 
+## Per-session serialization
+
+The orchestrator is single-threaded, but every money operation `await`s
+the math and the wallet, and an `await` yields the event loop. Two
+operations targeting the **same session** could therefore interleave
+across their awaits — e.g. two spins both passing the `bet > balance`
+check against the same stale balance (overspend), or a client `closeRound`
+running concurrently with an `autocloseRound` and both calling
+`closeComplex` (double credit).
+
+To prevent this, the orchestrator serializes operations per session: each
+of `init`, `spin`, `openRound`, `stepRound`, `closeRound`, `promoAccept`,
+and `autocloseRound` (including event- and admin-triggered autoclose) runs
+under a per-`sessionId` async queue, so at most one is in flight for a
+session at a time. An operation runs start-to-finish — including clearing
+`session.openRound` — before the next begins, so a close racing an
+autoclose collapses to one credit (the second observes no open round). This
+is the orchestrator-level guard; idempotency keys (deterministic per round
+for closes — see Spec 05) are the wallet-level backstop. Operations on
+*different* sessions are unaffected and run concurrently.
+
+The lock guards in-process ordering only; it is not a substitute for the
+wallet being the source of truth across processes. Enforcing a
+`ConcurrencyPolicy` for a *second connection* to a live session (kick-old
+vs reject-new) is separate and still pending.
+
 ## Acceptance criteria
 
 - Every public method returns within the latency budget in **Spec 06**
