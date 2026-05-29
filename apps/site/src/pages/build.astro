@@ -128,6 +128,7 @@ autoclose   = function(s) return { multiplier = 0, type = "crash", ... } end,`}<
   step = function(state, action)
     local s = json_decode(state)
     if action.type == "gamble_action" and action.choice == "take" then
+      s.taken = true                               -- so is_terminal() is true
       return { state = json_encode(s) }            -- terminal (no awaiting)
     end
     if host.rng_next() < 0.5 then s.mult = s.mult * 2
