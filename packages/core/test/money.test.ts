@@ -4,7 +4,7 @@
 // rounding rule and the integer guarantee.
 
 import { describe, expect, test } from "bun:test";
-import { roundHalfEven, settleAmount } from "../src/money.js";
+import { roundHalfEven, settleAmount, assertSafeAmount } from "../src/money.js";
 import { RGSError } from "@open-rgs/contract";
 
 describe("roundHalfEven  - banker's rounding (C1 / ADR-002)", () => {
@@ -61,5 +61,35 @@ describe("settleAmount  - integer minor units to the wallet (C1)", () => {
   test("throws (fails closed) if a non-finite slips through", () => {
     expect(() => settleAmount(NaN, 100)).toThrow(RGSError);
     expect(() => settleAmount(Infinity, 100)).toThrow(RGSError);
+  });
+
+  test("throws (fails closed) on a win past the safe-integer range (H1)", () => {
+    // A huge multiplier x bet that lands beyond 2^53 would silently lose
+    // precision as a float  - reject it rather than corrupt the ledger.
+    expect(() => settleAmount(1e12, 1e6)).toThrow(RGSError);
+  });
+});
+
+describe("assertSafeAmount  - the safe-integer money guard (H1)", () => {
+  test("accepts non-negative safe integers (including the boundary)", () => {
+    expect(() => assertSafeAmount(0, "x")).not.toThrow();
+    expect(() => assertSafeAmount(100, "x")).not.toThrow();
+    expect(() => assertSafeAmount(Number.MAX_SAFE_INTEGER, "x")).not.toThrow();
+  });
+
+  test("rejects amounts past 2^53 (the first unsafe integer)", () => {
+    expect(() => assertSafeAmount(Number.MAX_SAFE_INTEGER + 1, "x")).toThrow(RGSError);
+    expect(() => assertSafeAmount(2 ** 53, "balance")).toThrow(/safe range/);
+  });
+
+  test("rejects negatives, fractions and non-finite values", () => {
+    expect(() => assertSafeAmount(-1, "x")).toThrow(RGSError);
+    expect(() => assertSafeAmount(1.5, "x")).toThrow(RGSError);
+    expect(() => assertSafeAmount(NaN, "x")).toThrow(RGSError);
+    expect(() => assertSafeAmount(Infinity, "x")).toThrow(RGSError);
+  });
+
+  test("the error names the amount for diagnosis", () => {
+    expect(() => assertSafeAmount(-5, "win")).toThrow(/win/);
   });
 });

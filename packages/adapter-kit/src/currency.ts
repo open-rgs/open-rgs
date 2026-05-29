@@ -126,14 +126,14 @@ export function fromWireAmount(
     if (typeof value !== "number" || !Number.isInteger(value)) {
       throw new TypeError(`fromWireAmount(integer): expected integer, got ${typeof value} ${value}`);
     }
-    return value;
+    return safeMinor(value);
   }
 
   if (format === "float") {
     if (typeof value !== "number") {
       throw new TypeError(`fromWireAmount(float): expected number, got ${typeof value} ${value}`);
     }
-    return applyRounding(value * Math.pow(10, decimals), rounding);
+    return safeMinor(applyRounding(value * Math.pow(10, decimals), rounding));
   }
 
   // decimal_string
@@ -152,14 +152,28 @@ export function fromWireAmount(
     // No precision loss  - the wire value fits within the currency's grid.
     const padded = fracRaw.padEnd(decimals, "0");
     const exact = Number(whole + padded);
-    return negative ? -exact : exact;
+    return safeMinor(negative ? -exact : exact);
   }
   // Wire value has more precision than the currency  - round from the dropped
   // tail. Decide the tie by STRING comparison, never by reparsing the tail as
   // a float: `Number("0." + "4999999999999999999") === 0.5`, which would make
   // half-even/half-up break at exactly the boundary they exist to handle.
   const base = Number(whole + fracRaw.slice(0, decimals));
-  return roundFromTail(base, fracRaw.slice(decimals), negative, rounding);
+  return safeMinor(roundFromTail(base, fracRaw.slice(decimals), negative, rounding));
+}
+
+/** Guard a converted minor-unit amount: `number` silently loses integer
+ *  precision past 2^53, so a value beyond the safe range is a corruption, not
+ *  an amount. Reject it loudly  - high-decimal currencies (BTC sats) or huge
+ *  balances need bigint money (audit H1 / ADR-002). */
+function safeMinor(n: number): number {
+  if (!Number.isSafeInteger(n)) {
+    throw new RangeError(
+      `fromWireAmount: ${n} exceeds the safe integer range (+/-${Number.MAX_SAFE_INTEGER}); ` +
+      `amounts this large need bigint money`,
+    );
+  }
+  return n;
 }
 
 /** Round a magnitude `base` up or down based on the dropped decimal `tail`

@@ -125,6 +125,39 @@ describe("fromWireAmount", () => {
   });
 });
 
+describe("fromWireAmount rejects amounts past the safe-integer range (H1)", () => {
+  // Money is carried as `number`, which loses integer precision past 2^53.
+  // A wire amount that converts beyond MAX_SAFE_INTEGER must fail loud rather
+  // than silently corrupt the ledger. 9007199254740992 === 2^53 is the first
+  // unsafe integer (MAX_SAFE_INTEGER === 2^53 - 1 === 9007199254740991).
+  test("decimal_string exact-fit value at 2^53 is rejected", () => {
+    // "90071992547409.92" with decimals=2 -> 9007199254740992 === 2^53.
+    expect(() => fromWireAmount("90071992547409.92", 2, "decimal_string")).toThrow(/safe integer/);
+  });
+
+  test("decimal_string value just below 2^53 is accepted", () => {
+    // "90071992547409.91" -> 9007199254740991 === MAX_SAFE_INTEGER.
+    expect(fromWireAmount("90071992547409.91", 2, "decimal_string")).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  test("decimal_string rounding path past 2^53 is rejected", () => {
+    // Excess precision that rounds up to 2^53.
+    expect(() => fromWireAmount("90071992547409.919", 2, "decimal_string", "half_up")).toThrow(/safe integer/);
+  });
+
+  test("integer format past 2^53 is rejected", () => {
+    expect(() => fromWireAmount(9007199254740992, 0, "integer")).toThrow(/safe integer/);
+  });
+
+  test("float format past 2^53 is rejected", () => {
+    expect(() => fromWireAmount(1e15, 2, "float")).toThrow(/safe integer/);
+  });
+
+  test("negative amount past -2^53 is rejected", () => {
+    expect(() => fromWireAmount("-90071992547409.92", 2, "decimal_string")).toThrow(/safe integer/);
+  });
+});
+
 describe("round-trip identity (minor -> wire -> minor)", () => {
   const cases: Array<[number, number]> = [
     [15050, 2],
