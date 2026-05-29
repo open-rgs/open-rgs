@@ -56,7 +56,6 @@ J — public-surface freeze v0.5: pending
 
 | Item | Spec | Status |
 |------|------|--------|
-| Multi-game per process | 02 | scaffolding; orchestrator path-routing TODO |
 | Cross-process restart recovery | 02, 05 | platform adapter inquiry endpoint TBD |
 | Idempotency keys end-to-end | 04, 05 | contract done; orchestrator + adapter wiring pending |
 | Adapter-owns-state migration | 04, 05 | contract done; orchestrator reads from SessionInfo.carry pending |
@@ -108,9 +107,10 @@ The order above prioritises:
 2. **Production-readiness gaps** (cheat strip, manifest validation,
    metrics, graceful shutdown) — the runtime is correct but operators
    would refuse to deploy without these.
-3. **Architectural breadth** (WASM loader, bonus engine, multi-game,
-   public/private state) — needed once we onboard the second game or
-   the second wallet.
+3. **Architectural breadth** (WASM loader, bonus engine, public/private
+   state) — needed once we onboard the second game or the second wallet.
+   (Multi-game-*per-process* is explicitly out — one game per process;
+   spec 10, "What we deliberately AVOID".)
 4. **Quality-of-life** (transports, hot reload) — improvements that
    compound but don't unblock anything urgent.
 
