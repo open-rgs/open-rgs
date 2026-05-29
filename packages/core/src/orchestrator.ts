@@ -723,23 +723,40 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     }
     const math = mode.math as ComplexMath;
 
-    // Math decides the autoclose outcome if it implemented .autoclose;
-    // otherwise we fall back to closing whatever the current state holds.
+    // Honour the game-declared AutoclosePolicy (was previously ignored, and
+    // a round with banked value could be silently forfeited).
+    const policy = manifest.autoclose?.policy ?? "math-decides";
+    if (policy === "hold") {
+      // Don't autoclose — the round persists for later resolution.
+      return { closed: false, reason: "policy-hold" };
+    }
+
     let closeResult;
     try {
-      if (typeof math.autoclose === "function") {
+      if (policy === "settle-as-loss") {
+        // Operator explicitly chose to forfeit on abandonment.
+        closeResult = { multiplier: 0, ops: [], type: "autoclose-loss" };
+      } else if (typeof math.autoclose === "function") {
+        // math-decides / settle-at-current both prefer the math's valuation.
         closeResult = await Promise.resolve(math.autoclose(open.state));
       } else if (await Promise.resolve(math.isTerminal(open.state))) {
         closeResult = await Promise.resolve(math.close(open.state));
+      } else if (policy === "settle-at-current") {
+        // settle-at-current needs a valuation the math didn't provide.
+        // Refuse rather than silently forfeit banked player value — surface
+        // the misconfiguration; the round stays open for resolution.
+        log.error("Autoclose policy 'settle-at-current' but math has no autoclose() valuation — refusing to forfeit", {
+          "event.category": "autoclose",
+          "session.id": req.sessionId,
+          "round.id": open.roundId,
+          "mode.id": open.modeId,
+        });
+        return { closed: false, reason: "settle-at-current-requires-math-autoclose" };
       } else {
-        // Math has nothing to say and the round isn't terminal —
-        // settle as a zero-multiplier loss. Conservative for the
-        // operator (no surprise pay-out from a stale state).
-        closeResult = {
-          multiplier: 0,
-          ops: [],
-          type: "autoclose-loss",
-        };
+        // math-decides, no autoclose, not terminal — conservative loss (no
+        // surprise pay-out from a stale state). Games that can leave value on
+        // the table should implement math.autoclose or use settle-at-current.
+        closeResult = { multiplier: 0, ops: [], type: "autoclose-loss" };
       }
     } catch (e) {
       log.exception("Autoclose math call failed", e, {
