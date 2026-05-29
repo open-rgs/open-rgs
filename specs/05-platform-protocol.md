@@ -107,7 +107,6 @@ Recommended mappings for common WebSocket-based codes:
 | `InsufficientFunds` | -> | `INSUFFICIENT_BALANCE` |
 | `SessionInvalid` | -> | `SESSION_INVALID` |
 | `InvalidRoundOperation` | -> | `INVALID_ROUND` |
-| `RoundLimitReached` | -> | `MAX_WIN_REACHED` |
 | `ProtocolViolation` | -> | `INTERNAL_ERROR` |
 | (anything else) | -> | the verb-specific failure code (`SPIN_FAILED`, `OPEN_FAILED`, etc.) |
 

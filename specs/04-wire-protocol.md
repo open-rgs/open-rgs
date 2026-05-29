@@ -127,7 +127,7 @@ INVALID_MODE             requested mode not in manifest, or wrong kind
 INVALID_ACTION           step action.type didn't match awaiting.type
 INVALID_ROUND            close called before terminal, or round-id mismatch
 PLATFORM_UNAVAILABLE    wallet not connected
-MAX_WIN_REACHED          jurisdictional cap (planned)
+MATH_TIMEOUT             math exceeded its per-call execution budget
 ROUND_ALREADY_OPEN       openRound while another is in flight
 NO_ROUND_OPEN            step/close without an active round
 INTERNAL_ERROR           uncaught exception (should never escape)
