@@ -35,6 +35,7 @@ import {
 } from "@open-rgs/contract";
 import * as sessions from "./session.js";
 import * as promo from "./promo.js";
+import { settleAmount } from "./money.js";
 import { log } from "./log.js";
 import type { RgsMetrics } from "./metrics-rgs.js";
 import type { IdempotencyConfig } from "@open-rgs/contract";
@@ -370,7 +371,9 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       betInfo.bet,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = cappedOutcome.multiplier * betInfo.bet;
+    // Money is integer minor units; the multiplier is a float, so round
+    // the product half-to-even at this one boundary (ADR-002).
+    const win = settleAmount(cappedOutcome.multiplier, betInfo.bet);
 
     let receipt;
     try {
@@ -570,7 +573,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       open.bet,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = cappedClose.multiplier * open.bet;
+    const win = settleAmount(cappedClose.multiplier, open.bet);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -689,7 +692,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       open.bet,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = cappedClose.multiplier * open.bet;
+    const win = settleAmount(cappedClose.multiplier, open.bet);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
