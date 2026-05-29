@@ -155,6 +155,23 @@ The orchestrator passes `betIndex` and `priceMultiplier × stakeMultiplier`
 to the wallet so adapters can preserve their native (index, multiplier)
 audit trail.
 
+### Free-round funding
+
+`win = multiplier × bet`, so a `stakeMultiplier: 0` mode has `bet = 0` and any
+win would settle to **0** — silently losing the payout. The orchestrator
+forbids this: a 0-bet round that produces a winning multiplier fails with
+`INVALID_BET`. Free rounds must therefore be funded so the bet is non-zero:
+
+- **Promo pool** — a `PromoFreeRounds` pool locks a non-zero bet for the
+  round (`computeBet` uses the pool's bet, not `stakeMultiplier × 0`); the
+  win pays normally and the pool decrements.
+- **Carry into the parent** — a game-triggered feature accumulates its
+  winnings into the triggering round's `carry` and pays them at that round's
+  close (the triggering paid spin owns the feature EV).
+
+A 0-bet round that *loses* (multiplier 0) is fine — it settles 0, as a free
+spin that didn't win should.
+
 ## Autoclose
 
 Autoclose is **strictly externally-triggered**. The orchestrator does
