@@ -35,10 +35,22 @@ export function roundHalfEven(x: number): number {
  *  per ADR-002. */
 export function settleAmount(multiplier: number, bet: number): number {
   const win = roundHalfEven(multiplier * bet);
-  if (!Number.isInteger(win)) {
-    // Only reachable if a caller skipped multiplier sanitization or passed
-    // a non-finite bet — fail closed rather than settle a bad amount.
-    throw new RGSError("INTERNAL_ERROR", "computed win is not an integer minor unit");
-  }
+  assertSafeAmount(win, "win");
   return win;
+}
+
+/** Guard a monetary amount: it must be a non-negative integer within the
+ *  float64 safe-integer range. Money is carried as `number` (ADR-002), which
+ *  silently loses precision past 2^53 — high-decimal currencies (BTC sats),
+ *  low-unit fiat, jackpots, and aggregate counters can exceed it. Rather
+ *  than corrupt the ledger, fail loud here. (Full `bigint` money is the
+ *  longer-term fix; ADR-002.) */
+export function assertSafeAmount(n: number, name: string): void {
+  if (!Number.isSafeInteger(n) || n < 0) {
+    throw new RGSError(
+      "INTERNAL_ERROR",
+      `${name} must be a non-negative integer within the safe range ` +
+      `(±${Number.MAX_SAFE_INTEGER}); got ${n}. Amounts past 2^53 need bigint money.`,
+    );
+  }
 }
