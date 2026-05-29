@@ -1,7 +1,7 @@
 {
   "name": "@open-rgs/client",
   "version": "0.2.1",
-  "description": "Tiny WebSocket client for open-rgs. Promise-based init/spin/openRound/stepRound/closeRound/frcAccept. Bun / Node / browser.",
+  "description": "Tiny WebSocket client for open-rgs. Promise-based init/spin/openRound/stepRound/closeRound/promoAccept. Bun / Node / browser.",
   "license": "MIT",
   "engines": {
     "bun": ">=1.0.0"

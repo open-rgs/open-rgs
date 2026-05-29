@@ -48,7 +48,7 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
   extension for strip + payline + book-of helpers)
 - Complex rounds (Mines, Chicken-Road, crash) — see the docs at
   <https://open-rgs.dev/build>
-- Promo free-rounds, autoclose, FRC offers (supported by core; not
+- Promo free-rounds, autoclose (supported by core; not
   exercised here)
 
 ## Next steps

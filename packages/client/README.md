@@ -27,11 +27,11 @@ c.disconnect();
 | `connect()` | `Promise<void>` — opens the WS, waits for `onopen` |
 | `disconnect()` | `void` — closes the WS gracefully |
 | `init(sid)` | `Promise<ClientResponseInit>` |
-| `spin({ mode?, betIndex?, priceMultiplier?, cheat?, params? })` | `Promise<ClientResponseSpin>` |
-| `openRound({ mode?, betIndex?, priceMultiplier?, params? })` | `Promise<ClientResponseOpenRound>` |
+| `spin({ mode?, betIndex?, priceMultiplier?, params?, idempotencyKey? })` | `Promise<ClientResponseSpin>` |
+| `openRound({ mode?, betIndex?, priceMultiplier?, params?, idempotencyKey? })` | `Promise<ClientResponseOpenRound>` |
 | `stepRound({ action })` | `Promise<ClientResponseStepRound>` |
 | `closeRound({})` | `Promise<ClientResponseCloseRound>` |
-| `frcAccept({ accept })` | `Promise<ClientResponseFrcAccept>` |
+| `promoAccept({ accept })` | `Promise<ClientResponsePromoAccept>` |
 
 All types come from `@open-rgs/contract`.
 
