@@ -496,7 +496,12 @@ export interface RoundReceipt {
 }
 
 export type PlatformEvent =
-  | { type: "balanceChanged"; sessionId: string; balance: number; reason: string }
+  /** `seq` (optional) is a per-session monotonically increasing version the
+   *  adapter stamps on balance changes. When present, the orchestrator
+   *  ignores an event whose seq is not greater than the last it applied, so
+   *  an out-of-order/duplicate balance event can't clobber a fresher value.
+   *  Omit it only if the upstream guarantees in-order delivery. */
+  | { type: "balanceChanged"; sessionId: string; balance: number; reason: string; seq?: number }
   | { type: "sessionClosed"; sessionId: string; reason: string }
   | { type: "promoGranted"; sessionId: string; promo: PromoFreeRounds }
   /** Wallet asks the RGS to autoclose an in-flight round. RGS-side autoclose

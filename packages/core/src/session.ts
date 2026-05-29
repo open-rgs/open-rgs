@@ -54,6 +54,9 @@ export interface LocalSession {
   /** In-flight complex round, if any. */
   openRound?: OpenRound;
   promo?: LocalPromo;
+  /** Highest balanceChanged event seq applied (see PlatformEvent.seq). Used
+   *  to drop out-of-order/duplicate balance events. */
+  balanceSeq?: number;
   readonly createdAt: number;
 }
 
