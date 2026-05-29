@@ -6,13 +6,24 @@
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { webcrypto } from "node:crypto";
 import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
-const math = await loadLuaMath(resolve(here, "../maths/spin.lua"));
+// Inject the RNG that determines outcomes. open-rgs deliberately does NOT
+// default to Math.random for real-money play  - loadLuaMath fails closed in
+// production without an rng. Here we use a crypto-backed 53-bit float in
+// [0,1); a production deployment wires its certified/approved RNG instead.
+function cryptoRng(): number {
+  const u = new Uint32Array(2);
+  webcrypto.getRandomValues(u);
+  return (u[0]! * 2 ** 21 + (u[1]! >>> 11)) / 2 ** 53;
+}
+
+const math = await loadLuaMath(resolve(here, "../maths/spin.lua"), { rng: cryptoRng });
 
 const manifest = defineGame({
   id:               "hello-spin",

@@ -42,7 +42,20 @@ interface LuaApi {
 }
 
 export interface LoadLuaMathOptions {
+  /** Random source for the math VM  - `() => number` in `[0, 1)`.
+   *
+   *  REQUIRED for real-money use. A certified RGS must determine outcomes
+   *  from an auditable CSPRNG; `Math.random` (V8 xorshift128+) is
+   *  non-cryptographic, unseedable, and explicitly disallowed by GLI-19 /
+   *  GLI-11. When omitted, `loadLuaMath` FAILS CLOSED under
+   *  `NODE_ENV=production` (throws) rather than silently using `Math.random`.
+   *  Outside production it falls back to `Math.random` with a loud warning,
+   *  which is fine for simulation, local dev, and examples only. */
   rng?: () => number;
+  /** Escape hatch: permit the `Math.random` fallback even under
+   *  `NODE_ENV=production` (e.g. an offline, non-real-money tooling job).
+   *  Defaults to `false`  - production fails closed without an injected rng. */
+  allowInsecureRng?: boolean;
   /** Extensions installed into the VM before evaluating the math file.
    *  See {@link LuaExtension}. Registration order is significant: it
    *  determines the order transforms run, and the order host() functions
@@ -54,8 +67,32 @@ export interface LoadLuaMathOptions {
   marks?: boolean;
 }
 
+/** Resolve the math RNG, failing closed in production when none is injected.
+ *  A real-money RGS must not determine outcomes from `Math.random`; in
+ *  production we refuse to boot without an explicit (certified) source. */
+function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => number {
+  if (opts?.rng) return opts.rng;
+  const isProduction = process.env["NODE_ENV"] === "production";
+  if (isProduction && !opts?.allowInsecureRng) {
+    throw new Error(
+      `loadLuaMath(${path}): no rng provided. A production RGS must inject a ` +
+      `certified CSPRNG for outcome determination  - refusing to fall back to ` +
+      `Math.random (non-auditable, GLI-19/GLI-11 disallowed). Pass { rng } or, ` +
+      `for non-real-money tooling only, { allowInsecureRng: true }.`,
+    );
+  }
+  log.warn("loadLuaMath: no rng injected  - falling back to Math.random. " +
+    "NOT auditable; do not use for real-money play.", {
+    "event.category": "process",
+    "event.action": "rng_insecure_fallback",
+    "math.path": path,
+  });
+  return Math.random;
+}
+
 /** Load a Lua math file and adapt it to MathModule. */
 export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Promise<MathModule> {
+  const rng = resolveRng(path, opts);
   const source = await readFile(path, "utf8");
   const lua: LuaEngine = await factory.createEngine();
 
@@ -88,7 +125,7 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   // helpers  - by design. Math sees ONLY randomness, a logger, and
   // (optionally) annotation marks.
   lua.global.set("host", {
-    rng_next: () => (opts?.rng ?? Math.random)(),
+    rng_next: () => rng(),
     log_debug: (msg: string) => log.debug(`[lua:${path}] ${msg}`),
     mark: {
       count:      (name: string)               => marks.count(name),

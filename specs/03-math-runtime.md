@@ -29,14 +29,20 @@ Math NEVER ships its own PRNG. The host provides one:
 - **WASM**: import `host.rng_next` declared as `(): f64`.
 - **TS**: a `random: () => number` argument injected at construction.
 
-The host implementation is chosen at boot:
+The host implementation is **injected at boot** via
+`loadLuaMath(path, { rng })`. There is no real-money default:
 
-- Default: `Math.random` (sufficient for dev).
-- Production: a certified RNG sidecar (e.g., the .NET .DLL host the
-  example-game-server reference uses). Wrapped behind a synchronous
-  `rng.next()` with background refill.
-- Testing: a seeded Mersenne Twister or xoshiro256** for reproducible
-  RTP runs.
+- Production: a certified RNG (e.g. a CSPRNG or a jurisdiction-approved
+  RNG sidecar) wrapped behind a synchronous `rng.next()`. **Required**  -
+  `loadLuaMath` fails closed (throws) under `NODE_ENV=production` when no
+  `rng` is injected; it will not silently use `Math.random` (non-crypto,
+  unseedable, GLI-19/GLI-11 disallowed).
+- Dev / examples: when no `rng` is injected outside production,
+  `loadLuaMath` falls back to `Math.random` with a loud warning. Acceptable
+  for local play only; an offline tooling job can opt in explicitly with
+  `{ allowInsecureRng: true }`.
+- Testing / simulation: a seeded PRNG (e.g. `mulberry32` from
+  `@open-rgs/simulator`) for reproducible RTP runs.
 
 Math produces byte-identical outputs for byte-identical RNG sequences,
 because no other source of nondeterminism is exposed.
