@@ -148,20 +148,41 @@ export function fromWireAmount(
   const body = negative ? trimmed.slice(1) : trimmed;
   const [whole, fracRaw = ""] = body.split(".");
   // Pad or trim the fractional part to the currency's precision.
-  let exact: number;
   if (fracRaw.length <= decimals) {
     // No precision loss — the wire value fits within the currency's grid.
     const padded = fracRaw.padEnd(decimals, "0");
-    exact = Number(whole + padded);
-  } else {
-    // Wire value has more precision than the currency — apply rounding.
-    const keep = fracRaw.slice(0, decimals);
-    const tail = fracRaw.slice(decimals);
-    // Build the un-rounded float-equivalent for the rounding policy.
-    const overshoot = Number(whole + keep) + Number("0." + tail);
-    exact = applyRounding(overshoot, rounding);
+    const exact = Number(whole + padded);
+    return negative ? -exact : exact;
   }
-  return negative ? -exact : exact;
+  // Wire value has more precision than the currency — round from the dropped
+  // tail. Decide the tie by STRING comparison, never by reparsing the tail as
+  // a float: `Number("0." + "4999999999999999999") === 0.5`, which would make
+  // half-even/half-up break at exactly the boundary they exist to handle.
+  const base = Number(whole + fracRaw.slice(0, decimals));
+  return roundFromTail(base, fracRaw.slice(decimals), negative, rounding);
+}
+
+/** Round a magnitude `base` up or down based on the dropped decimal `tail`
+ *  (a non-empty digit string) and sign, deciding ties from the string — no
+ *  float. Returns the signed integer. */
+function roundFromTail(base: number, tail: string, negative: boolean, mode: RoundingMode): number {
+  const tailHasNonZero = /[1-9]/.test(tail);
+  // Compare the dropped fraction to exactly one half.
+  const firstDigit = tail.charCodeAt(0) - 48;
+  const restNonZero = /[1-9]/.test(tail.slice(1));
+  const cmpHalf = firstDigit < 5 ? -1 : firstDigit > 5 ? 1 : (restNonZero ? 1 : 0);
+
+  let up: boolean;
+  switch (mode) {
+    case "floor":     up = negative && tailHasNonZero; break;   // toward -inf
+    case "ceiling":   up = !negative && tailHasNonZero; break;  // toward +inf
+    case "half_up":   up = cmpHalf >= 0; break;                 // ties away from zero
+    case "half_down": up = cmpHalf > 0; break;                  // ties toward zero
+    case "half_even": up = cmpHalf > 0 || (cmpHalf === 0 && base % 2 === 1); break;
+    default:          up = cmpHalf >= 0;
+  }
+  const mag = up ? base + 1 : base;
+  return negative ? -mag : mag;
 }
 
 /** Apply a rounding mode to a numeric value, returning an integer. */
