@@ -809,6 +809,9 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         // Same deterministic key as a client close of this round (above)  -
         // a close racing an autoclose collapses to one wallet credit.
         idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "close"),
+        // Forward the autoclose trigger reason for the wallet's audit trail
+        // (a normal client close omits it).
+        reason: req.reason,
       }));
     } catch (e) {
       log.exception("Autoclose platform.closeComplex failed", e, {

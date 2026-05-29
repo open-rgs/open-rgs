@@ -24,7 +24,8 @@ class SpyPlatform implements PlatformAdapter {
   }
   async settleSimple(): Promise<RoundReceipt> { return { roundId: "s", balance: this.balance }; }
   async openComplex(req: OpenComplex): Promise<RoundReceipt> { this.balance -= req.bet; return { roundId: `r${++this.seq}`, balance: this.balance }; }
-  async closeComplex(req: CloseComplex): Promise<RoundReceipt> { this.closeWins.push(req.win); this.balance += req.win; return { roundId: req.roundId, balance: this.balance }; }
+  closeReasons: (string | undefined)[] = [];
+  async closeComplex(req: CloseComplex): Promise<RoundReceipt> { this.closeWins.push(req.win); this.closeReasons.push(req.reason); this.balance += req.win; return { roundId: req.roundId, balance: this.balance }; }
   onEvent(_h: (e: PlatformEvent) => void) {}
 }
 
@@ -99,5 +100,13 @@ describe("autoclose policy (H5)", () => {
     const opened = await orch.openRound({ mode: "cx" }, conn);
     await orch.autocloseRound({ sessionId: "s5", roundId: opened.roundId, reason: "idle" });
     expect(platform.closeWins).toEqual([500]);
+  });
+
+  test("autoclose forwards the trigger reason to the wallet for audit (M1)", async () => {
+    const { orch, platform, conn } = setup("math-decides", true);
+    await orch.init({ sid: "s6" }, conn);
+    const opened = await orch.openRound({ mode: "cx" }, conn);
+    await orch.autocloseRound({ sessionId: "s6", roundId: opened.roundId, reason: "session-closed: kicked" });
+    expect(platform.closeReasons).toEqual(["session-closed: kicked"]);
   });
 });
