@@ -16,6 +16,7 @@ import type {
 } from "@open-rgs/contract";
 import { createOrchestrator } from "./orchestrator.js";
 import { createAdminHandler, startAdmin } from "./admin.js";
+import { createAuditLog, type AuditSink } from "./audit-log.js";
 import { log } from "./log.js";
 import { CORE_VERSION } from "./version.js";
 import { createRgsMetrics, type RgsMetrics } from "./metrics-rgs.js";
@@ -56,6 +57,11 @@ export interface ServerConfig {
   metrics?: RgsMetrics;
   /** Idempotency-key generator + retention. See @open-rgs/contract. */
   idempotency?: IdempotencyConfig;
+  /** Durable, append-only sink for the tamper-evident game-outcome audit log.
+   *  When set, every money-moving round records a hash-chained event. Provide
+   *  a durable sink in production (file+fsync, object storage, Kafka, ...);
+   *  `memoryAuditSink`/`jsonlStdoutAuditSink` are for dev only. */
+  auditSink?: AuditSink;
   /** Graceful-shutdown drain window in ms. Default 30_000. */
   shutdownDrainMs?: number;
   /** Install a SIGTERM handler that calls stop(). Default true; set
@@ -168,6 +174,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     cheatsEnabled,
     metrics,
     ...(cfg.idempotency ? { idempotency: cfg.idempotency } : {}),
+    ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink) } : {}),
   });
 
   // Single-port mode: mount the admin handler on the transport's

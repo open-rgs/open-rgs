@@ -81,8 +81,13 @@ See `docs/architecture.drawio` for the colour-coded diagrams (six tabs).
   Bun is the chosen runtime. PRs to make it run on Node, Deno, or
   workers are not accepted unless they preserve the hot-path performance
   profile spec'd in `06-performance.md`.
-- We do not provide a turnkey audit/compliance solution. The wallet's
-  audit trail is the regulatory record. RGS-side logs are operational.
+- We do not provide a turnkey end-to-end compliance solution. The wallet
+  remains the financial-ledger record. But because the wallet only sees an
+  opaque round_state + a multiplier/type, game-OUTCOME auditing is an RGS
+  responsibility: core ships a durable, append-only, hash-chained
+  game-outcome log (see audit-log.ts) that streams to an operator-provided
+  durable sink and is tamper-evident and reconstructable for which math
+  produced each outcome. RGS operational logs remain separate.
 - We do not couple the math contract to any particular language. Lua is
   the default loader because the embedding cost is near-zero; Zig->WASM,
   Rust->WASM, AssemblyScript and TypeScript-in-process are all valid
