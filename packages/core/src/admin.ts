@@ -12,11 +12,20 @@
 //     wants a separate admin port. createServer prefers single-port.
 //
 // Path matching:
-//   Routes match by SUFFIX, not equality. The example-cluster Istio
-//   ingress rewrites /api/<gameId>/<rest> → /api/<rest> (drops the
-//   game-id segment, keeps /api/). Other deployments rewrite to /,
-//   to /api/<rest>, or not at all. Suffix matching is robust to all
-//   of these — we just check the path ends with the canonical route.
+//   Routes match EXACTLY against `routeBasePath + canonicalRoute`
+//   (routeBasePath defaults to ""). Suffix matching was a security hole:
+//   any path *ending* in a route (e.g. `/wss/admin/autoclose`) resolved to
+//   the handler, defeating prefix-based ingress allowlists. If your ingress
+//   serves admin under a prefix (e.g. `/api`), declare it once via
+//   `routeBasePath` so matching stays exact.
+//
+// Auth:
+//   `/admin/*` and the detailed `/healthz` require `Authorization: Bearer
+//   <authToken>` when a token is configured (constant-time compared). With
+//   no token AND `requireAuth` (set in production), those routes fail closed
+//   (403) — the old "every request is from a trusted operator" assumption is
+//   false when admin shares the public client port. The k8s probes
+//   `/livez` and `/readyz` are always open (no secrets; kubelet needs them).
 //
 // Canonical routes:
 //   /livez                always 200 OK (process is alive)
@@ -30,13 +39,8 @@
 //   /admin/autoclose POST external autoclose trigger
 //   /__echo               debug — returns the raw pathname the pod saw
 //
-// Suffix matching means /api/admin/manifest, /admin/manifest,
-// /api/example-game/admin/manifest, /something/else/admin/manifest all
-// resolve to the same handler. Acceptable because we never serve
-// uploaded paths; every request comes from operators or from the
-// platform ingress, both trusted.
-
 import type { GameManifest, PlatformAdapter, OrchestratorAPI, AutocloseRequest } from "@open-rgs/contract";
+import { createHash, timingSafeEqual } from "node:crypto";
 import * as sessions from "./session.js";
 import { log } from "./log.js";
 import { CORE_VERSION } from "./version.js";
@@ -53,6 +57,21 @@ export interface AdminConfig {
    *  as game_version in /healthz. Default "unknown" — callers should
    *  pass their package.json version through createServer({ version }). */
   gameVersion?: string;
+  /** Bearer token required on /admin/* and the detailed /healthz. When set,
+   *  requests must send `Authorization: Bearer <authToken>` (constant-time
+   *  compared). createServer reads it from `adminToken` or the
+   *  OPEN_RGS_ADMIN_TOKEN env var. */
+  authToken?: string;
+  /** When true and no authToken is configured, sensitive routes fail closed
+   *  (403) instead of serving openly. createServer sets this in production. */
+  requireAuth?: boolean;
+  /** Exact base path prepended to every canonical route — one declared
+   *  ingress rewrite (e.g. "/api"). Default "" → exact canonical paths. */
+  routeBasePath?: string;
+  /** CORS origin allowlist for browser-based operator dashboards. Default:
+   *  none — no CORS headers are sent (server-to-server / same-origin only).
+   *  Never wildcard: these endpoints move money and expose balances. */
+  allowedOrigins?: string[];
 }
 
 export interface StartAdminConfig extends AdminConfig {
@@ -67,56 +86,58 @@ export interface AdminHandler {
 
 export function createAdminHandler(cfg: AdminConfig): AdminHandler {
   const startedAt = Date.now();
+  const base = cfg.routeBasePath ?? "";
 
   return {
     fetch: async (req): Promise<Response | undefined> => {
       const url  = new URL(req.url);
       const path = url.pathname;
 
-      // Suffix match: pod's path may be the canonical route,
-      // /api/<route>, /api/<gameId>/<route>, or any other prefix the
-      // ingress hands us. We just check the trailing segment(s) match
-      // a known canonical route. No assumptions about rewrite rules.
-      const endsWith = (route: string): boolean =>
-        path === route || path.endsWith(route);
+      // Exact match against the (optionally prefixed) canonical route — no
+      // suffix matching, which let `/wss/admin/autoclose` reach the handler.
+      const matches = (route: string): boolean => path === base + route;
 
-      if (req.method === "OPTIONS") return cors(new Response(null));
+      if (req.method === "OPTIONS") return cors(new Response(null, { status: 204 }), req);
 
-      // ── K8s probes ───────────────────────────────────────────────
-
-      if (endsWith("/livez")) {
+      // ── K8s probes — always open (no secrets; kubelet needs them) ─────
+      if (matches("/livez")) {
         return new Response("OK");
       }
-      if (endsWith("/readyz")) {
+      if (matches("/readyz")) {
         return cfg.platform.isHealthy
           ? new Response("OK")
           : new Response("Platform not connected", { status: 503 });
       }
-      if (endsWith("/healthz")) {
-        return cors(json(health(), cfg.platform.isHealthy ? 200 : 503));
+
+      // ── Auth gate for sensitive routes (detailed /healthz + /admin/*) ──
+      const sensitive = matches("/healthz") || path.startsWith(`${base}/admin/`);
+      if (sensitive) {
+        const denied = authGate(req);
+        if (denied) return cors(denied, req);
       }
 
-      // ── Admin (canonical /admin/*) ───────────────────────────────
-
-      if (endsWith("/admin/logs")) {
-        return cors(json(logs(url)));
+      if (matches("/healthz")) {
+        return cors(json(health(), cfg.platform.isHealthy ? 200 : 503), req);
       }
-      if (endsWith("/admin/metrics") && cfg.metrics) {
+      if (matches("/admin/logs")) {
+        return cors(json(logs(url)), req);
+      }
+      if (matches("/admin/metrics") && cfg.metrics) {
         return cors(new Response(cfg.metrics.registry.expose(), {
           headers: { "Content-Type": "text/plain; version=0.0.4" },
-        }));
+        }), req);
       }
-      if (endsWith("/admin/sessions")) {
-        return cors(json(sessions.all()));
+      if (matches("/admin/sessions")) {
+        return cors(json(sessions.all()), req);
       }
-      if (endsWith("/admin/manifest")) {
-        return cors(json(serializeManifest()));
+      if (matches("/admin/manifest")) {
+        return cors(json(serializeManifest()), req);
       }
-      if (endsWith("/admin/modes")) {
-        return cors(json(modeCatalog()));
+      if (matches("/admin/modes")) {
+        return cors(json(modeCatalog()), req);
       }
-      if (endsWith("/admin/autoclose") && req.method === "POST") {
-        return cors(await handleAutoclose(req));
+      if (matches("/admin/autoclose") && req.method === "POST") {
+        return cors(await handleAutoclose(req), req);
       }
 
       // Not an admin route — let the caller (transport / outer server)
@@ -124,6 +145,38 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       return undefined;
     },
   };
+
+  /** Bearer-token gate. Returns a deny Response, or null when allowed.
+   *  - token configured → require a matching Bearer (constant-time);
+   *  - no token + requireAuth (prod) → fail closed (403);
+   *  - no token + !requireAuth (dev) → open. */
+  function authGate(req: Request): Response | null {
+    if (cfg.authToken) {
+      const got = bearerToken(req);
+      if (!got || !tokenMatches(got, cfg.authToken)) {
+        return json({ error: "unauthorized" }, 401);
+      }
+      return null;
+    }
+    if (cfg.requireAuth) {
+      return json({ error: "admin auth required — set an admin token (OPEN_RGS_ADMIN_TOKEN)" }, 403);
+    }
+    return null;
+  }
+
+  function cors(res: Response, req: Request): Response {
+    // Never wildcard — these routes move money and expose balances. Echo the
+    // request origin only when it's on the configured allowlist; otherwise
+    // send no CORS headers (server-to-server / same-origin only).
+    const origin = req.headers.get("origin");
+    if (origin && cfg.allowedOrigins?.includes(origin)) {
+      res.headers.set("Access-Control-Allow-Origin", origin);
+      res.headers.set("Vary", "Origin");
+      res.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    return res;
+  }
 
   async function handleAutoclose(req: Request): Promise<Response> {
     let body: AutocloseRequest;
@@ -235,9 +288,18 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function cors(res: Response): Response {
-  res.headers.set("Access-Control-Allow-Origin", "*");
-  res.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.headers.set("Access-Control-Allow-Headers", "Content-Type");
-  return res;
+/** Extract a `Bearer <token>` value from the Authorization header. */
+function bearerToken(req: Request): string | null {
+  const h = req.headers.get("authorization");
+  if (!h) return null;
+  const m = /^Bearer\s+(.+)$/i.exec(h);
+  return m ? m[1]!.trim() : null;
+}
+
+/** Constant-time token comparison (compares fixed-length SHA-256 digests so
+ *  neither the result nor the token length leaks via timing). */
+function tokenMatches(got: string, expected: string): boolean {
+  const a = createHash("sha256").update(got).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
 }
