@@ -10,6 +10,7 @@ import type { SimpleMath } from "@open-rgs/contract";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const SIMPLE = resolve(here, "fixtures/simple.lua");
+const NO_RTP = resolve(here, "fixtures/no-rtp.lua");
 
 const savedEnv = process.env["NODE_ENV"];
 afterEach(() => {
@@ -70,5 +71,12 @@ describe("loadLuaMath rejects a simulator-only PRNG in production (H8)", () => {
     process.env["NODE_ENV"] = "development";
     const m = await loadLuaMath(SIMPLE, { rng: simRng });
     expect(m.kind).toBe("simple");
+  });
+});
+
+describe("math with no declared rtp (L8)", () => {
+  test("defaults rtp to 0 (and warns at load)", async () => {
+    const m = await loadLuaMath(NO_RTP, { rng: () => 0.5 });
+    expect(m.rtp).toBe(0);
   });
 });
