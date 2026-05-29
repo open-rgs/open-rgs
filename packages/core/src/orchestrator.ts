@@ -37,6 +37,7 @@ import * as sessions from "./session.js";
 import * as promo from "./promo.js";
 import { settleAmount } from "./money.js";
 import { deriveIdempotencyKey } from "./idempotency.js";
+import type { AuditLog, AuditInput } from "./audit-log.js";
 import { log } from "./log.js";
 import type { RgsMetrics } from "./metrics-rgs.js";
 import type { IdempotencyConfig } from "@open-rgs/contract";
@@ -56,6 +57,9 @@ export interface OrchestratorConfig {
   /** Optional standard metrics registry. Created automatically by
    *  createServer; only passed explicitly in unit tests. */
   metrics?: RgsMetrics;
+  /** Optional durable, tamper-evident game-outcome log. When set, every
+   *  money-moving round records an event (see audit-log.ts). */
+  auditLog?: AuditLog;
   /** Idempotency-key generator + retention. Defaults to uuid-v4 +
    *  5-minute TTL (a hint for upstream caches). */
   idempotency?: IdempotencyConfig;
@@ -102,7 +106,31 @@ function errorReason(msg: string): string {
 export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   const { manifest, platform, metrics } = cfg;
   const cheatsEnabled = cfg.cheatsEnabled ?? false;
+  const auditLog = cfg.auditLog;
   const genIdemKey = cfg.idempotency?.generate ?? defaultIdempotencyKey;
+
+  // Record one tamper-evident audit event per money-moving round. Never let
+  // an audit-sink failure break the round (the sink owns durability).
+  function recordAudit(
+    mode: GameMode,
+    e: Omit<AuditInput, "mathName" | "mathVersion" | "mathContentHash">,
+  ): void {
+    if (!auditLog) return;
+    try {
+      auditLog.record({
+        ...e,
+        mathName: mode.math.name,
+        mathVersion: mode.math.version,
+        mathContentHash: mode.math.contentHash ?? "",
+      }, Date.now());
+    } catch (err) {
+      log.exception("audit-log record failed", err, {
+        "event.category": "audit",
+        "session.id": e.sessionId,
+        "round.id": e.roundId,
+      });
+    }
+  }
 
   // Idempotency key for a round-INITIATING call (simple spin / complex
   // open). No server-side round id exists yet, so retry-safety requires a
@@ -516,6 +544,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     sessions.setBalance(s.sessionId, receipt.balance);
     sessions.setCarry(s.sessionId, cappedOutcome.carry, cappedOutcome.nextMode);
+    recordAudit(mode, {
+      sessionId: s.sessionId, roundId: receipt.roundId, kind: "settle",
+      type: cappedOutcome.type, bet: betInfo.bet, win, multiplier: cappedOutcome.multiplier, reason: "",
+    });
 
     // Capture promo state for the response BEFORE applyUpdate may drain
     // the pool (we want to surface the post-round view to the client).
@@ -593,6 +625,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       opsLog: [...open.ops],
       openedAt: Date.now(),
     };
+    recordAudit(mode, {
+      sessionId: s.sessionId, roundId: receipt.roundId, kind: "open",
+      type: "open", bet: betInfo.bet, win: 0, multiplier: 0, reason: "",
+    });
 
     return {
       roundId: receipt.roundId,
@@ -704,6 +740,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     sessions.setBalance(s.sessionId, receipt.balance);
     sessions.setCarry(s.sessionId, cappedClose.carry, cappedClose.nextMode);
     if (receipt.promo) promo.applyUpdate(s, receipt.promo);
+    recordAudit(mode, {
+      sessionId: s.sessionId, roundId: receipt.roundId, kind: "close",
+      type: cappedClose.type, bet: open.bet, win, multiplier: cappedClose.multiplier, reason: "",
+    });
     s.openRound = undefined;
 
     return {
@@ -858,6 +898,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       cappedClose.nextMode,
     );
     if (receipt.promo) promo.applyUpdate(s, receipt.promo);
+    recordAudit(mode, {
+      sessionId: s.sessionId, roundId: receipt.roundId, kind: "autoclose",
+      type: cappedClose.type, bet: open.bet, win, multiplier: cappedClose.multiplier, reason: req.reason,
+    });
     s.openRound = undefined;
 
     log.info("Round autoclosed", {
