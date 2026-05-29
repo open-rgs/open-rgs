@@ -82,8 +82,9 @@ flowchart TD
     </table>
 
     <p>
-      Money moves <strong>once per simple round</strong> and
-      <strong>twice per complex round</strong> — never more. STEP is
+      A simple round is <strong>one settle RPC</strong> (carrying the debit
+      and the credit together); a complex round is <strong>two RPCs</strong>
+      (open = debit, close = credit) — never more. STEP is
       pure in-process: the math computes the next visual + state, no
       wallet is touched. Cash-out on a Mines / Chicken-Road style round
       is a client-initiated CLOSE, not a special STEP.

@@ -21,8 +21,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <table>
       <thead><tr><th class="mono">Code</th><th>Fires when</th></tr></thead>
       <tbody>
-        <tr><td class="mono">INVALID_FORMAT</td><td>frame byte is not a known message code</td></tr>
-        <tr><td class="mono">DECODE_ERROR</td><td>msgpack payload couldn't be decoded</td></tr>
+        <tr><td class="mono">INVALID_FORMAT</td><td>frame wasn't a binary message (e.g. a text or empty frame)</td></tr>
+        <tr><td class="mono">DECODE_ERROR</td><td>msgpack payload couldn't be decoded, or an unknown message code</td></tr>
         <tr><td class="mono">MISSING_SESSION</td><td>request needs <code>sid</code> but none was supplied or attached</td></tr>
         <tr><td class="mono">SESSION_NOT_FOUND</td><td>platform <code>openSession</code> rejected the id</td></tr>
         <tr><td class="mono">SESSION_INVALID</td><td>session exists but is closed / blocked / expired</td></tr>

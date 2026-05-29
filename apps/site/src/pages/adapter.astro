@@ -47,8 +47,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     </table>
 
     <p class="mute">
-      Two transactions per round, no exceptions. Mid-round
-      <code>step</code> calls never touch the wallet. If you need an
+      At most two money RPCs per round — one <code>settleSimple</code> for a
+      simple round (a debit and a credit in one call), or
+      <code>openComplex</code> + <code>closeComplex</code> for a complex one.
+      Mid-round <code>step</code> calls never touch the wallet. If you need an
       audit trail for in-flight state, implement the optional
       <code>updateComplex</code> — the orchestrator calls it
       fire-and-forget after each step; failures are logged, never
