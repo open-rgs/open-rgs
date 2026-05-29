@@ -24,6 +24,16 @@ that math designers and labs use.
 Goal: assert measured RTP per mode converges to declared RTP within
 epsilon over N spins.
 
+`simulate` threads cross-round `carry` spin-to-spin exactly as the
+orchestrator does, so a stateful game's RTP is measured correctly. Each
+mode's report carries an RTP **verdict**: it computes the standard error of
+the measured RTP (`stdDev(per-spin return)/√n`) and a 95% confidence
+interval, then reports `pass` (declared within the 95% CI), `warn` (within
+99%), or `fail` (declared significantly outside) — so "does measured RTP
+match declared?" gets an answer, not just a printed delta. (An
+optimal-strategy exploit pass over a public-state `view()` projection is
+still planned — see `compare`/`fuzz`.)
+
 ```bash
 @open-rgs/cli simulate ./examples/lucky-digits/manifest.ts \
     --mode default --spins 10M --seed 42
