@@ -28,8 +28,8 @@ See `examples/` in this repo for fully-worked references.
 ```bash
 # from your game repo root:
 docker build -t my-game -f path/to/this/docker/Dockerfile .
-docker run --rm -p 8080:80 \
-  -e PLATFORM_WS_URL=wss://your-platform/ws \
+docker run --rm -p 8080:8080 \
+  -e PLATFORM_WS_URL=wss://wallet.example/ws \
   my-game
 ```
 

@@ -4,7 +4,7 @@
 //
 // Usage:
 //   open-rgs-adapter-conform \
-//     --adapter '@open-rgs/adapter-your-provider' \
+//     --adapter '@your-org/wallet-adapter' \
 //     --export MyAdapter \
 //     --opts '{"gameId":"example-game","wsUrl":"wss://platform.example.com/v1/ws?game=example-game","authToken":"..."}' \
 //     --out-md ./conform.md

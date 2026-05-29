@@ -481,10 +481,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     let receipt;
     try {
       // Default round_state envelope when the math returns no carry.
-      // Some platforms (your platform, ...) validate this as required-non-empty,
-      // so we ALWAYS send a meaningful audit envelope describing the
-      // round outcome  - never an empty string. When the math DOES set
-      // carry, we forward it verbatim; the math owns the format.
+      // Some wallets validate this as required-non-empty, so we ALWAYS send a
+      // meaningful audit envelope describing the round outcome  - never an
+      // empty string. When the math DOES set carry, we forward it verbatim;
+      // the math owns the format.
       const roundState = cappedOutcome.carry ?? JSON.stringify({
         type:       cappedOutcome.type,
         multiplier: cappedOutcome.multiplier,

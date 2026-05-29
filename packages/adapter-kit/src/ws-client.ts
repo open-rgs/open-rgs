@@ -43,7 +43,7 @@ export interface WsClientOptions {
    *  WebSocket API can't set these  - this kit uses the `ws` npm
    *  package which can. */
   headers?: Record<string, string>;
-  /** Optional WS subprotocols. e.g. ["json"] for your platform. */
+  /** Optional WS subprotocols, e.g. ["json"] when the wallet requires one. */
   protocols?: string | string[];
   /** Encode an RPC request frame. */
   encodeRequest: (corrId: number, method: string, params: unknown) => WsFrame;

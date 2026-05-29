@@ -145,30 +145,31 @@ Adapters MUST forward this key downstream when the underlying protocol
 supports it; if not, the adapter is responsible for local dedupe. The
 `IdempotencyConfig.ttlMs` (default 5 min) is the recommended dedupe window.
 
-## Reference adapter behavior (your platform)
+## Reference adapter behavior (illustrative)
 
-The your platform reference adapter (lives in `example-game-server`,
-not in this repo) implements:
+A typical persistent-WebSocket adapter (such as the one in the external
+`example-game-server`, not in this repo) implements:
 
-- `connect()` opens a single shared WebSocket per server, sends a
-  `Hello` envelope, awaits `Welcome`.
-- Lazy reconnect on `GoAway: IdleTimeout`. The next RPC after an idle
+- `connect()` opens a single shared WebSocket per server, performs the
+  upstream's handshake, and awaits its acknowledgement.
+- Lazy reconnect on an idle-timeout close; the next RPC after an idle
   disconnect transparently reconnects.
-- `op_seq` counter on outbound envelopes; correlation IDs on inbound.
-- `openSession` -> `SessionInfoRequest`. Returned `SessionInfoResponse`
-  is mapped to canonical `SessionInfo`. Active promo free-rounds pool is translated.
-- `settleSimple` -> `PlayRoundRequest`. `betIndex` and `priceMultiplier`
-  are forwarded as-is to preserve your platform's accounting.
-- `openComplex` / `closeComplex` map to `OpenRoundRequest` /
-  `CloseRoundRequest`. Not yet implemented (lucky-digits is simple-only).
-- `updateComplex` maps to `UpdateRoundStateRequest`, fire-and-forget.
-- Inbound events on the `events` channel are translated:
-  `BalanceChangedEvent` -> `balanceChanged`, `SessionClosedEvent` ->
-  `sessionClosed`. `AutocloseRequestedEvent` (if your platform emits one) ->
-  `autocloseRequested`.
+- An outbound sequence counter; correlation ids on inbound frames.
+- `openSession` -> the upstream's session-info request; the response is
+  mapped to canonical `SessionInfo` (an active promo free-rounds pool is
+  translated).
+- `settleSimple` -> the upstream's play-round request; `betIndex` and
+  `priceMultiplier` are forwarded as-is to preserve the upstream's
+  accounting.
+- `openComplex` / `closeComplex` -> the upstream's open/close-round requests.
+- `updateComplex` -> the upstream's state-update request, fire-and-forget.
+- Inbound events are translated: balance-changed -> `balanceChanged`,
+  session-closed -> `sessionClosed`, autoclose-requested (if the upstream
+  emits one) -> `autocloseRequested`.
 
-The adapter is **private to the operator**  - it lives outside this repo
-because it encodes a commercial API contract.
+A real adapter is **private to the operator**  - it lives outside this repo
+because it encodes a commercial API contract. Public packages never name a
+specific provider's brand, product id, or wire shape.
 
 ## What the wallet does NOT see
 
