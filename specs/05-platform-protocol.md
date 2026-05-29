@@ -69,6 +69,24 @@ The wallet guarantees:
   grace window MUST be closeable by the orchestrator at any later time.
   If the wallet has its own deadline policy, it MUST emit
   `autocloseRequested` rather than silently expiring the round.
+- **Autoclose backstop (hard requirement).** Because the orchestrator
+  runs no idle timers (ADR-003), an open complex round only ever closes
+  in response to an external signal. Every adapter MUST therefore
+  guarantee that some signal eventually arrives for every open round —
+  it MUST satisfy at least one of:
+    1. forward a wallet-native deadline/expiry as `autocloseRequested`;
+    2. forward `sessionClosed` (the orchestrator cascades it to
+       autoclose-then-drop the open round); or
+    3. derive its own backstop deadline and emit `autocloseRequested`
+       when no upstream signal exists.
+
+  An adapter that can neither be told to close a round nor derive a
+  close on its own is **non-conformant** — it would leak open rounds
+  forever. This is not optional: the conformance suite
+  (`@open-rgs/adapter-test-kit`) asserts an open round reaches
+  `closeComplex` after an autoclose signal, and operators relying on
+  RGS-side scheduling must instead drive autoclose from their wallet or
+  the admin endpoint.
 - `BalanceChangedEvent` is emitted whenever the balance changes for any
   reason (round settle, deposit, withdrawal, manual adjustment).
 
