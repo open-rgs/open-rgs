@@ -35,8 +35,9 @@ into the matching skeleton in the appendix.
    `openSession` / `settleSimple` / `openComplex` / `closeComplex` /
    `updateComplex`? Write them in a comment at the top of `index.ts`.
 2. **Identify the event mapping.** Which upstream events translate to
-   `balanceChanged` / `sessionClosed` / `campaignGranted` /
-   `autocloseRequested`?
+   `balanceChanged` / `sessionClosed` / `promoGranted` /
+   `autocloseRequested`? (Use the exact `PlatformEvent.type` strings — an
+   unknown type is dropped; `promoGranted`, not `campaignGranted`.)
 3. **Identify the error vocabulary.** Build a single
    [`ErrorMap`](../packages/adapter-kit/src/error-map.ts) at construct
    time mapping vendor codes/messages to `RGSErrorCode`.
@@ -225,9 +226,9 @@ declare RTP under the no-carry assumption.
 
 ### FRC-less platforms
 
-Similar: omit `frc` from `openSession` results, ignore `frcCampaignId`
-on round calls, and don't emit `campaignGranted` events. The
-orchestrator handles the absence — FRC just isn't offered to players.
+Similar: omit `promo` from `openSession` results, ignore `promoId`
+on round calls, and don't emit `promoGranted` events. The
+orchestrator handles the absence — free rounds just aren't offered to players.
 
 ### Sequence-numbered upstream
 
