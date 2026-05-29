@@ -49,7 +49,13 @@ Outputs:
 5. Pre-flight balance check (skipped for FRC). Insufficient →
    `INSUFFICIENT_BALANCE`.
 6. Call `math.play(session.carry, ctx)`. `ctx` is `{ mode, cheat?, params? }`.
-7. Compute `win = outcome.multiplier × bet`.
+7. **Sanitize + cap the multiplier**, then compute `win = multiplier × bet`.
+   The multiplier is the only untrusted value crossing into money, so it
+   is validated fail-closed *before* the cap: a non-finite multiplier
+   (`NaN` / `±Infinity`) is a math fault and fails the round (never a
+   payout); a negative multiplier is clamped to `0`; a multiplier above
+   `maxWinMultiplier` is clipped and the outcome stamped
+   `max_win_reached`.
 8. Call `wallet.settleSimple({ bet, betIndex, priceMultiplier, win,
    multiplier, type, roundState: outcome.carry ?? "", frcCampaignId? })`.
 9. On wallet success: update local balance, store `outcome.carry` and
@@ -95,7 +101,8 @@ Outputs:
 2. Confirm `math.isTerminal(state) === true`. Otherwise `INVALID_ROUND`.
 3. Call `math.close(state)`. Math returns `{ multiplier, ops, type,
    carry?, nextMode? }`.
-4. Compute `win = multiplier × bet`.
+4. Sanitize + cap the multiplier (same fail-closed rules as `spin` step 7),
+   then compute `win = multiplier × bet`.
 5. Call `wallet.closeComplex({ roundId, finalState: state, win,
    multiplier, type })`.
 6. On success: update balance, set carry/nextMode for next round, apply
@@ -163,7 +170,9 @@ The autoclose flow:
 3. Otherwise, if `math.isTerminal(state) === true`, call `math.close(state)`.
 4. Otherwise, return a zero-multiplier loss outcome (conservative for
    the operator — no surprise pay-outs from stale state).
-5. Compute `win = multiplier × bet`. Call `wallet.closeComplex(...)`.
+5. Apply the same sanitize + max-win cap as a client close (autoclose
+   moves money too, so it must not bypass the guard), then compute
+   `win = multiplier × bet`. Call `wallet.closeComplex(...)`.
 6. Update balance, drop `openRound`. Log with `event.category=autoclose`
    and the trigger reason.
 
