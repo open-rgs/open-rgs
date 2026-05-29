@@ -3,6 +3,9 @@
   "version": "0.3.1",
   "description": "In-memory PlatformAdapter for open-rgs development and testing. Includes FRC and autoclose-event helpers.",
   "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/open-rgs/open-rgs.git",

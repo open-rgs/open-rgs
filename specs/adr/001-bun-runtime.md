@@ -40,6 +40,31 @@ Use **Bun** as the canonical runtime.
 - Code that uses Bun-specific APIs is not Node-compatible. We're
   fine with that — Node compatibility is not a goal.
 
+## Distribution / packaging (consequence of "Bun, not Node")
+
+Because Bun runs `.ts` directly, the published packages follow suit —
+this is deliberate, not an oversight:
+
+- **Packages publish raw `.ts`, no `dist/`.** `main`, `types`, and
+  `exports` all point at `src/*.ts`; the `files` allowlist ships `src`.
+  There is no compile/bundle step, so there's no `dist` to drift from
+  source, no sourcemap dance, and the published code is the code you
+  read. The cost is that a **consumer must run Bun** (or a TS-aware
+  loader) — importing `@open-rgs/core` from plain `node` won't resolve
+  the `.ts` entry. That's the intended audience.
+- **CLIs are `bunx`-only.** `@open-rgs/simulator` (`open-rgs-sim`) and
+  `@open-rgs/adapter-test-kit` (`open-rgs-adapter-conform`) declare a
+  `.ts` `bin` with a `#!/usr/bin/env bun` shebang. They are meant to be
+  run with `bunx open-rgs-sim …`, **not** `npm install -g` on a
+  Node-only box (npm would create a shim that execs `bun`, which fails
+  if Bun isn't installed). Documented in each package's README.
+- **The requirement is declared, not just prose.** Every publishable
+  package sets `engines.bun` (`>=1.0.0`), so `bun install` enforces it
+  and the constraint is machine-readable for consumers.
+
+If Node consumption is ever required, the fix is a build step that emits
+`dist/*.js` + `.d.ts` and dual `exports` — explicitly out of scope today.
+
 ## Alternatives considered
 
 - **Node.js** — works, mature, well-known, but slower WS, slower

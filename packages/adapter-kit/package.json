@@ -3,6 +3,9 @@
   "version": "0.4.1",
   "description": "Toolkit for building PlatformAdapter implementations. WS / HTTP RPC clients, error mapping, diagnostics scaffolding.",
   "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/open-rgs/open-rgs.git",
