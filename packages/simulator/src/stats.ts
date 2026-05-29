@@ -1,10 +1,23 @@
 // Streaming-friendly stat helpers for big simulator runs.
 
+/** Kahan (compensated) summation  - bounds the rounding error that naive
+ *  left-to-right addition accumulates over the 10^8+ samples a real RTP
+ *  certification run produces. (L2) */
+function kahanSum(xs: readonly number[]): number {
+  let sum = 0;
+  let c = 0; // running compensation for lost low-order bits
+  for (const x of xs) {
+    const y = x - c;
+    const t = sum + y;
+    c = (t - sum) - y;
+    sum = t;
+  }
+  return sum;
+}
+
 export function mean(xs: readonly number[]): number {
   if (xs.length === 0) return 0;
-  let s = 0;
-  for (const x of xs) s += x;
-  return s / xs.length;
+  return kahanSum(xs) / xs.length;
 }
 
 /** Population stddev (divides by N, not N-1). Simulator samples are full
@@ -12,12 +25,16 @@ export function mean(xs: readonly number[]): number {
 export function stdDev(xs: readonly number[], m?: number): number {
   if (xs.length === 0) return 0;
   const mu = m ?? mean(xs);
-  let s = 0;
+  let sum = 0;
+  let c = 0;
   for (const x of xs) {
     const d = x - mu;
-    s += d * d;
+    const y = d * d - c;
+    const t = sum + y;
+    c = (t - sum) - y;
+    sum = t;
   }
-  return Math.sqrt(s / xs.length);
+  return Math.sqrt(sum / xs.length);
 }
 
 /** Percentile by nearest-rank on a *sorted* array. Pass an already-sorted
