@@ -60,6 +60,11 @@ export interface OrchestratorConfig {
   /** Optional durable, tamper-evident game-outcome log. When set, every
    *  money-moving round records an event (see audit-log.ts). */
   auditLog?: AuditLog;
+  /** How the wallet-side `updateComplex` action-log checkpoint is treated on
+   *  a complex-round step. "best-effort" (default) fires it and swallows
+   *  failures; "mandatory" awaits it and FAILS the step if it's dropped — for
+   *  jurisdictions that require a server-side action log. */
+  auditMode?: "best-effort" | "mandatory";
   /** Idempotency-key generator + retention. Defaults to uuid-v4 +
    *  5-minute TTL (a hint for upstream caches). */
   idempotency?: IdempotencyConfig;
@@ -107,6 +112,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   const { manifest, platform, metrics } = cfg;
   const cheatsEnabled = cfg.cheatsEnabled ?? false;
   const auditLog = cfg.auditLog;
+  const auditMode = cfg.auditMode ?? "best-effort";
   const genIdemKey = cfg.idempotency?.generate ?? defaultIdempotencyKey;
 
   // Record one tamper-evident audit event per money-moving round. Never let
@@ -668,13 +674,29 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     open.actionLog.push(req.action);
     open.opsLog.push(...stepResult.ops);
 
-    // Optional audit checkpoint, fire-and-forget if provider supports it.
+    // Record the player action into the tamper-evident game-cycle log (no
+    // money moves on a step, so win/multiplier are 0).
+    recordAudit(mode, {
+      sessionId: s.sessionId, roundId: open.roundId, kind: "step",
+      type: String(req.action.type), bet: 0, win: 0, multiplier: 0, reason: "",
+    });
+
+    // Wallet-side action-log checkpoint, if the provider supports it.
     if (typeof platform.updateComplex === "function") {
-      void timedPlatformCall(metrics, "updateComplex", () => platform.updateComplex!({
+      const update = () => timedPlatformCall(metrics, "updateComplex", () => platform.updateComplex!({
         sessionId: s.sessionId,
         roundId: open.roundId,
         state: open.state,
-      })).catch((err) => log.warn("audit updateComplex failed", { "error.message": String(err) }));
+      }));
+      if (auditMode === "mandatory") {
+        // Jurisdictions that mandate a server-side action log can't treat a
+        // dropped update as "best effort" — block the step and fail it so the
+        // mandated record is never silently missing.
+        try { await update(); }
+        catch (e) { throw translate(e, "STEP_FAILED"); }
+      } else {
+        void update().catch((err) => log.warn("audit updateComplex failed", { "error.message": String(err) }));
+      }
     }
 
     return {

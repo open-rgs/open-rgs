@@ -62,6 +62,10 @@ export interface ServerConfig {
    *  a durable sink in production (file+fsync, object storage, Kafka, …);
    *  `memoryAuditSink`/`jsonlStdoutAuditSink` are for dev only. */
   auditSink?: AuditSink;
+  /** "mandatory" makes the wallet-side `updateComplex` action-log checkpoint
+   *  block-and-fail a complex-round step if dropped (for jurisdictions that
+   *  require a server-side action log). Default "best-effort". */
+  auditMode?: "best-effort" | "mandatory";
   /** Graceful-shutdown drain window in ms. Default 30_000. */
   shutdownDrainMs?: number;
   /** Install a SIGTERM handler that calls stop(). Default true; set
@@ -175,6 +179,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     metrics,
     ...(cfg.idempotency ? { idempotency: cfg.idempotency } : {}),
     ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink) } : {}),
+    ...(cfg.auditMode ? { auditMode: cfg.auditMode } : {}),
   });
 
   // Single-port mode: mount the admin handler on the transport's

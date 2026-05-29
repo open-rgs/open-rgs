@@ -30,7 +30,7 @@ export interface AuditEvent {
   ts: number;
   sessionId: string;
   roundId: string;
-  kind: "settle" | "open" | "close" | "autoclose";
+  kind: "settle" | "open" | "step" | "close" | "autoclose";
   /** Outcome type tag from math (e.g. "win", "loss", "max_win_reached"). */
   type: string;
   bet: number;
