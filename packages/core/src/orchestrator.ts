@@ -681,7 +681,15 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       return { closed: false, reason: `math-error: ${e instanceof Error ? e.message : String(e)}` };
     }
 
-    const win = closeResult.multiplier * open.bet;
+    // Autoclose moves money too, so it must run the same sanitize + cap
+    // path as a client close  - otherwise a non-finite/negative multiplier
+    // from math.autoclose() (or a cap-exceeding one) would settle unguarded.
+    const cappedClose = applyMaxWinCapClose(
+      closeResult,
+      open.bet,
+      mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
+    );
+    const win = cappedClose.multiplier * open.bet;
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -689,8 +697,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         roundId: open.roundId,
         finalState: open.state,
         win,
-        multiplier: closeResult.multiplier,
-        type: closeResult.type,
+        multiplier: cappedClose.multiplier,
+        type: cappedClose.type,
         idempotencyKey: genIdemKey(),
       }));
     } catch (e) {
@@ -702,14 +710,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       return { closed: false, reason: `platform-error: ${e instanceof Error ? e.message : String(e)}` };
     }
 
-    metrics?.roundTotal.inc(1, { kind: "complex", mode: open.modeId, type: closeResult.type });
+    metrics?.roundTotal.inc(1, { kind: "complex", mode: open.modeId, type: cappedClose.type });
     metrics?.roundDuration.observe((Date.now() - open.openedAt) / 1000, { kind: "complex", mode: open.modeId });
 
     sessions.setBalance(s.sessionId, receipt.balance);
     sessions.setCarry(
       s.sessionId,
-      closeResult.carry,
-      closeResult.nextMode,
+      cappedClose.carry,
+      cappedClose.nextMode,
     );
     if (receipt.promo) promo.applyUpdate(s, receipt.promo);
     s.openRound = undefined;
@@ -721,7 +729,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       "round.id": receipt.roundId,
       "autoclose.reason": req.reason,
       "round.win": win,
-      "round.multiplier": closeResult.multiplier,
+      "round.multiplier": cappedClose.multiplier,
     });
 
     return { closed: true, roundId: receipt.roundId };
@@ -784,42 +792,68 @@ function translate(e: unknown, fallback: import("@open-rgs/contract").RGSErrorCo
   return new RGSError(fallback, msg);
 }
 
-/** Apply max-win cap to a simple-round outcome. If the cap fires:
+/** Validate a math-produced multiplier *before* it ever touches money.
+ *
+ *  This is the single guard between untrusted math output and a settle
+ *  call, so it must fail closed. The old cap check (`multiplier <= cap`)
+ *  was the only validation and it was backwards for bad inputs: `NaN <= cap`
+ *  and `Infinity <= cap` are both `false`, so a non-finite multiplier fell
+ *  through to the cap branch and paid out `cap x bet`  - a math bug became a
+ *  *maximum* payout. A negative multiplier passed the check unchanged and
+ *  produced a negative settlement.
+ *
+ *  Rules:
+ *   - non-finite (NaN / +/-Infinity) -> hard error; fail the round, never pay.
+ *   - negative -> clamp to 0 (treat as a loss); money never flows backwards.
+ *   - finite, >= 0 -> returned unchanged for the caller to cap. */
+function sanitizeMultiplier(multiplier: number): number {
+  if (!Number.isFinite(multiplier)) {
+    throw new RGSError("INTERNAL_ERROR", "math returned a non-finite multiplier");
+  }
+  return multiplier < 0 ? 0 : multiplier;
+}
+
+/** Apply max-win cap to a simple-round outcome. The multiplier is first
+ *  sanitized (see sanitizeMultiplier  - non-finite throws, negative clamps
+ *  to 0). If the cap then fires:
  *  - multiplier is clipped to maxMultiplier
  *  - type is stamped as "max_win_reached" so the client can render
  *    the max-win celebration
  *  - ops are preserved; if the cap fired, we append a "max_win" op
  *    so the client knows visually
- *  When no cap or outcome is under cap -> returned unchanged. */
+ *  When no cap or outcome is under cap -> returned with the sanitized
+ *  multiplier (unchanged when it was already finite and non-negative). */
 export function applyMaxWinCap(
   outcome: RoundOutcome,
   _bet: number,
   maxMultiplier: number | undefined,
 ): RoundOutcome {
-  if (maxMultiplier == null || outcome.multiplier <= maxMultiplier) {
-    return outcome;
+  const multiplier = sanitizeMultiplier(outcome.multiplier);
+  if (maxMultiplier == null || multiplier <= maxMultiplier) {
+    return multiplier === outcome.multiplier ? outcome : { ...outcome, multiplier };
   }
   return {
     multiplier: maxMultiplier,
-    ops: [...outcome.ops, { kind: "max_win", cap_multiplier: maxMultiplier, raw_multiplier: outcome.multiplier }],
+    ops: [...outcome.ops, { kind: "max_win", cap_multiplier: maxMultiplier, raw_multiplier: multiplier }],
     type: "max_win_reached",
     ...(outcome.carry !== undefined ? { carry: outcome.carry } : {}),
     ...(outcome.nextMode !== undefined ? { nextMode: outcome.nextMode } : {}),
   };
 }
 
-/** Same cap applied to a complex-round close outcome. */
+/** Same sanitize-then-cap applied to a complex-round close outcome. */
 export function applyMaxWinCapClose(
   outcome: CloseOutcome,
   _bet: number,
   maxMultiplier: number | undefined,
 ): CloseOutcome {
-  if (maxMultiplier == null || outcome.multiplier <= maxMultiplier) {
-    return outcome;
+  const multiplier = sanitizeMultiplier(outcome.multiplier);
+  if (maxMultiplier == null || multiplier <= maxMultiplier) {
+    return multiplier === outcome.multiplier ? outcome : { ...outcome, multiplier };
   }
   return {
     multiplier: maxMultiplier,
-    ops: [...outcome.ops, { kind: "max_win", cap_multiplier: maxMultiplier, raw_multiplier: outcome.multiplier }],
+    ops: [...outcome.ops, { kind: "max_win", cap_multiplier: maxMultiplier, raw_multiplier: multiplier }],
     type: "max_win_reached",
     ...(outcome.carry !== undefined ? { carry: outcome.carry } : {}),
     ...(outcome.nextMode !== undefined ? { nextMode: outcome.nextMode } : {}),
