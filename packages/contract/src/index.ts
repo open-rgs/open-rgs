@@ -37,7 +37,9 @@ export interface AwaitingHint {
   type: string;
   /** Optional list of valid values for the action's primary parameter. */
   options?: unknown[];
-  /** Optional ms-budget for this step before autoclose injects a default. */
+  /** Optional UX hint: ms-budget for this step. NOT enforced by the engine
+   *  (autoclose is external-trigger only — there are no in-process step
+   *  timers); a client may use it to show a countdown. */
   deadline?: number;
   /** Optional UX hint for the client. */
   prompt?: string;
@@ -243,6 +245,10 @@ export type AutoclosePolicy =
   | { policy: "hold" }
   | { policy: "math-decides" };
 
+/** NOTE: declared but NOT yet enforced. Cross-process restart recovery needs
+ *  a wallet open-round inquiry endpoint that isn't specified yet; today the
+ *  orchestrator always discards in-memory state on restart. Tracked in
+ *  Spec 09 (roadmap). */
 export interface RecoveryPolicy {
   /** What to do with rounds left open across server restart. */
   onRestart: "resume" | "forfeit" | "autoclose";
@@ -406,17 +412,6 @@ export interface OpenRoundResume {
   openedAt?: number;
 }
 
-export interface CloseComplexAuto {
-  sessionId: string;
-  roundId: string;
-  finalState: RoundState;
-  win: number;
-  multiplier: number;
-  type: string;
-  /** Reason for the autoclose — passed through for audit. */
-  reason: string;
-}
-
 export interface SettleSimple {
   sessionId: string;
   /** Final bet in currency's minimal unit (integer).
@@ -484,6 +479,10 @@ export interface CloseComplex {
   /** Idempotency key — RGS-generated. Adapter forwards to the wallet
    *  if the wallet supports dedupe. */
   idempotencyKey?: string;
+  /** Set when this close was an AUTOCLOSE (external trigger), carrying the
+   *  trigger reason for the wallet's audit trail (e.g. "session-closed",
+   *  "idle-timeout"). Absent for a normal client-initiated close. */
+  reason?: string;
 }
 
 export interface RoundReceipt {
@@ -747,7 +746,11 @@ export interface IdempotencyConfig {
 
 // ─── Concurrency policy ────────────────────────────────────────────────────
 
-/** What to do when a second WS connection arrives for an existing session. */
+/** What to do when a second WS connection arrives for an existing session.
+ *  NOTE: declared but NOT yet enforced — second connections to a live
+ *  session are currently unmanaged at the transport level (per-session
+ *  *operation* serialization exists in the orchestrator; connection-level
+ *  policy does not). Tracked in Spec 09 (roadmap). */
 export type ConcurrencyPolicy = "kick-old" | "reject-new";
 
 // ─── Numeric convention ────────────────────────────────────────────────────
