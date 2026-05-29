@@ -47,4 +47,16 @@ describe("createDiagnostics", () => {
     for (let i = 0; i < 5; i++) d.noteEvent();
     expect(d.snapshot()["events_received"]).toBe(5);
   });
+
+  test("direct field access is a live view, not a creation-time snapshot (L6)", () => {
+    // The handle exposes DiagnosticsState fields directly; reading them must
+    // reflect the latest mutation, not the values captured at create time.
+    const d = createDiagnostics({ adapter: "t", version: "0" });
+    expect(d.connected).toBe(false);
+    expect(d.rpcsInFlight).toBe(0);
+    d.noteConnect();
+    d.noteRpcStart();
+    expect(d.connected).toBe(true);
+    expect(d.rpcsInFlight).toBe(1);
+  });
 });
