@@ -3,7 +3,30 @@
 Conformance test suite for `PlatformAdapter` implementations. Hand it
 any adapter; get back a checklist of what works.
 
-## Use
+## Runtime
+
+**Bun is required** (`engines.bun >= 1.0.0`). This package publishes raw
+TypeScript (no `dist/`) and the `open-rgs-adapter-conform` `bin` is a
+`.ts` file with a `#!/usr/bin/env bun` shebang, so run it with **`bunx`**
+ - not `npm install -g` on a Node-only machine. See ADR-001 for why.
+
+## CLI
+
+```bash
+bunx open-rgs-adapter-conform \
+  --adapter '@your-org/wallet-adapter' \
+  --export MyAdapter \
+  --opts '{"gameId":"example-game","wsUrl":"wss://wallet.example.com/ws"}' \
+  --out-md ./conform.md
+```
+
+Required: `--adapter <module>` (npm package or path) and `--export <name>`
+(adapter class export, default `default`). Optional: `--opts <json>` (or
+env `ADAPTER_OPTS_JSON`), `--skip-complex`, `--skip-events`,
+`--timeout-ms <n>`, `--out-json <path>`. Exit code is 0 only if every
+non-skipped check is `ok`.
+
+## Use (as a library)
 
 ```ts
 import { runConformance, mdConformanceReport } from "@open-rgs/adapter-test-kit";

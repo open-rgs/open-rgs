@@ -3,6 +3,9 @@
   "version": "0.3.1",
   "description": "Public type contracts for open-rgs: MathModule, WalletProvider, ClientTransport, GameManifest. Zero runtime, zero deps.",
   "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/open-rgs/open-rgs.git",
