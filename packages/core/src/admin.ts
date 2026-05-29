@@ -37,7 +37,6 @@
 //   /admin/manifest       serialised GameManifest
 //   /admin/modes          mode catalog
 //   /admin/autoclose POST external autoclose trigger
-//   /__echo               debug — returns the raw pathname the pod saw
 //
 import type { GameManifest, PlatformAdapter, OrchestratorAPI, AutocloseRequest } from "@open-rgs/contract";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -230,7 +229,10 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
 
   function logs(url: URL) {
     const level = url.searchParams.get("level") as "debug" | "info" | "warn" | "error" | "fatal" | null;
-    const limit = Math.min(Number(url.searchParams.get("limit") ?? 200), 500);
+    // A non-numeric ?limit gives Number(...) === NaN → getRecent(NaN). Clamp
+    // to a sane default/range instead. (L5)
+    const raw = Number(url.searchParams.get("limit") ?? 200);
+    const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.trunc(raw), 1), 500) : 200;
     return log.getRecent(level ?? undefined, limit);
   }
 
