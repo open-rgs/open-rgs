@@ -167,8 +167,12 @@ const jsonLd = isLanding
         var mermaidPromise = null;
         function loadMermaid() {
           if (mermaidPromise) return mermaidPromise;
+          // Pin the EXACT version (not a floating `@11`): a major-range URL
+          // silently pulls whatever minor/patch jsdelivr last resolved, so a
+          // bad or compromised release would land in the site with no commit.
+          // Bump this deliberately.
           mermaidPromise = import(
-            "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"
+            "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs"
           ).then(function (m) { return m.default; });
           return mermaidPromise;
         }
@@ -182,10 +186,13 @@ const jsonLd = isLanding
               theme:         "base",
               themeVariables: themeVars(),
               fontFamily:    cssVar("--sans"),
-              /* Diagram source is authored by us, never user input, so
-                 the looser DOMPurify profile (allows <br/>, span styles
-                 inside HTML labels) is safe and gives clean output. */
-              securityLevel: "loose",
+              /* "antiscript": HTML tags in labels (we use <br/>) are still
+                 allowed, but any <script> element is stripped — defense in
+                 depth even though the diagram source is authored by us, never
+                 user input. That's the only difference from "loose" here (the
+                 diagrams use no script in labels), so rendered output is
+                 unchanged. */
+              securityLevel: "antiscript",
               flowchart:     { useMaxWidth: true, htmlLabels: true, curve: "basis", padding: 12 },
               sequence:      { useMaxWidth: true, wrap: true, mirrorActors: false,
                                 messageFontSize: 13, actorFontSize: 14, noteFontSize: 12,
