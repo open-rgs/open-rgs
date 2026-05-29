@@ -219,7 +219,7 @@ await createServer({
 - The image starts and serves `/livez` within 5 seconds of container
   start, given wallet env vars.
 - The image starts and serves the WS transport correctly even when
-  the wallet endpoint is unreachable (returns `GAMES_API_UNAVAILABLE`
+  the wallet endpoint is unreachable (returns `PLATFORM_UNAVAILABLE`
   on INIT).
 - A K8s Deployment with `replicas: 3` round-robins INITs across pods
   with no shared state required.

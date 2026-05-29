@@ -283,7 +283,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
   async function init(req: ClientRequestInit, conn: ConnectionMeta): Promise<ClientResponseInit> {
     if (!req.sid) throw new RGSError("MISSING_SESSION", "sid required");
-    if (!platform.isHealthy) throw new RGSError("GAMES_API_UNAVAILABLE", "Platform not connected");
+    if (!platform.isHealthy) throw new RGSError("PLATFORM_UNAVAILABLE", "Platform not connected");
 
     // Resume path: if a session for this sid is already in our cache (e.g.
     // the player disconnected mid-round and reconnected), reuse it. The
@@ -481,10 +481,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     let receipt;
     try {
       // Default round_state envelope when the math returns no carry.
-      // Some platforms (your platform, ...) validate this as required-non-empty,
-      // so we ALWAYS send a meaningful audit envelope describing the
-      // round outcome — never an empty string. When the math DOES set
-      // carry, we forward it verbatim; the math owns the format.
+      // Some wallets validate this as required-non-empty, so we ALWAYS send a
+      // meaningful audit envelope describing the round outcome — never an
+      // empty string. When the math DOES set carry, we forward it verbatim;
+      // the math owns the format.
       const roundState = cappedOutcome.carry ?? JSON.stringify({
         type:       cappedOutcome.type,
         multiplier: cappedOutcome.multiplier,
