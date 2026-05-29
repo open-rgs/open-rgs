@@ -264,15 +264,46 @@ export interface GameManifest {
 /** Identity helper: validates and freezes the manifest. */
 export function defineGame(m: GameManifest): GameManifest {
   if (!m.id) throw new Error("GameManifest.id required");
-  if (!m.modes[m.defaultMode]) {
+  if (!m.modes || Object.keys(m.modes).length === 0) {
+    throw new Error("GameManifest.modes must be non-empty");
+  }
+  const defaultMode = m.modes[m.defaultMode];
+  if (!defaultMode) {
     throw new Error(`defaultMode '${m.defaultMode}' not in modes`);
   }
+  // The default mode must be client-reachable — routing to an internal-only
+  // mode by default strands every fresh round.
+  if (defaultMode.internal) {
+    throw new Error(`defaultMode '${m.defaultMode}' is internal — pick a client-reachable default`);
+  }
+  // RTP is a fraction (0.96 = 96%); the overall game figure must be ≤ 1.
+  if (!Number.isFinite(m.declaredRtp) || m.declaredRtp < 0 || m.declaredRtp > 1) {
+    throw new Error(`GameManifest.declaredRtp must be a finite number in [0, 1], got ${m.declaredRtp}`);
+  }
+  if (m.maxWinMultiplier !== undefined && (!Number.isFinite(m.maxWinMultiplier) || m.maxWinMultiplier <= 0)) {
+    throw new Error(`GameManifest.maxWinMultiplier must be a positive finite number, got ${m.maxWinMultiplier}`);
+  }
   for (const [id, mode] of Object.entries(m.modes)) {
-    if (typeof mode.stakeMultiplier !== "number" || mode.stakeMultiplier < 0) {
+    if (typeof mode.stakeMultiplier !== "number" || !Number.isFinite(mode.stakeMultiplier) || mode.stakeMultiplier < 0) {
       throw new Error(`mode '${id}' has invalid stakeMultiplier`);
     }
+    if (!mode.math || (mode.math.kind !== "simple" && mode.math.kind !== "complex")) {
+      throw new Error(`mode '${id}' has no math or an invalid math.kind`);
+    }
+    // Per-mode declaredRtp may exceed 1 (a bonus mode measured in isolation
+    // is funded by the base), so only require it finite and non-negative.
+    if (mode.declaredRtp !== undefined && (!Number.isFinite(mode.declaredRtp) || mode.declaredRtp < 0)) {
+      throw new Error(`mode '${id}' has invalid declaredRtp`);
+    }
+    if (mode.maxWinMultiplier !== undefined && (!Number.isFinite(mode.maxWinMultiplier) || mode.maxWinMultiplier <= 0)) {
+      throw new Error(`mode '${id}' has invalid maxWinMultiplier`);
+    }
   }
-  return Object.freeze({ ...m, modes: Object.freeze({ ...m.modes }) }) as GameManifest;
+  // Deep-freeze each mode too — the old shallow freeze left nested mode/math
+  // objects mutable.
+  const frozenModes: Record<string, GameMode> = {};
+  for (const [id, mode] of Object.entries(m.modes)) frozenModes[id] = Object.freeze({ ...mode });
+  return Object.freeze({ ...m, modes: Object.freeze(frozenModes) }) as GameManifest;
 }
 
 // ─── Platform adapter contract ──────────────────────────────────────────────
