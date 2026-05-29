@@ -11,14 +11,15 @@
 // the orchestrator's wire spec assumes. Concurrent calls reject.
 
 import { encode, decode } from "@msgpack/msgpack";
-import type {
-  ClientRequestInit, ClientResponseInit,
-  ClientRequestSpin, ClientResponseSpin,
-  ClientRequestOpenRound, ClientResponseOpenRound,
-  ClientRequestStepRound, ClientResponseStepRound,
-  ClientRequestCloseRound, ClientResponseCloseRound,
-  ClientRequestPromoAccept, ClientResponsePromoAccept,
-  ClientResponseError, RGSErrorCode,
+import {
+  WIRE_CORRELATION_KEY,
+  type ClientRequestInit, type ClientResponseInit,
+  type ClientRequestSpin, type ClientResponseSpin,
+  type ClientRequestOpenRound, type ClientResponseOpenRound,
+  type ClientRequestStepRound, type ClientResponseStepRound,
+  type ClientRequestCloseRound, type ClientResponseCloseRound,
+  type ClientRequestPromoAccept, type ClientResponsePromoAccept,
+  type ClientResponseError, type RGSErrorCode,
 } from "@open-rgs/contract";
 import { FRAME, type FrameCode } from "./codes.js";
 
@@ -38,9 +39,26 @@ export interface RgsClientOptions {
 
 interface Pending {
   expect: FrameCode;
+  /** Correlation id stamped on this request; the response must echo it. */
+  cid: string;
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+}
+
+let cidSeq = 0;
+function nextCid(): string {
+  // Unique per process+call; enough to disambiguate a late response from a
+  // timed-out request against a newer one on the same connection.
+  cidSeq += 1;
+  return `c${cidSeq}-${Math.trunc(performance.now())}`;
+}
+
+/** Drop the wire correlation key so callers get a clean response object. */
+function stripCid(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") return payload;
+  const { [WIRE_CORRELATION_KEY]: _omit, ...rest } = payload as Record<string, unknown>;
+  return rest;
 }
 
 export class RgsClient {
@@ -113,7 +131,8 @@ export class RgsClient {
     if (this.pending) {
       return Promise.reject(new Error("RgsClient: another request is in flight"));
     }
-    const body = encode(payload as unknown as Record<string, unknown>);
+    const cid = nextCid();
+    const body = encode({ ...(payload as Record<string, unknown>), [WIRE_CORRELATION_KEY]: cid });
     const frame = new Uint8Array(body.length + 1);
     frame[0] = typeOut;
     frame.set(body, 1);
@@ -122,10 +141,10 @@ export class RgsClient {
 
     return new Promise<Resp>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        if (this.pending?.expect === expectIn) this.pending = undefined;
+        if (this.pending?.cid === cid) this.pending = undefined;
         reject(new Error(`RgsClient: request 0x${typeOut.toString(16)} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
-      this.pending = { expect: expectIn, resolve: resolve as (v: unknown) => void, reject, timeout };
+      this.pending = { expect: expectIn, cid, resolve: resolve as (v: unknown) => void, reject, timeout };
       try { this.ws!.send(frame); }
       catch (e) {
         clearTimeout(timeout);
@@ -146,7 +165,17 @@ export class RgsClient {
       catch { /* malformed; drop */ return; }
     }
 
-    // Server-side error frame  - fails any in-flight request.
+    const cid = (payload && typeof payload === "object")
+      ? (payload as Record<string, unknown>)[WIRE_CORRELATION_KEY]
+      : undefined;
+
+    // A frame carrying a correlation id must match the in-flight request's id.
+    // A mismatch is a stale/duplicate response from a timed-out call  - drop it
+    // so it can't resolve a newer request. (Pre-dispatch errors and legacy
+    // servers may omit the id; those fall through to the type match.)
+    if (cid !== undefined && this.pending && cid !== this.pending.cid) return;
+
+    // Server-side error frame  - fails the matching in-flight request.
     if (code === FRAME.ERROR) {
       const err = payload as ClientResponseError;
       if (this.pending) {
@@ -162,7 +191,7 @@ export class RgsClient {
 
     if (this.pending?.expect === code) {
       clearTimeout(this.pending.timeout);
-      this.pending.resolve(payload);
+      this.pending.resolve(stripCid(payload));
       this.pending = undefined;
     }
     // Else drop  - could be a stale response after timeout, or out-of-band push.
