@@ -62,6 +62,13 @@ export interface LocalSession {
 
 const sessions = new Map<string, LocalSession>();
 
+/** Soft cap on cached sessions. On overflow the oldest IDLE sessions (no
+ *  open round) are evicted — their balance cache is rebuilt on next INIT.
+ *  Sessions with an open round are NEVER evicted (a debited stake + resume
+ *  state are outstanding); bounding *those* needs a wallet autoclose backstop
+ *  (see specs/07 + the autoclose section of specs/02). */
+export const MAX_CACHED_SESSIONS = 50_000;
+
 export function promoFromApi(p: PromoFreeRounds): LocalPromo {
   const local: LocalPromo = {
     id: p.id,
@@ -77,11 +84,44 @@ export function promoFromApi(p: PromoFreeRounds): LocalPromo {
   return local;
 }
 
-export function put(s: LocalSession): void { sessions.set(s.sessionId, s); }
+export function put(s: LocalSession): void {
+  sessions.set(s.sessionId, s);
+  if (sessions.size > MAX_CACHED_SESSIONS) evictIdleOverflow();
+}
 export function get(id: string): LocalSession | undefined { return sessions.get(id); }
 export function remove(id: string): void { sessions.delete(id); }
 export function all(): readonly LocalSession[] { return [...sessions.values()]; }
 export function size(): number { return sessions.size; }
+
+/** Evict the oldest IDLE (no open round) sessions down to a low-water mark.
+ *  Returns the number evicted. */
+function evictIdleOverflow(): number {
+  const lowWater = Math.floor(MAX_CACHED_SESSIONS * 0.9);
+  const idle = [...sessions.values()]
+    .filter((s) => !s.openRound)
+    .sort((a, b) => a.createdAt - b.createdAt);
+  let removed = 0;
+  for (const s of idle) {
+    if (sessions.size <= lowWater) break;
+    sessions.delete(s.sessionId);
+    removed++;
+  }
+  return removed;
+}
+
+/** Operational snapshot of in-flight (open) rounds — for /healthz so the
+ *  count of debited-but-unclosed rounds is observable (audit M6). */
+export function openRoundStats(now: number): { open_rounds: number; oldest_open_round_age_ms: number } {
+  let count = 0;
+  let oldestOpenedAt = now;
+  for (const s of sessions.values()) {
+    if (s.openRound) {
+      count++;
+      if (s.openRound.openedAt < oldestOpenedAt) oldestOpenedAt = s.openRound.openedAt;
+    }
+  }
+  return { open_rounds: count, oldest_open_round_age_ms: count > 0 ? now - oldestOpenedAt : 0 };
+}
 
 export function setBalance(id: string, balance: number): void {
   const s = sessions.get(id);

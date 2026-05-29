@@ -221,6 +221,9 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       platform_connected:   cfg.platform.isHealthy,
       platform_diagnostics: cfg.platform.diagnostics,
       active_sessions:      sessions.size(),
+      // Debited-but-unclosed rounds. A growing count / age is the signal that
+      // abandoned rounds aren't being autoclosed (audit M6 / M7).
+      ...sessions.openRoundStats(Date.now()),
       math,
     };
   }
