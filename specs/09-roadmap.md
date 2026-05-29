@@ -16,7 +16,6 @@ A living document. Updated when work lands or reprioritises.
 - MIT license + npm-publishable metadata.
 - Spec corpus 00-10 (overview through design philosophy).
 - ADR seed (001-006).
-- First per-provider analysis: `specs/adapters/pgsoft.md`.
 - `CLAUDE.md` handoff doc for AI session continuity.
 
 ## Architectural decisions captured (A1-A10)
@@ -45,7 +44,7 @@ A  - idempotency simplification: ✓ implemented
 B  - math version field naming: ✓ implemented
 C  - loader extraction: pending
 D  - ADR directory: ✓ seeded
-E  - `specs/adapters/`: ✓ seeded with PG Soft
+E  - `specs/adapters/`: pending (per-provider analyses added as real wallet specs arrive; kept brand-neutral)
 F  - kick-old WS policy: pending
 G  - math version migration discard-fresh: pending
 H  - type tests on contract: pending
@@ -59,8 +58,8 @@ J  - public-surface freeze v0.5: pending
 | Cross-process restart recovery | 02, 05 | platform adapter inquiry endpoint TBD |
 | Idempotency keys end-to-end | 04, 05 | contract done; orchestrator + adapter wiring pending |
 | Adapter-owns-state migration | 04, 05 | contract done; orchestrator reads from SessionInfo.carry pending |
-| External API surface (casino-facing) | NEW | designed in pgsoft.md analysis; not yet specced |
-| Game launcher | NEW | designed in pgsoft.md analysis; not yet specced |
+| External API surface (casino-facing) | NEW | sketched during an early provider analysis; not yet specced |
+| Game launcher | NEW | sketched during an early provider analysis; not yet specced |
 
 ## Planned next 30 days
 
