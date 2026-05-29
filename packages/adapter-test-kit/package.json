@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "description": "Conformance test suite for PlatformAdapter implementations. Hand it any adapter; get back a checklist of what works.",
   "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/open-rgs/open-rgs.git",

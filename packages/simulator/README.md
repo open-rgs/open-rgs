@@ -1,13 +1,33 @@
 # @open-rgs/simulator
 
 Per-mode RTP + hit-rate simulator and report generator for open-rgs
-games. Library, no CLI in v1.
+games. Usable as a library or via the `open-rgs-sim` CLI.
+
+## Runtime
+
+**Bun is required** (`engines.bun >= 1.0.0`). This package publishes raw
+TypeScript (no `dist/`) and its `bin` is a `.ts` file with a
+`#!/usr/bin/env bun` shebang, so run the CLI with **`bunx`** — not
+`npm install -g` on a Node-only machine. See ADR-001 for why.
 
 ## Install
 
 ```bash
 bun add -d @open-rgs/simulator
 ```
+
+## CLI
+
+```bash
+bunx open-rgs-sim <manifest-module> [--spins N] [--seed N] [--bet N] \
+                  [--out DIR] [--format md|html|json|all] [--skip-internal] [--quiet]
+```
+
+`<manifest-module>` is a path to a module that exports a `GameManifest`
+(from `defineGame`) — as `default`, `manifest`, or `buildManifest`; a
+function export is called with `{ seed }` so it can seed the math RNG.
+Reports are written to `--out` (default `./reports`) in the chosen
+`--format` (default `all`).
 
 ## Use
 

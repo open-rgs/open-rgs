@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "description": "Tiny WebSocket client for open-rgs. Promise-based init/spin/openRound/stepRound/closeRound/frcAccept. Bun / Node / browser.",
   "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/open-rgs/open-rgs.git",
