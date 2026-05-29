@@ -163,22 +163,34 @@ NOT run idle timers. Three triggers:
 3. **Admin HTTP** `POST /api/autoclose` calls
    `orchestrator.autocloseRound()` directly.
 
-The autoclose flow:
+The autoclose flow honours the game's `manifest.autoclose.policy`
+(default `math-decides`):
 
 1. Look up session and `openRound`. Validate optional `roundId` matches.
-2. Call `math.autoclose(state)` if math implements it.
-3. Otherwise, if `math.isTerminal(state) === true`, call `math.close(state)`.
-4. Otherwise, return a zero-multiplier loss outcome (conservative for
-   the operator  - no surprise pay-outs from stale state).
-5. Apply the same sanitize + max-win cap as a client close (autoclose
+2. **`hold`** -> don't autoclose; return `{ closed: false, reason:
+   "policy-hold" }` and leave the round open for later resolution.
+3. **`settle-as-loss`** -> settle a zero-multiplier loss (explicit forfeit).
+4. Otherwise (`math-decides` / `settle-at-current`): call `math.autoclose(
+   state)` if implemented; else if `math.isTerminal(state)`, call
+   `math.close(state)`.
+5. If neither produced an outcome:
+   - **`settle-at-current`** -> **refuse** (`{ closed: false }`): the policy
+     needs a valuation the math didn't provide, and we must NOT silently
+     forfeit banked player value. The round stays open and the
+     misconfiguration is logged at error level.
+   - **`math-decides`** -> zero-multiplier loss (conservative; no surprise
+     pay-out from stale state).
+6. Apply the same sanitize + max-win cap as a client close (autoclose
    moves money too, so it must not bypass the guard), then compute
    `win = multiplier x bet`. Call `wallet.closeComplex(...)`.
-6. Update balance, drop `openRound`. Log with `event.category=autoclose`
+7. Update balance, drop `openRound`. Log with `event.category=autoclose`
    and the trigger reason.
 
-Math's `autoclose(state)` is the math-decided policy  - "force-stand the
-dealer," "lock the gamble at current pool," "settle the crash at last
-seen multiplier," etc.
+A game that can leave value on the table (banked guaranteed winnings) MUST
+either implement `math.autoclose(state)` or declare `settle-at-current`  -
+otherwise an abandoned round is forfeited. Math's `autoclose(state)` is the
+math-decided valuation  - "force-stand the dealer," "lock the gamble at
+current pool," "settle the crash at last seen multiplier," etc.
 
 ## Resume on reconnect
 
