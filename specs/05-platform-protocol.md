@@ -117,15 +117,34 @@ debug level (avoids leaking operator-specific vocabulary).
 
 ## Idempotency expectations
 
-The current contract does NOT specify idempotency. If the orchestrator
-retries an RPC, it sends a new request and the wallet may end up
-double-debiting.
+Every state-changing RPC carries an `idempotencyKey`, and **wallets MUST
+dedupe on it**: a repeat of the same key is the same logical operation and
+must move money at most once, returning the original receipt. This is the
+contract's only defence against a lost-response retry double-debiting or
+double-crediting.
 
-**Planned (Spec 09 §Roadmap)**: every state-changing RPC carries an
-`idempotencyKey` (UUID v4). Wallets dedupe within a TTL window
-(typically 5 minutes). Adapters MUST forward this key downstream when
-the underlying protocol supports it; if not, the adapter is responsible
-for local dedupe.
+Key derivation (see `@open-rgs/core`'s `idempotency.ts`):
+
+- **Settling a known round** — `closeComplex` from a client CLOSE, an
+  `autocloseRequested` event, the `sessionClosed` cascade, or the admin
+  endpoint — derives the key deterministically from `(sessionId, roundId)`
+  (`"<sessionId>:<roundId>:close"`). Every close path and every retry of a
+  round therefore present the **identical** key, so a duplicated or raced
+  close (e.g. a client close arriving alongside an autoclose) collapses to
+  a single credit. No client cooperation is needed.
+
+- **Round-initiating calls** — a simple `settleSimple` (spin) or
+  `openComplex` (open) — have no server-assigned round id yet. Retry-safety
+  there requires a stable token from the client (`ClientRequestSpin
+  /OpenRound.idempotencyKey`): when present the key is derived from it
+  (`"<sessionId>:spin:<token>"`), so the client can safely resend. When
+  absent the orchestrator falls back to a random key — a blind retry of a
+  round-initiating call **without** a client token cannot be deduped, and
+  clients SHOULD resume the round on reconnect rather than blind-retry.
+
+Adapters MUST forward this key downstream when the underlying protocol
+supports it; if not, the adapter is responsible for local dedupe. The
+`IdempotencyConfig.ttlMs` (default 5 min) is the recommended dedupe window.
 
 ## Reference adapter behavior (your platform)
 

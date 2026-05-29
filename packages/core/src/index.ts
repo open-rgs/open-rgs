@@ -3,6 +3,7 @@
 export { createServer, type ServerConfig, type ServerHandle } from "./server.js";
 export { createOrchestrator, defaultIdempotencyKey } from "./orchestrator.js";
 export { settleAmount, roundHalfEven } from "./money.js";
+export { deriveIdempotencyKey, uuidV4 } from "./idempotency.js";
 export { binaryTransport } from "./transport-binary.js";
 export { loadLuaMath, type LoadLuaMathOptions } from "./lua-math.js";
 export { startAdmin } from "./admin.js";
