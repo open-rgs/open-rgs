@@ -62,7 +62,8 @@ describe("HttpClient", () => {
         return jsonResp({ ok: true });
       },
     });
-    const r = await c.request<{ ok: boolean }>("flaky", {});
+    // Retries only apply to calls explicitly marked idempotent.
+    const r = await c.request<{ ok: boolean }>("flaky", {}, { idempotent: true });
     expect(n).toBe(3);
     expect(r.ok).toBe(true);
   });
@@ -74,7 +75,32 @@ describe("HttpClient", () => {
       retryDelayMs: () => 1,
       fetch: async () => jsonResp({ err: "nope" }, 500),
     });
-    await expect(c.request("permafail", {})).rejects.toThrow(/HTTP 500/);
+    await expect(c.request("permafail", {}, { idempotent: true })).rejects.toThrow(/HTTP 500/);
+  });
+
+  test("does NOT retry a non-idempotent call on 5xx (money safety, H6)", async () => {
+    let n = 0;
+    const c = new HttpClient({
+      baseUrl: "https://x",
+      retries: 3,                                   // budget exists…
+      retryDelayMs: () => 1,
+      fetch: async () => { n++; return jsonResp({}, 503); },
+    });
+    // …but settleSimple isn't marked idempotent, so it must not resend.
+    await expect(c.request("settleSimple", { bet: 100 })).rejects.toThrow(/HTTP 503/);
+    expect(n).toBe(1);
+  });
+
+  test("a non-idempotent network failure surfaces UNKNOWN outcome, not a retry (H6)", async () => {
+    let n = 0;
+    const c = new HttpClient({
+      baseUrl: "https://x",
+      retries: 3,
+      retryDelayMs: () => 1,
+      fetch: async () => { n++; throw new Error("ECONNRESET"); },
+    });
+    await expect(c.request("settleSimple", { bet: 100 })).rejects.toThrow(/UNKNOWN/);
+    expect(n).toBe(1);
   });
 
   test("throws on 4xx without retry", async () => {
