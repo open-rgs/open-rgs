@@ -511,6 +511,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // Money is integer minor units; the multiplier is a float, so round
     // the product half-to-even at this one boundary (ADR-002).
     const win = settleAmount(cappedOutcome.multiplier, betInfo.bet);
+    assertFundedWin(betInfo.bet, cappedOutcome.multiplier);
 
     let receipt;
     try {
@@ -735,6 +736,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
     const win = settleAmount(cappedClose.multiplier, open.bet);
+    assertFundedWin(open.bet, cappedClose.multiplier);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -885,6 +887,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
     const win = settleAmount(cappedClose.multiplier, open.bet);
+    assertFundedWin(open.bet, cappedClose.multiplier);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -986,6 +989,22 @@ function sessionOrThrow(id: string | null | undefined): sessions.LocalSession {
   const s = sessions.get(id);
   if (!s) throw new RGSError("SESSION_NOT_FOUND", "Session not initialized  - INIT first");
   return s;
+}
+
+/** A 0 effective bet (e.g. a `stakeMultiplier: 0` free-round mode) with a
+ *  winning multiplier would settle `win = multiplier x 0 = 0`, silently
+ *  losing the player's payout. Forbid it  - free rounds must be funded so the
+ *  win is non-zero: either by a promo pool (which locks a non-zero bet) or by
+ *  accumulating the feature's winnings into the parent round's carry and
+ *  paying them at that round's close. (audit H4) */
+function assertFundedWin(bet: number, multiplier: number): void {
+  if (bet === 0 && multiplier > 0) {
+    throw new RGSError(
+      "INVALID_BET",
+      "a 0-bet round produced a win, which would settle to 0  - fund free rounds via a " +
+      "promo pool or accumulate winnings into the parent round's carry",
+    );
+  }
 }
 
 function parseCheat(raw: Record<string, unknown> | undefined): CheatHint | undefined {
