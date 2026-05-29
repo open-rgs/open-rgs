@@ -17,7 +17,10 @@ const log = createLogger({
   version: "0.1.0",
   environment: process.env.NODE_ENV,
   minLevel: "info",
-  redactKeys: ["password", "token", "session_id"],
+  // Credentials are redacted by DEFAULT (password/token/secret/authorization/
+  // cookie/...). Add your own; matching is separator-insensitive, so
+  // "session_id" also catches "session.id" / "sessionId".
+  redactKeys: ["session_id"],
   ringBufferSize: 2000,
   sampleEvery: { "spin.tick": 100 },  // log 1 of every 100 ticks
 });
@@ -60,7 +63,7 @@ const recent = log.getRecent("warn", 100);
 | ECS field names   | Drops into Elastic / Datadog / Grafana Loki dashboards unchanged   |
 | Ring buffer       | Admin endpoint can return last N entries without external storage  |
 | Child loggers     | Per-request / per-session context without repeating field names    |
-| PII redaction     | Case-insensitive, recursive, never mutates caller's objects        |
+| PII redaction     | On by default (credential keys); separator-insensitive key match + value scrubbing (Bearer tokens, `?token=...` URLs); recursive, never mutates caller's objects |
 | Sampling          | Keyed by `event.action`; drops to 1-in-N for high-volume entries   |
 | Pluggable sink    | Default is stdout JSON; swap for syslog / OTEL collector / file    |
 | Sink-safe         | A throwing sink never crashes the caller                           |
