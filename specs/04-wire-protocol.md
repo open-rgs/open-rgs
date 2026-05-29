@@ -72,7 +72,7 @@ The full TS schemas live in `@open-rgs/contract`:
 - `ClientRequestOpenRound`, `ClientResponseOpenRound`
 - `ClientRequestStepRound`, `ClientResponseStepRound`
 - `ClientRequestCloseRound`, `ClientResponseCloseRound`
-- `ClientRequestFrcAccept`, `ClientResponseFrcAccept`
+- `ClientRequestPromoAccept`, `ClientResponsePromoAccept`
 - `ClientResponseError`
 
 This spec doesn't duplicate them  - read the source. What this spec

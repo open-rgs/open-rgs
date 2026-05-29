@@ -1,7 +1,7 @@
 {
   "name": "@open-rgs/core",
   "version": "0.5.1",
-  "description": "Open-RGS core: orchestrator, session, FRC, Lua/WASM math loader, binary-msgpack transport, admin endpoints. Bun-native.",
+  "description": "Open-RGS core: orchestrator, session, promo free-rounds, Lua/WASM math loader, binary-msgpack transport, admin endpoints. Bun-native.",
   "license": "MIT",
   "engines": {
     "bun": ">=1.0.0"
