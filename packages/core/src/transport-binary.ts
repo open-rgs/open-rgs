@@ -12,6 +12,13 @@ import {
 } from "@open-rgs/contract";
 import { log } from "./log.js";
 
+/** Max wire frame size, both directions (Spec 04: a frame >1 MiB SHOULD
+ *  disconnect). Inbound: enforced by Bun via `maxPayloadLength` (oversized
+ *  frames close the connection, never reaching the handler). Outbound:
+ *  `sendFrame` refuses to emit a larger frame (a runaway math `ops` array
+ *  could otherwise produce an unbounded response). */
+export const MAX_FRAME_BYTES = 1024 * 1024;
+
 // Frame type codes
 export const MSG_INIT_REQUEST       = 0x01;
 export const MSG_INIT_RESPONSE      = 0x02;
@@ -97,6 +104,9 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
           return new Response("Not found", { status: 404 });
         },
         websocket: {
+          // Reject oversized inbound frames at the WS layer  - Bun closes the
+          // connection (1009) before the handler runs (Spec 04, H2).
+          maxPayloadLength: MAX_FRAME_BYTES,
           open(ws) {
             ws.data.connectedAt = Date.now();
             cfg.onConnect?.();
@@ -235,6 +245,23 @@ async function dispatch(
 
 function sendFrame(ws: { send: (b: Uint8Array) => void }, type: number, payload: unknown): void {
   const body = encode(payload);
+  if (1 + body.byteLength > MAX_FRAME_BYTES) {
+    // A runaway ops array (Op is forwarded untouched) must not produce an
+    // unbounded outbound frame. Drop it and send a bounded error instead.
+    log.error("Outbound frame exceeds max size  - dropping", {
+      "event.category": "transport",
+      "event.action": "frame_too_large",
+      "frame.type": type,
+      "frame.bytes": body.byteLength,
+      "frame.max_bytes": MAX_FRAME_BYTES,
+    });
+    const errBody = encode({ code: "INTERNAL_ERROR" as RGSErrorCode, message: "response too large" });
+    const errFrame = new Uint8Array(1 + errBody.byteLength);
+    errFrame[0] = MSG_ERROR;
+    errFrame.set(errBody, 1);
+    ws.send(errFrame);
+    return;
+  }
   const frame = new Uint8Array(1 + body.byteLength);
   frame[0] = type;
   frame.set(body, 1);
