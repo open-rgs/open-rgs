@@ -53,9 +53,12 @@ extensions and MUST be ignored by the canonical orchestrator.
 ## URL convention
 
 The reference transport listens on `ws://host:PORT/wss` and
-`ws://host:PORT/api/wss`. Multi-game deployments use
-`ws://host:PORT/api/{gameId}/wss` (planned; see **Spec 02 §Open
-questions**).
+`ws://host:PORT/api/wss`. Each RGS process serves exactly one game
+(spec 02, "Open questions"), so the path carries no game id. A
+multi-game *deployment* is several single-game processes behind an edge
+router that maps a per-game path or host to each one
+(`/{gameId}/wss → that game's process`); the per-game routing lives at
+the edge, not inside RGS (spec 07, "Multi-game deployments").
 
 A `sessionId` query parameter is accepted at upgrade time but the
 authoritative session-bind happens via INIT_REQUEST `sid`.
