@@ -117,20 +117,23 @@ spec:
   replicas: 3                        # stateless — scale freely
   template:
     spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
       containers:
       - name: rgs
         image: <registry>/<game-id>:<sha>
+        securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
         ports:
-          - { name: ws, containerPort: 80 }
-          - { name: admin, containerPort: 81 }
+          - { name: ws, containerPort: 8080 }   # WS + probes + admin (single-port, non-privileged)
         env:
+          - { name: PORT, value: "8080" }
+          - { name: OPEN_RGS_ADMIN_TOKEN, valueFrom: { secretKeyRef: { ... } } }  # admin fails closed without it
           - { name: API_KEY, valueFrom: { secretKeyRef: { ... } } }
           - { name: PLATFORM_WS_URL, value: ws://platform.example.com/v1/ws }
         readinessProbe:
-          httpGet: { path: /healthz, port: admin }
+          httpGet: { path: /readyz, port: ws }
           periodSeconds: 5
         livenessProbe:
-          httpGet: { path: /livez, port: admin }
+          httpGet: { path: /livez, port: ws }
           periodSeconds: 10
         resources:
           requests: { cpu: 100m, memory: 128Mi }
@@ -143,7 +146,6 @@ spec:
   selector: { app: <game-id> }
   ports:
     - { name: ws, port: 80, targetPort: ws }
-    - { name: admin, port: 81, targetPort: admin }
 ```
 
 Notes:
