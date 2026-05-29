@@ -38,14 +38,21 @@ into the matching skeleton in the appendix.
    `balanceChanged` / `sessionClosed` / `promoGranted` /
    `autocloseRequested`? (Use the exact `PlatformEvent.type` strings — an
    unknown type is dropped; `promoGranted`, not `campaignGranted`.)
-3. **Identify the error vocabulary.** Build a single
+3. **Guarantee an autoclose backstop (mandatory).** RGS runs no idle
+   timers (ADR-003), so an open complex round closes only on an external
+   signal. Your adapter MUST ensure one always eventually arrives —
+   forward a wallet-native deadline as `autocloseRequested`, forward
+   `sessionClosed` (RGS cascades it), or derive your own backstop
+   deadline. An adapter that can do none of these leaks open rounds and
+   is non-conformant. See spec 05 "The wallet guarantees."
+4. **Identify the error vocabulary.** Build a single
    [`ErrorMap`](../packages/adapter-kit/src/error-map.ts) at construct
    time mapping vendor codes/messages to `RGSErrorCode`.
-4. **Identify the transport.** WS? HTTP? Both? Pick the matching kit
+5. **Identify the transport.** WS? HTTP? Both? Pick the matching kit
    helper from the table above.
-5. **Implement the 7-method `PlatformAdapter`.** Most adapters end up
+6. **Implement the 7-method `PlatformAdapter`.** Most adapters end up
    ~150 lines of code (kit handles the rest).
-6. **Run conformance:**
+7. **Run conformance:**
    ```ts
    import { runConformance, mdConformanceReport } from "@open-rgs/adapter-test-kit";
    const r = await runConformance(new MyAdapter(...));
