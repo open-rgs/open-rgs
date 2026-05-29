@@ -92,6 +92,21 @@ describe("fromWireAmount", () => {
   test("decimal_string respects floor / ceiling", () => {
     expect(fromWireAmount("1.999", 2, "decimal_string", "floor")).toBe(199);
     expect(fromWireAmount("1.001", 2, "decimal_string", "ceiling")).toBe(101);
+    // floor/ceiling are sign-correct (round toward -inf / +inf), not magnitude.
+    expect(fromWireAmount("-1.001", 2, "decimal_string", "floor")).toBe(-101);
+    expect(fromWireAmount("-1.999", 2, "decimal_string", "ceiling")).toBe(-199);
+  });
+
+  test("ties are detected from the string, not a reparsed float (M10)", () => {
+    // A tail just BELOW 0.5 that Number('0.'+tail) collapses to exactly 0.5.
+    // Correct: it's < 0.5, so half_up rounds DOWN.
+    expect(fromWireAmount("1.004999999999999999", 2, "decimal_string", "half_up")).toBe(100);
+    // A tail just ABOVE 0.5 that also reparses to 0.5. Correct: > 0.5, so
+    // half_down rounds UP.
+    expect(fromWireAmount("1.005000000000000001", 2, "decimal_string", "half_down")).toBe(101);
+    // An exact half with trailing zeros still ties correctly (half_even).
+    expect(fromWireAmount("1.0050000000", 2, "decimal_string", "half_even")).toBe(100);
+    expect(fromWireAmount("1.0150000000", 2, "decimal_string", "half_even")).toBe(102);
   });
 
   test("float multiplies by 10^decimals", () => {
