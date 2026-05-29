@@ -343,6 +343,17 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   const kind = api.kind === "complex" ? "complex" : "simple";
   const name = api.name ?? path;
   const version = api.version ?? "0.0.0";
+  // A math that omits `rtp` defaults to 0, which makes the boot-time
+  // declaredRtp-vs-math.rtp check look like a mismatch. Warn so it's clear
+  // the rtp is unset, not wrong. (L8)
+  if (api.rtp === undefined) {
+    log.warn("Lua math declared no rtp — defaulting to 0 (the boot RTP check will read as mismatched)", {
+      "event.category": "process",
+      "event.action": "math_rtp_unset",
+      "math.path": path,
+      "math.name": name,
+    });
+  }
   const rtp = api.rtp ?? 0;
   const expected = adaptExpectations(api.expected);
 
