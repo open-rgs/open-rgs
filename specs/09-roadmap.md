@@ -71,7 +71,7 @@ J  - public-surface freeze v0.5: pending
 | `@open-rgs/cli compare` | 08 | Exploit smoke test for CI |
 | `@open-rgs/cli certify` | 08 | Math labs need the report shape |
 | Reference deployment template | 07 | Ship Dockerfile + K8s manifests under `deploy/` |
-| Build-time cheat strip | 06 | Gate cheat parser behind `NODE_ENV=production` + warn loudly if mis-configured |
+| ~~Cheat fail-closed~~ (done) | 04 | Cheat removed from the wire contract; honored only via `params.cheat` with an explicit opt-in and never in production; loud warning when enabled |
 | Manifest validation: `nextMode` resolution | 01 | Catch typos at boot, not at runtime |
 
 ## Planned next 60-90 days

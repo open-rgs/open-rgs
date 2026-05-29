@@ -81,13 +81,20 @@ export interface CloseOutcome {
 export interface SpinContext {
   /** Mode id resolved by the wrapper (after promo override / nextMode override). */
   mode: string;
-  /** Optional dev-only cheat hint (stripped in prod builds). */
+  /** Dev-only forced-outcome hint. Populated by the orchestrator ONLY when
+   *  cheats are explicitly enabled (createServer `enableCheats` /
+   *  `OPEN_RGS_ENABLE_CHEATS=1`) AND not in production  - it is always
+   *  `undefined` in production, regardless of how `NODE_ENV` is set. It is
+   *  NOT a field of the wire request (a forced-outcome field must never be
+   *  part of the canonical contract); in dev it is carried inside
+   *  `ClientRequestSpin.params.cheat`. */
   cheat?: CheatHint;
   /** Free-form game-specific parameters. */
   params?: Record<string, unknown>;
 }
 
-/** Dev-only forced outcome hints. */
+/** Dev-only forced outcome hints. See SpinContext.cheat  - never reaches a
+ *  production build. */
 export interface CheatHint {
   force_win?: boolean;
   force_coeff?: number;
@@ -547,7 +554,6 @@ export interface ClientRequestSpin {
   mode?: string;
   betIndex?: number;
   priceMultiplier?: number;
-  cheat?: Record<string, unknown>;
   params?: Record<string, unknown>;
   /** Optional client-generated idempotency token. A round-initiating call
    *  (spin/open) has no server-side round id yet, so the ONLY way to make a
