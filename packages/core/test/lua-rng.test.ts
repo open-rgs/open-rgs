@@ -44,3 +44,31 @@ describe("loadLuaMath RNG fail-closed (C5)", () => {
     expect(m.kind).toBe("simple");
   });
 });
+
+describe("loadLuaMath rejects a simulator-only PRNG in production (H8)", () => {
+  // A mulberry32-style rng is tagged __insecureSimulatorRng.
+  const simRng = Object.assign(() => 0.5, { __insecureSimulatorRng: true as const });
+
+  test("production + tagged simulator rng -> throws", async () => {
+    process.env["NODE_ENV"] = "production";
+    await expect(loadLuaMath(SIMPLE, { rng: simRng })).rejects.toThrow(/simulator-only PRNG/);
+  });
+
+  test("production + tagged rng + allowInsecureRng -> loads", async () => {
+    process.env["NODE_ENV"] = "production";
+    const m = await loadLuaMath(SIMPLE, { rng: simRng, allowInsecureRng: true });
+    expect(m.kind).toBe("simple");
+  });
+
+  test("a normal (untagged) injected rng still loads in production", async () => {
+    process.env["NODE_ENV"] = "production";
+    const m = await loadLuaMath(SIMPLE, { rng: () => 0.5 });
+    expect(m.kind).toBe("simple");
+  });
+
+  test("non-production + tagged rng loads (simulator's own use)", async () => {
+    process.env["NODE_ENV"] = "development";
+    const m = await loadLuaMath(SIMPLE, { rng: simRng });
+    expect(m.kind).toBe("simple");
+  });
+});

@@ -80,8 +80,21 @@ export interface LoadLuaMathOptions {
  *  A real-money RGS must not determine outcomes from `Math.random`; in
  *  production we refuse to boot without an explicit (certified) source. */
 function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => number {
-  if (opts?.rng) return opts.rng;
   const isProduction = process.env["NODE_ENV"] === "production";
+  if (opts?.rng) {
+    // Reject a simulator-only PRNG (e.g. mulberry32) for production outcome
+    // determination  - it's reproducible and predictable (see audit H8).
+    const tagged = (opts.rng as { __insecureSimulatorRng?: boolean }).__insecureSimulatorRng;
+    if (isProduction && tagged && !opts.allowInsecureRng) {
+      throw new Error(
+        `loadLuaMath(${path}): the injected rng is a simulator-only PRNG ` +
+        `(mulberry32 or similar)  - non-cryptographic and predictable, not for ` +
+        `real-money outcome determination. Inject a certified CSPRNG, or pass ` +
+        `{ allowInsecureRng: true } for non-real-money tooling only.`,
+      );
+    }
+    return opts.rng;
+  }
   if (isProduction && !opts?.allowInsecureRng) {
     throw new Error(
       `loadLuaMath(${path}): no rng provided. A production RGS must inject a ` +

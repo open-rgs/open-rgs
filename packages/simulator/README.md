@@ -84,6 +84,11 @@ import { mulberry32 } from "@open-rgs/simulator/rng";
 const math = await loadLuaMath("./maths/spin.lua", { rng: mulberry32(42) });
 ```
 
+> ⚠️ **Simulation/dev only.** `mulberry32` is a 32-bit, fully-predictable
+> PRNG  - never route it into a production `loadLuaMath({ rng })`. It is
+> tagged so `loadLuaMath` throws if it sees it under `NODE_ENV=production`.
+> Production outcome determination requires a certified CSPRNG (Spec 03).
+
 The same `mulberry32` is exported from both `@open-rgs/simulator` and
 its `/rng` subpath, so you can import it into the simulator script *or*
 into a separate math-loading harness without dragging the whole sim in.
