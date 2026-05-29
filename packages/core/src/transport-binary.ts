@@ -228,14 +228,33 @@ async function dispatch(
         return sendError(ws, "DECODE_ERROR", `Unknown msg type 0x${type.toString(16)}`, cid);
     }
   } catch (e) {
-    if (e instanceof RGSError) {
-      sendError(ws, e.code, e.message, cid);
+    const err = e instanceof RGSError
+      ? e
+      : new RGSError("INTERNAL_ERROR", e instanceof Error ? e.message : String(e));
+    // Codes whose message wraps arbitrary internal detail (a Lua runtime
+    // error with a file path, an upstream wallet body, a stack). Never send
+    // that to the client — log it server-side and return a generic message
+    // plus the correlation id so an operator can find the log line. (M11)
+    if (OPAQUE_ERROR_CODES.has(err.code)) {
+      log.exception("transport dispatch error", e, {
+        "event.category": "transport",
+        "error.code": err.code,
+        "correlation.id": cid === undefined ? "" : String(cid),
+      });
+      sendError(ws, err.code, `internal error (ref: ${cid === undefined ? "n/a" : String(cid)})`, cid);
     } else {
-      log.exception("Unhandled error in transport dispatch", e);
-      sendError(ws, "INTERNAL_ERROR", e instanceof Error ? e.message : String(e), cid);
+      // Controlled-vocabulary errors (INVALID_BET, INSUFFICIENT_BALANCE, …)
+      // carry author-written, non-sensitive messages — safe to surface.
+      sendError(ws, err.code, err.message, cid);
     }
   }
 }
+
+/** Error codes whose `message` may contain internal detail (wrapped Lua /
+ *  upstream errors). Their client-facing message is genericized. */
+const OPAQUE_ERROR_CODES: ReadonlySet<RGSErrorCode> = new Set<RGSErrorCode>([
+  "INTERNAL_ERROR", "INIT_FAILED", "SPIN_FAILED", "OPEN_FAILED", "STEP_FAILED", "CLOSE_FAILED",
+]);
 
 /** Read the correlation id a client stamped on a request payload. */
 function correlationId(payload: unknown): unknown {
