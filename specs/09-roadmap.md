@@ -5,10 +5,10 @@ A living document. Updated when work lands or reprioritises.
 ## Done (shipped in repo)
 
 - `@open-rgs/contract` — types-only public package, MIT.
-- `@open-rgs/core` — orchestrator, session, FRC, Lua loader, binary
+- `@open-rgs/core` — orchestrator, session, promo, Lua loader, binary
   transport, admin endpoints, autoclose (external-triggered),
   resume-on-reconnect.
-- `@open-rgs/platform-mock` — in-memory dev/test wallet with FRC and
+- `@open-rgs/platform-mock` — in-memory dev/test wallet with promo and
   autoclose helpers.
 - Two example games: `lucky-digits` (simple + buyable FS) and
   `gamble-cherry` (complex round with looping gamble).
@@ -82,7 +82,7 @@ J — public-surface freeze v0.5: pending
 | Graceful shutdown + drain mode | 02, 07 | K8s rolling restarts drop sessions |
 | WASM math loader | 03 | Open the door for Zig-authored maths |
 | Public/private state split (`view(state)`) | 01, 03, 08 | Required for honest exploit testing |
-| Bonus engine abstraction (FRC → BonusCampaign) | 02 | Jackpots, tournaments, gamification points |
+| Bonus engine abstraction (promo → BonusCampaign) | 02 | Jackpots, tournaments, gamification points |
 | `@open-rgs/cli fuzz` & `optimize` | 08 | Round out the math-author DX |
 
 ## Deferred / not committed

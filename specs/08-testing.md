@@ -14,7 +14,7 @@ that math designers and labs use.
 | Math exploit | Are there strategies that beat declared RTP? | `@open-rgs/cli compare`, `fuzz` |
 | Math tuning | Find parameter values that hit target RTP+vol | `@open-rgs/cli optimize` |
 | Math certification | Signed report comparing measured vs declared | `@open-rgs/cli certify` |
-| Orchestrator unit | Round flows, mode resolution, FRC, autoclose | `bun:test` against `OrchestratorAPI` |
+| Orchestrator unit | Round flows, mode resolution, promo, autoclose | `bun:test` against `OrchestratorAPI` |
 | Platform adapter | Native protocol → canonical contract | per-adapter test suite |
 | Transport | Frame in / frame out | `bun:test` with mock orchestrator |
 | End-to-end | Full stack with real wallet (mock) | `bun:test` integration |
@@ -181,11 +181,11 @@ is regulator-friendly and signable by any tool.
 Drive `OrchestratorAPI` directly with `MockPlatform`. Examples of what
 the test suite covers:
 
-- INIT with no FRC → no `frc` field on response.
-- INIT with FRC → `frc` field populated, marked offered on session.
+- INIT with no promo → no `promo` field on response.
+- INIT with promo → `promo` field populated, marked offered on session.
 - SPIN with insufficient balance → `INSUFFICIENT_BALANCE`, no wallet
   call.
-- SPIN with active FRC → bet locked to campaign's bet, mode forced to
+- SPIN with active promo → bet locked to promo's bet, mode forced to
   default.
 - Math returns `nextMode: "free-spins"` → next SPIN routes there even
   if client requests `default`.
