@@ -149,7 +149,10 @@ Typical frame sizes for budgeting:
 
 Hard cap: a single frame MUST NOT exceed 1 MiB. Larger payloads
 indicate a math bug (runaway `ops` array) and the transport SHOULD
-disconnect the client.
+disconnect the client. Enforced (`MAX_FRAME_BYTES`): inbound via Bun's
+`maxPayloadLength` (oversized frames close the connection before reaching
+the handler); outbound, `sendFrame` refuses to emit a larger frame and
+sends a bounded `INTERNAL_ERROR` instead.
 
 ## PING / PONG
 
