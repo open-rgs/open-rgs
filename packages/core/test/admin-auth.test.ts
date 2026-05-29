@@ -66,6 +66,19 @@ describe("admin auth (C8)", () => {
   });
 });
 
+describe("admin /admin/logs ?limit handling (L5)", () => {
+  test("a non-numeric ?limit doesn't break the route", async () => {
+    const h = handler({ requireAuth: false });
+    const res = (await get(h, "/admin/logs?limit=notanumber"))!;
+    expect(res.status).toBe(200);
+    expect(Array.isArray(await res.json())).toBe(true);
+  });
+  test("a valid ?limit is honored", async () => {
+    const h = handler({ requireAuth: false });
+    expect((await get(h, "/admin/logs?limit=10"))!.status).toBe(200);
+  });
+});
+
 describe("admin routing is exact (C8)", () => {
   test("suffix-injected paths no longer reach the handler", async () => {
     const h = handler({ requireAuth: true, authToken: "s3cret" });
