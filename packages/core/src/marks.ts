@@ -18,6 +18,19 @@ export function createMarkCollector(): MarkCollector {
   let spinsCompleted = 0;
   let inSpin = false;
 
+  // Flush the current spin's tags into the tally and count it. Both endSpin
+  // and a beginSpin that finds a prior spin still open route through here, so
+  // an abandoned spin (no endSpin) is COUNTED rather than silently dropping
+  // its tags and skewing the tag-share denominator. (L1)
+  function finalizeSpin(): void {
+    for (const t of spinTags) {
+      tagSpins[t] = (tagSpins[t] ?? 0) + 1;
+    }
+    spinTags = new Set();
+    spinsCompleted += 1;
+    inSpin = false;
+  }
+
   return {
     count(name) {
       counts[name] = (counts[name] ?? 0) + 1;
@@ -32,19 +45,11 @@ export function createMarkCollector(): MarkCollector {
       contributions[name] = (contributions[name] ?? 0) + multiplier;
     },
     beginSpin() {
-      if (inSpin) {
-        // Reset stale tag state if a prior spin didn't endSpin cleanly.
-        spinTags = new Set();
-      }
+      if (inSpin) finalizeSpin(); // prior spin never ended — count it, don't drop it
       inSpin = true;
     },
     endSpin() {
-      for (const t of spinTags) {
-        tagSpins[t] = (tagSpins[t] ?? 0) + 1;
-      }
-      spinTags = new Set();
-      spinsCompleted += 1;
-      inSpin = false;
+      if (inSpin) finalizeSpin();
     },
     snapshot(): MarkSnapshot {
       return {
