@@ -8,18 +8,20 @@ services:
       dockerfile: deploy/docker/Dockerfile
     image: open-rgs-game:dev
     ports:
-      - "8080:80"   # client transport (binary-msgpack WS)
-      - "8081:81"   # admin / health
+      - "8080:8080"   # client WS + probes + admin (single-port)
     environment:
       NODE_ENV: development
+      # debug is fine for local dev; do NOT promote it  - it over-logs and can
+      # surface PII/money detail. Production should run at info or above.
       LOG_LEVEL: debug
-      PORT: "80"
-      ADMIN_PORT: "81"
+      PORT: "8080"
+      # In production, admin fails closed without a token:
+      # OPEN_RGS_ADMIN_TOKEN: "dev-only-token"
       # When pointing at a real provider, set these:
       # API_KEY: "..."
       # PLATFORM_WS_URL: "wss://..."
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:81/livez"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/livez"]
       interval: 5s
       timeout: 2s
       retries: 6

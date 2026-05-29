@@ -1,7 +1,12 @@
 # Reference K8s Deployment + Service for an open-rgs game server.
 #
-# Replace <game-id>, <registry>, <sha>, and the wallet env vars.
+# Replace <game-id>, <registry>, <sha>, and the wallet/admin env vars.
 # The image is built via deploy/docker/Dockerfile from your game repo.
+#
+# Single-port: client WS, k8s probes, and (token-gated) admin all share
+# port 8080. The process runs as non-root, so the port is non-privileged.
+# To isolate admin on a private port, set it in your wiring and add a second
+# containerPort + a NetworkPolicy that only allows operators to reach it.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -24,17 +29,32 @@ spec:
       labels:
         app: rgs-<game-id>
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000             # the oven/bun image's `bun` user
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: rgs
           image: <registry>/rgs-<game-id>:<sha>
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
-            - { name: ws, containerPort: 80 }
-            - { name: admin, containerPort: 81 }
+            - { name: ws, containerPort: 8080 }
           env:
             - { name: NODE_ENV, value: production }
-            - { name: PORT, value: "80" }
-            - { name: ADMIN_PORT, value: "81" }
+            - { name: PORT, value: "8080" }
+            # Admin (/admin/* + detailed /healthz) fails closed in production
+            # without this token.
+            - name: OPEN_RGS_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: rgs-<game-id>-secrets
+                  key: admin-token
             - name: API_KEY
               valueFrom:
                 secretKeyRef:
@@ -47,7 +67,7 @@ spec:
                   key: platform-ws-url
           # /livez is process-up only  - never restart the pod for wallet flapping.
           livenessProbe:
-            httpGet: { path: /livez, port: admin }
+            httpGet: { path: /livez, port: ws }
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
@@ -56,10 +76,17 @@ spec:
           # down, without restarting it. (Use /readyz, not /healthz: the
           # detailed /healthz requires the admin token and would 403 the probe.)
           readinessProbe:
-            httpGet: { path: /readyz, port: admin }
+            httpGet: { path: /readyz, port: ws }
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 2
+          # Let the load balancer deregister this pod before SIGTERM so no new
+          # connections arrive mid-drain. The graceful drain (default 30s) then
+          # runs with headroom under terminationGracePeriodSeconds.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           resources:
             requests:
               cpu: 100m
@@ -67,7 +94,7 @@ spec:
             limits:
               cpu: 1000m
               memory: 256Mi
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 45
 ---
 apiVersion: v1
 kind: Service
@@ -77,5 +104,4 @@ spec:
   selector:
     app: rgs-<game-id>
   ports:
-    - { name: ws,    port: 80, targetPort: ws }
-    - { name: admin, port: 81, targetPort: admin }
+    - { name: ws, port: 80, targetPort: ws }
