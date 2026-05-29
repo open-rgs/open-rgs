@@ -87,9 +87,14 @@ the client can narrate "you've already gambled twice."
 `ClientRequestSpin.priceMultiplier` — defaults to 1 if absent. Combined
 with the manifest's mode `stakeMultiplier` to compute the actual bet.
 
-`ClientRequestSpin.cheat` — accepted ONLY in dev builds. The
-orchestrator silently ignores it in production unless the wallet
-explicitly grants the session `cheatEligible: true` (planned).
+Forced-outcome cheats are **not** a wire field — `ClientRequestSpin` has no
+`cheat`. A forced-outcome field must never be part of the canonical
+contract. In dev only, a cheat hint may ride inside
+`ClientRequestSpin.params.cheat`, and the orchestrator honors it **only**
+when cheats are explicitly enabled (`createServer { enableCheats }` /
+`OPEN_RGS_ENABLE_CHEATS=1`) AND `NODE_ENV !== "production"`. It is off by
+default everywhere and impossible in production — a misconfigured
+`NODE_ENV` can no longer enable it.
 
 `ClientResponseSpin.promo` — present iff the promo pool was active for
 this spin. Tells the client the remaining count so it can update the

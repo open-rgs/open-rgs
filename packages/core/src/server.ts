@@ -46,6 +46,12 @@ export interface ServerConfig {
   adminRouteBasePath?: string;
   /** Override the env-detected dev flag. */
   isDev?: boolean;
+  /** Enable the dev-only forced-outcome cheat path (client sends a cheat in
+   *  `params.cheat`). Default false. Cheats are ALWAYS off in production
+   *  (`NODE_ENV=production`) regardless of this flag, and off everywhere
+   *  unless this is true or `OPEN_RGS_ENABLE_CHEATS=1`. Never enable for a
+   *  real-money deployment. */
+  enableCheats?: boolean;
   /** Bring your own metrics registry, or omit to use the standard one. */
   metrics?: RgsMetrics;
   /** Idempotency-key generator + retention. See @open-rgs/contract. */
@@ -67,6 +73,16 @@ export interface ServerHandle {
 export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const isDev       = cfg.isDev ?? process.env["NODE_ENV"] !== "production";
   const gameVersion = cfg.version ?? "unknown";
+
+  // Forced-outcome cheats: fail closed. Require an explicit opt-in AND a
+  // non-production NODE_ENV. The old gate keyed off `isDev`, which defaults
+  // to ON whenever NODE_ENV is anything other than exactly "production"
+  // (unset, "prod", "staging", a typo) — so a misconfigured env shipped a
+  // live forced-win path. Now the env can't enable cheats; only a
+  // deliberate opt-in can, and never in production.
+  const isProduction = process.env["NODE_ENV"] === "production";
+  const cheatsEnabled = !isProduction
+    && (cfg.enableCheats ?? process.env["OPEN_RGS_ENABLE_CHEATS"] === "1");
 
   log.init(`open-rgs-${cfg.manifest.id}`, gameVersion, isDev);
   log.info("RGS starting", {
@@ -138,10 +154,18 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
 
   const metrics = cfg.metrics ?? createRgsMetrics();
 
+  if (cheatsEnabled) {
+    log.warn("CHEATS ENABLED — forced-outcome hints from params.cheat are active. " +
+      "This must NEVER be on for real-money play.", {
+      "event.category": "process",
+      "event.action":   "cheats_enabled",
+    });
+  }
+
   const orchestrator = createOrchestrator({
     manifest: cfg.manifest,
     platform: cfg.platform,
-    isDev,
+    cheatsEnabled,
     metrics,
     ...(cfg.idempotency ? { idempotency: cfg.idempotency } : {}),
   });

@@ -44,7 +44,15 @@ import type { IdempotencyConfig } from "@open-rgs/contract";
 export interface OrchestratorConfig {
   manifest: GameManifest;
   platform: PlatformAdapter;
-  isDev: boolean;
+  /** @deprecated No longer used by the orchestrator — cheats are gated by
+   *  `cheatsEnabled`, not the environment. Accepted for back-compat. */
+  isDev?: boolean;
+  /** Enable the dev-only forced-outcome cheat path (read from
+   *  `ClientRequestSpin.params.cheat`). Default false. createServer only
+   *  sets this true outside production AND with an explicit opt-in
+   *  (`enableCheats` / OPEN_RGS_ENABLE_CHEATS), so a forced-outcome path
+   *  can never be reached in a production build. */
+  cheatsEnabled?: boolean;
   /** Optional standard metrics registry. Created automatically by
    *  createServer; only passed explicitly in unit tests. */
   metrics?: RgsMetrics;
@@ -88,7 +96,8 @@ function errorReason(msg: string): string {
 }
 
 export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
-  const { manifest, platform, isDev, metrics } = cfg;
+  const { manifest, platform, metrics } = cfg;
+  const cheatsEnabled = cfg.cheatsEnabled ?? false;
   const genIdemKey = cfg.idempotency?.generate ?? defaultIdempotencyKey;
 
   // Idempotency key for a round-INITIATING call (simple spin / complex
@@ -189,7 +198,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   }
 
   function buildSpinContext(modeId: string, cheatRaw?: Record<string, unknown>, params?: Record<string, unknown>): SpinContext {
-    const cheat = isDev ? parseCheat(cheatRaw) : undefined;
+    // Cheats are fully off unless explicitly enabled outside production
+    // (see OrchestratorConfig.cheatsEnabled) — a forced-outcome path can
+    // never be reached in a production build.
+    const cheat = cheatsEnabled ? parseCheat(cheatRaw) : undefined;
     return { mode: modeId, cheat, params };
   }
 
@@ -398,7 +410,9 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INSUFFICIENT_BALANCE", `bet ${betInfo.bet} > balance ${s.balance}`);
     }
 
-    const ctx = buildSpinContext(requestedMode, req.cheat, req.params);
+    // Dev cheats (when enabled) ride inside params.cheat — never a
+    // first-class wire field. Ignored entirely when cheatsEnabled is false.
+    const ctx = buildSpinContext(requestedMode, req.params?.["cheat"] as Record<string, unknown> | undefined, req.params);
     const math = mode.math as SimpleMath;
     const mathStart = performance.now();
     const outcome = await Promise.resolve(math.play(s.carry, ctx));
