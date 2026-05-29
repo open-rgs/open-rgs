@@ -36,6 +36,7 @@ import {
 import * as sessions from "./session.js";
 import * as promo from "./promo.js";
 import { settleAmount } from "./money.js";
+import { deriveIdempotencyKey } from "./idempotency.js";
 import { log } from "./log.js";
 import type { RgsMetrics } from "./metrics-rgs.js";
 import type { IdempotencyConfig } from "@open-rgs/contract";
@@ -89,6 +90,16 @@ function errorReason(msg: string): string {
 export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   const { manifest, platform, isDev, metrics } = cfg;
   const genIdemKey = cfg.idempotency?.generate ?? defaultIdempotencyKey;
+
+  // Idempotency key for a round-INITIATING call (simple spin / complex
+  // open). No server-side round id exists yet, so retry-safety requires a
+  // stable token from the client: when present we derive deterministically
+  // from it; otherwise we fall back to a random key (a blind retry of a
+  // round-initiating call WITHOUT a client token cannot be deduped — see
+  // the contract's IdempotencyConfig and specs/05-platform-protocol.md).
+  function initiatingIdemKey(sessionId: string, phase: "spin" | "open", clientToken?: string): string {
+    return clientToken ? deriveIdempotencyKey(sessionId, phase, clientToken) : genIdemKey();
+  }
 
   // Wire platform events into local session cache.
   platform.onEvent((e) => {
@@ -401,7 +412,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         roundState,
         ...(cappedOutcome.nextMode !== undefined ? { nextMode: cappedOutcome.nextMode } : {}),
         ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
-        idempotencyKey: genIdemKey(),
+        idempotencyKey: initiatingIdemKey(s.sessionId, "spin", req.idempotencyKey),
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
       }));
     } catch (e) {
@@ -472,7 +483,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         betIndex: betInfo.betIndex,
         priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier,
         initialState: open.state,
-        idempotencyKey: genIdemKey(),
+        idempotencyKey: initiatingIdemKey(s.sessionId, "open", req.idempotencyKey),
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
       }));
     } catch (e) {
@@ -586,7 +597,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         ...(cappedClose.carry !== undefined ? { carry: cappedClose.carry } : {}),
         ...(cappedClose.nextMode !== undefined ? { nextMode: cappedClose.nextMode } : {}),
         ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
-        idempotencyKey: genIdemKey(),
+        // Deterministic per-round close key: client CLOSE and an external
+        // autoclose of the same round derive the identical key, so the
+        // wallet dedupes any duplicate/raced close into one credit.
+        idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "close"),
       }));
     } catch (e) {
       throw translate(e, "CLOSE_FAILED");
@@ -702,7 +716,9 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         win,
         multiplier: cappedClose.multiplier,
         type: cappedClose.type,
-        idempotencyKey: genIdemKey(),
+        // Same deterministic key as a client close of this round (above) —
+        // a close racing an autoclose collapses to one wallet credit.
+        idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "close"),
       }));
     } catch (e) {
       log.exception("Autoclose platform.closeComplex failed", e, {
