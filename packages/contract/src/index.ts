@@ -549,8 +549,14 @@ export interface ClientRequestSpin {
   priceMultiplier?: number;
   cheat?: Record<string, unknown>;
   params?: Record<string, unknown>;
+  /** Optional client-generated idempotency token. A round-initiating call
+   *  (spin/open) has no server-side round id yet, so the ONLY way to make a
+   *  blind retry of it deduplicable is for the client to resend the same
+   *  token. Supply a stable token (e.g. a UUID minted once per logical
+   *  spin) and reuse it across every retry of that spin. */
+  idempotencyKey?: string;
 }
-export interface ClientRequestOpenRound  { sid?: string; mode?: string; betIndex?: number; priceMultiplier?: number; params?: Record<string, unknown> }
+export interface ClientRequestOpenRound  { sid?: string; mode?: string; betIndex?: number; priceMultiplier?: number; params?: Record<string, unknown>; idempotencyKey?: string }
 export interface ClientRequestStepRound  { sid?: string; action: PlayerAction }
 export interface ClientRequestCloseRound { sid?: string }
 export interface ClientRequestPromoAccept { sid?: string; accept: boolean }
@@ -674,13 +680,22 @@ export interface ClientTransport {
 /** How RGS stamps state-changing wallet RPCs for retry-safety.
  *  Configured at boot via `createServer({ idempotency: ... })`.
  *
- *  Default: uuid-v4, 5-minute TTL.
- *  Override either field to taste. Helpers in @open-rgs/core/idempotency:
- *    import { uuidV4, cuidV2 } from "@open-rgs/core/idempotency";
- *    createServer({ idempotency: { generate: cuidV2, ttlMs: 600_000 }, ... })
+ *  Keys for *settling a known round* (close / autoclose) are derived
+ *  deterministically from `(sessionId, roundId)`, so every close path and
+ *  every retry of a round collapse to one wallet credit  - `generate` is not
+ *  used for those. `generate` is the fallback for a round-INITIATING call
+ *  (simple spin / complex open) when the client supplies no idempotency
+ *  token; default uuid-v4.
+ *
+ *  The deterministic derivation helper is exported from @open-rgs/core:
+ *    import { deriveIdempotencyKey } from "@open-rgs/core";
+ *
+ *  Wallets MUST dedupe on `idempotencyKey` for the retry-safety guarantee
+ *  to hold  - see specs/05-platform-protocol.md.
  */
 export interface IdempotencyConfig {
-  /** Generator function. Defaults to uuid-v4. */
+  /** Random fallback generator for round-initiating calls with no client
+   *  token. Defaults to uuid-v4. */
   generate?: () => string;
   /** TTL for retry dedupe window, in ms. Defaults to 300_000 (5 min). */
   ttlMs?: number;
