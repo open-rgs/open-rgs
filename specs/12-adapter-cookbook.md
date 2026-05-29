@@ -21,7 +21,7 @@ into the matching skeleton in the appendix.
 | REST endpoints + SSE event channel             | `HttpClient` + EventSource      | Common in newer aggregators. See "REST + SSE" skeleton.                    |
 | REST endpoints + WS event channel              | `HttpClient` + `WsClient` (events only) | Two-channel design. Money over REST, events over WS.                    |
 | Sequence-numbered upstream (must replay missed) | Wrap `WsClient`; track lastSeq | Don't fight it — accept a `lastSeq` extra in diagnostics and replay on reconnect. |
-| No FRC                                         | Implement methods without FRC fields | Return `frc: undefined` on openSession; never set `frcCampaignId` on round calls. |
+| No promo free-rounds                           | Implement methods without promo fields | Return `promo: undefined` on openSession; never set `promoId` on round calls. |
 | No `updateComplex` (no audit checkpoint)       | Omit the method                | It's optional in the contract; orchestrator falls back silently.            |
 | No carry / nextMode persistence                | Implement openSession to always return `carry: undefined` | Orchestrator handles the absence. Math files that need carry will see a fresh start each session. |
 | Throttled / rate-limited platform              | `HttpClient` + add token-bucket wrapper | Adapter-kit doesn't ship a bucket yet — TODO.                          |
@@ -231,7 +231,7 @@ files that depend on carry will see a fresh start; if that matters for
 their RTP, they should either not be deployed to that platform or
 declare RTP under the no-carry assumption.
 
-### FRC-less platforms
+### Promo-less platforms
 
 Similar: omit `promo` from `openSession` results, ignore `promoId`
 on round calls, and don't emit `promoGranted` events. The
