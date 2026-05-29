@@ -1,12 +1,16 @@
 // runConformance — walks an adapter through the standard lifecycle and
 // records a pass/fail per check. Doesn't throw; you read the report.
 //
-// Coverage today:
+// Coverage:
 //   • lifecycle: connect, isHealthy, diagnostics shape, disconnect
 //   • simple-round: openSession returns SessionInfo, settleSimple debits+credits
 //   • complex-round (if attempted): openComplex → updateComplex(optional) → closeComplex
-//   • events: onEvent registered, balanceChanged + autocloseRequested fire when expected
-//   • idempotency: same key sent twice produces same receipt (skipped if adapter doesn't expose a way to verify)
+//   • events: onEvent registered, balanceChanged fires when expected
+//   • idempotency: a REPEATED key moves money once and returns the same
+//     receipt — the property the contract relies on (was advertised but
+//     never actually run; audit H13)
+//   • error paths: overspend, unknown session, and bad round id are rejected
+//   • each check is bounded by perCheckTimeoutMs (enforced via Promise.race)
 //
 // The suite doesn't mutate real-money state because it expects a mock
 // or sandboxed adapter; it's a CONTRACT check, not an integration test.
@@ -39,20 +43,40 @@ export async function runConformance(
 
   const events: PlatformEvent[] = [];
   const eventHandler = (e: PlatformEvent) => events.push(e);
+  const perCheckTimeoutMs = opts.perCheckTimeoutMs ?? 5_000;
 
   async function run(id: string, group: string, description: string, fn: () => Promise<void>): Promise<void> {
     const start = performance.now();
     let status: CheckStatus = "ok";
     let message: string | undefined;
+    // Bound each check — a hung adapter call must surface as a failed check,
+    // not freeze the whole run. (perCheckTimeoutMs was plumbed but never
+    // enforced; audit H13.)
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await fn();
+      await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`check timed out after ${perCheckTimeoutMs}ms`)), perCheckTimeoutMs);
+        }),
+      ]);
     } catch (e) {
       status = "fail";
       message = e instanceof Error ? e.message : String(e);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
     const entry: CheckResult = { id, group, description, status, durationMs: Math.round(performance.now() - start) };
     if (message !== undefined) entry.message = message;
     checks.push(entry);
+  }
+
+  /** Assert a call rejects (for error-path checks). Fails the check if it
+   *  resolves instead of throwing. */
+  async function expectReject(fn: () => Promise<unknown>, whatShouldHappen: string): Promise<void> {
+    let threw = false;
+    try { await fn(); } catch { threw = true; }
+    if (!threw) throw new Error(whatShouldHappen);
   }
 
   function skip(id: string, group: string, description: string, reason: string): void {
@@ -81,7 +105,9 @@ export async function runConformance(
     session = await adapter.openSession(fixture.sessionId, fixture.connectionId);
     if (!session) throw new Error("openSession returned undefined");
     if (session.sessionId !== fixture.sessionId) throw new Error(`sessionId echoed wrongly: ${session.sessionId}`);
-    if (typeof session.balance !== "number")    throw new Error(`balance not a number: ${session.balance}`);
+    if (!Number.isFinite(session.balance) || !Number.isInteger(session.balance)) {
+      throw new Error(`balance must be a finite integer minor unit (NaN/Infinity/float rejected): ${session.balance}`);
+    }
     if (typeof session.currency !== "string")   throw new Error(`currency not a string: ${session.currency}`);
     if (!Array.isArray(session.allowedBets) || session.allowedBets.length === 0) {
       throw new Error(`allowedBets missing or empty: ${JSON.stringify(session.allowedBets)}`);
@@ -113,7 +139,9 @@ export async function runConformance(
     receipt = await adapter.settleSimple(req);
     if (!receipt) throw new Error("settleSimple returned undefined");
     if (!receipt.roundId) throw new Error("receipt missing roundId");
-    if (typeof receipt.balance !== "number") throw new Error("receipt.balance not a number");
+    if (!Number.isFinite(receipt.balance) || !Number.isInteger(receipt.balance)) {
+      throw new Error(`receipt.balance must be a finite integer minor unit: ${receipt.balance}`);
+    }
     if (receipt.balance !== before - fixture.bet) {
       throw new Error(`balance ${receipt.balance} ≠ expected ${before - fixture.bet}`);
     }
@@ -141,10 +169,60 @@ export async function runConformance(
     }
   });
 
+  // ─── idempotency ────────────────────────────────────────────────
+  // The headline safety property: a retried settle (same key) must move
+  // money at most once and return the original receipt.
+  await run("idempotency.duplicate-key", "idempotency", "a repeated idempotencyKey moves money once and returns the same receipt", async () => {
+    if (!session) throw new Error("no session (prerequisite failed)");
+    const dupReq: SettleSimple = {
+      sessionId: fixture.sessionId,
+      bet: fixture.bet,
+      betIndex: fixture.betIndex,
+      priceMultiplier: fixture.priceMultiplier,
+      win: fixture.bet * 2,          // net non-zero, so a second move would show
+      multiplier: 2,
+      type: "win",
+      roundState: "",
+      idempotencyKey: "conf-dup-1",  // SAME key for both calls
+    };
+    const first = await adapter.settleSimple(dupReq);
+    const second = await adapter.settleSimple({ ...dupReq });
+    if (second.roundId !== first.roundId) {
+      throw new Error(`duplicate key produced a different roundId (${first.roundId} → ${second.roundId}) — not deduped`);
+    }
+    if (second.balance !== first.balance) {
+      throw new Error(`duplicate key moved money twice: balance ${first.balance} → ${second.balance}`);
+    }
+  });
+
+  // ─── error paths ────────────────────────────────────────────────
+  await run("errors.insufficient-funds", "errors", "a bet exceeding balance is rejected", async () => {
+    await expectReject(() => adapter.settleSimple({
+      sessionId: fixture.sessionId,
+      bet: 10_000_000_000,           // far above any conformance balance
+      betIndex: fixture.betIndex,
+      priceMultiplier: fixture.priceMultiplier,
+      win: 0, multiplier: 0, type: "loss", roundState: "",
+      idempotencyKey: "conf-overspend-1",
+    }), "settle with bet > balance was accepted — a wallet MUST reject overspend");
+  });
+
+  await run("errors.unknown-session", "errors", "a settle on an unopened session is rejected", async () => {
+    await expectReject(() => adapter.settleSimple({
+      sessionId: "conf-never-opened-zzz",
+      bet: fixture.bet,
+      betIndex: fixture.betIndex,
+      priceMultiplier: fixture.priceMultiplier,
+      win: 0, multiplier: 0, type: "loss", roundState: "",
+      idempotencyKey: "conf-unknown-session-1",
+    }), "settle on an unknown session was accepted — a wallet MUST reject it");
+  });
+
   // ─── complex round ──────────────────────────────────────────────
   if (opts.skipComplex) {
     skip("complex.openComplex", "complex-round", "openComplex debits the bet", "skipComplex set");
     skip("complex.closeComplex", "complex-round", "closeComplex credits the win", "skipComplex set");
+    skip("errors.bad-round-id", "errors", "closeComplex with an unknown roundId is rejected", "skipComplex set");
   } else {
     let openReceipt: RoundReceipt | undefined;
     await run("complex.openComplex", "complex-round", "openComplex debits the bet", async () => {
@@ -170,6 +248,16 @@ export async function runConformance(
     } else {
       skip("complex.updateComplex", "complex-round", "updateComplex (optional) — not implemented", "adapter does not implement updateComplex");
     }
+    // Bad round id is rejected — and must leave the real open round intact,
+    // so we run it before the valid close.
+    await run("errors.bad-round-id", "errors", "closeComplex with an unknown roundId is rejected", async () => {
+      await expectReject(() => adapter.closeComplex({
+        sessionId: fixture.sessionId,
+        roundId: "conf-no-such-round-zzz",
+        finalState: "", win: 0, multiplier: 0, type: "loss",
+        idempotencyKey: "conf-badround-1",
+      }), "closeComplex accepted an unknown roundId — a wallet MUST reject it");
+    });
     await run("complex.closeComplex", "complex-round", "closeComplex credits the win", async () => {
       if (!openReceipt) throw new Error("openReceipt missing");
       const r = await adapter.closeComplex({
