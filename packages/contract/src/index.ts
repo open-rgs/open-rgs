@@ -776,7 +776,6 @@ export type RGSErrorCode =
   | "INVALID_ACTION"
   | "INVALID_ROUND"
   | "GAMES_API_UNAVAILABLE"
-  | "MAX_WIN_REACHED"
   /** Math exceeded its per-call execution budget and was aborted (see
    *  loadLuaMath `timeoutMs`). Protects the single-threaded server from a
    *  runaway/hostile math file. */
