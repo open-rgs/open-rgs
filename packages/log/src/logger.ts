@@ -2,7 +2,7 @@
 // public surface; everything else here is an implementation detail.
 
 import type { LogEntry, LogLevel, Logger, LoggerOptions } from "./types.js";
-import { buildRedactSet, redactDeep } from "./redact.js";
+import { buildRedactSet, redactDeep, scrubString } from "./redact.js";
 import { makeStdoutSink, formatters } from "./formatters.js";
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
@@ -83,14 +83,15 @@ function buildLogger(state: InternalState, bound: Record<string, unknown>): Logg
       if (c % every !== 1) return;
     }
 
-    const redacted = state.redact.size > 0
-      ? redactDeep(combined, state.redact) as Record<string, unknown>
-      : combined;
+    // Always redact: even with no custom keys the default credential set +
+    // value scrubbing apply (the old `size > 0` gate skipped redaction
+    // entirely when no keys were configured — i.e. by default).
+    const redacted = redactDeep(combined, state.redact) as Record<string, unknown>;
 
     const entry: LogEntry = {
       "@timestamp": new Date().toISOString(),
       "log.level": level,
-      message,
+      message: scrubString(message),
       "service.name": state.service,
       "service.version": state.version,
       ...(state.environment !== undefined ? { "service.environment": state.environment } : {}),
