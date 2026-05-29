@@ -596,7 +596,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     const mode = modeOrThrow(open.modeId);
     const math = mode.math as ComplexMath;
 
-    if (!math.isTerminal(open.state)) {
+    if (!(await Promise.resolve(math.isTerminal(open.state)))) {
       throw new RGSError("INVALID_ROUND", "Round not terminal yet — finish the flow first");
     }
 
@@ -715,7 +715,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     try {
       if (typeof math.autoclose === "function") {
         closeResult = await Promise.resolve(math.autoclose(open.state));
-      } else if (math.isTerminal(open.state)) {
+      } else if (await Promise.resolve(math.isTerminal(open.state))) {
         closeResult = await Promise.resolve(math.close(open.state));
       } else {
         // Math has nothing to say and the round isn't terminal —
