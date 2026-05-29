@@ -89,8 +89,11 @@ sequenceDiagram
       rolls the bomb grid and commits it to <code>state</code>. Each
       <code>step</code> reveals one cell; a bomb ends the round, a safe
       pick grows the multiplier. <code>close</code> cashes out the
-      current ladder value. The grid is committed once, so every pick is
-      provably-fair against a single roll.
+      current ladder value. The grid is committed once at <code>open</code>,
+      so every pick resolves against that single committed roll. (This is
+      not a commit-reveal "provably-fair" scheme  - outcome integrity comes
+      from the certified RNG and the durable round log, not a player-checkable
+      commitment.)
     </p>
 
     <pre><code>{`-- maths/mines.lua
@@ -145,12 +148,18 @@ return {
     end
     local safe_picks = #s.picks
     local m = LADDER[s.mines][safe_picks] or 0
-    return {
-      state    = cjson.encode(s),
-      ops      = { { kind = "reveal", cell = cell, bomb = false, multiplier = m } },
-      awaiting = { type = "pick_cell", prompt = "Pick again or cash out" },
-      -- The client signals "cash out" by sending CLOSE instead of STEP.
+    local result = {
+      state = cjson.encode(s),
+      ops   = { { kind = "reveal", cell = cell, bomb = false, multiplier = m } },
     }
+    -- Present an awaiting XOR be terminal  - never both. On the final safe
+    -- pick the board is fully cleared (is_terminal true below), so emit NO
+    -- awaiting: the round is terminal and the client must CLOSE.
+    if safe_picks < (25 - s.mines) then
+      result.awaiting = { type = "pick_cell", prompt = "Pick again or cash out" }
+      -- The client signals "cash out" by sending CLOSE instead of STEP.
+    end
+    return result
   end,
 
   is_terminal = function(state_json)

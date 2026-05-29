@@ -196,10 +196,13 @@ await createServer({
       state-changing wallet RPC; the wallet may dedupe.
     </p>
 
-    <pre><code>{`import { cuidV2 } from "@open-rgs/core/idempotency";
+    <pre><code>{`import { uuidV4 } from "@open-rgs/core";
 
+// \`generate\` is the random fallback for round-INITIATING calls (spin/open)
+// with no client token. Close/autoclose keys are derived deterministically
+// from (sessionId, roundId)  - see deriveIdempotencyKey.
 await createServer({
-  idempotency: { generate: cuidV2, ttlMs: 600_000 },
+  idempotency: { generate: uuidV4, ttlMs: 600_000 },
   manifest, platform, transport,
 });`}</code></pre>
 
