@@ -66,6 +66,10 @@ export function defaultIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
+/** Upper bound on a client-supplied priceMultiplier (feature-buy stake). A
+ *  sane ceiling so a crafted value can't inflate the bet arbitrarily. */
+const MAX_PRICE_MULTIPLIER = 100_000;
+
 /** Wrap a platform RPC call with latency + error metrics. */
 async function timedPlatformCall<T>(
   metrics: RgsMetrics | undefined,
@@ -219,12 +223,24 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       return { bet: promoOv.bet, betIndex: idx, priceMultiplier: 1, promoId: promoOv.promoId };
     }
     const betIndex = requestedBetIndex ?? s.defaultBetIndex;
-    if (betIndex < 0 || betIndex >= s.allowedBets.length) {
+    if (!Number.isInteger(betIndex) || betIndex < 0 || betIndex >= s.allowedBets.length) {
       throw new RGSError("INVALID_BET", `betIndex ${betIndex} out of range`);
     }
     const baseBet = s.allowedBets[betIndex]!;
+    // priceMultiplier is client-supplied  - validate it like betIndex. A
+    // crafted large/fractional value would otherwise inflate the bet or make
+    // it non-integer (feeding the money path bad input). (M4)
     const priceMultiplier = requestedPriceMultiplier ?? 1;
+    if (!Number.isInteger(priceMultiplier) || priceMultiplier < 1 || priceMultiplier > MAX_PRICE_MULTIPLIER) {
+      throw new RGSError("INVALID_BET", `priceMultiplier must be an integer in [1, ${MAX_PRICE_MULTIPLIER}], got ${priceMultiplier}`);
+    }
     const bet = baseBet * priceMultiplier * mode.stakeMultiplier;
+    // Every amount that crosses to the wallet is an integer minor unit; a
+    // fractional stakeMultiplier (or bad base) must not produce a fractional
+    // bet. (0 is allowed  - free-round modes.)
+    if (!Number.isInteger(bet) || bet < 0) {
+      throw new RGSError("INVALID_BET", `computed bet must be a non-negative integer minor unit, got ${bet}`);
+    }
     return { bet, betIndex, priceMultiplier };
   }
 
@@ -397,6 +413,11 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   async function spin(req: ClientRequestSpin, conn: ConnectionMeta): Promise<ClientResponseSpin> {
     const roundStart = performance.now();
     const s = sessionOrThrow(req.sid ?? conn.sessionId);
+    // A simple spin must not mutate a session that has a complex round
+    // in flight (its debited stake is still outstanding). (M5)
+    if (s.openRound) {
+      throw new RGSError("ROUND_ALREADY_OPEN", "Finish the open complex round before a simple spin");
+    }
     const requestedMode = resolveRequestedMode(s, req.mode);
     const mode = modeOrThrow(requestedMode);
 
