@@ -78,11 +78,16 @@ import { HttpClient } from "@open-rgs/adapter-kit";
 const http = new HttpClient({
   baseUrl: "https://platform.example/api/v1",
   headers: { "x-game-id": "g1", authorization: `Bearer ${token}` },
-  retries: 2,
+  retries: 2,        // budget  - applies ONLY to calls marked idempotent
   diagnostics: diag,
 });
 
-// Inside settleSimple:
+// Inside settleSimple: a money RPC is NOT auto-retried by default. A lost
+// response could mean the settle already happened upstream, so resending it
+// would double-charge. Leave it non-idempotent (no retry; on a network error
+// the kit throws "outcome UNKNOWN" so you reconcile), or pass
+// { idempotent: true } ONLY when `req` carries a stable idempotency key the
+// wallet dedupes on.
 return await http.request<RoundReceipt>("settleSimple", req);
 ```
 
