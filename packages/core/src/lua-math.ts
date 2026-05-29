@@ -14,6 +14,7 @@
 import { LuaFactory, type LuaEngine } from "wasmoon";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { RGSError } from "@open-rgs/contract";
 import type {
   SimpleMath, ComplexMath, MathModule,
   RoundOutcome, OpenOutcome, StepOutcome, CloseOutcome,
@@ -56,6 +57,14 @@ export interface LoadLuaMathOptions {
    *  `NODE_ENV=production` (e.g. an offline, non-real-money tooling job).
    *  Defaults to `false`  - production fails closed without an injected rng. */
   allowInsecureRng?: boolean;
+  /** Per-call wall-clock budget (ms) for every math entry point
+   *  (play/open/step/close/autoclose) and for load-time evaluation. wasmoon
+   *  runs Lua synchronously on the event loop, so a runaway math
+   *  (`while true do end`) would block the whole server; a Lua instruction
+   *  hook aborts the call with `MATH_TIMEOUT` once the budget is exceeded.
+   *  Default 1000. Set `0` to disable the watchdog (e.g. heavy simulation
+   *  runs that trust the math). */
+  timeoutMs?: number;
   /** Extensions installed into the VM before evaluating the math file.
    *  See {@link LuaExtension}. Registration order is significant: it
    *  determines the order transforms run, and the order host() functions
@@ -99,6 +108,46 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   // Hash the *original* source (pre-transform). This proves which math
   // file was loaded, regardless of what extensions did to it during eval.
   const contentHash = createHash("sha256").update(source).digest("hex");
+
+  // --- Execution watchdog (see timeoutMs) --------------------------------
+  // wasmoon runs Lua synchronously on the event loop, so a runaway math
+  // (`while true do end`) would block the whole server and no JS timer could
+  // interrupt it. The only lever is a Lua instruction hook that aborts once
+  // we pass a wall-clock deadline. Crucially the hook only applies when the
+  // math is CALLED FROM a doString chunk (the JS function bridge runs on a
+  // context where the hook does not carry), so when the watchdog is on we
+  // invoke math through `__open_rgs_invoke` inside a doString and read the
+  // result back as that chunk's return value  - race-free because wasmoon
+  // executes the chunk synchronously (no await between arg-set and the call).
+  const timeoutMs = opts?.timeoutMs ?? 1000;
+  const watchdog = timeoutMs > 0;
+  let deadline = Infinity;
+  const asTimeout = (e: unknown): RGSError | null =>
+    e instanceof Error && e.message.includes("MATH_TIMEOUT")
+      ? new RGSError("MATH_TIMEOUT", `math exceeded its ${timeoutMs}ms execution budget`)
+      : null;
+
+  /** Invoke a math entry point. With the watchdog off, call it directly
+   *  (synchronous, zero overhead  - for trusted bulk simulation). With it on,
+   *  route through the guarded doString so the abort hook applies. */
+  function invoke(fnName: string, args: unknown[]): unknown | Promise<unknown> {
+    if (!watchdog) {
+      return (api as Record<string, (...a: unknown[]) => unknown>)[fnName]!(...args);
+    }
+    deadline = performance.now() + timeoutMs;
+    for (let i = 0; i < args.length; i++) lua.global.set(`__open_rgs_arg${i + 1}`, args[i]);
+    const refs = args.map((_, i) => `__open_rgs_arg${i + 1}`).join(", ");
+    const code = `return __open_rgs_invoke(__open_rgs_math.${fnName}${refs ? ", " + refs : ""})`;
+    return lua.doString(code).then(
+      (raw) => { deadline = Infinity; return raw; },
+      (e) => { deadline = Infinity; throw asTimeout(e) ?? e; },
+    );
+  }
+
+  /** Apply a Lua->TS adapter to an invoke() result, awaiting if guarded. */
+  function mapResult<T>(raw: unknown | Promise<unknown>, adapt: (r: unknown) => T): T | Promise<T> {
+    return raw instanceof Promise ? raw.then(adapt) : adapt(raw);
+  }
 
   const extensions = opts?.extensions ?? [];
 
@@ -196,6 +245,34 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
     end
   `);
 
+  // Define the guarded invoker BEFORE the sandbox nils `debug`. It arms a
+  // Lua count hook on the current thread, runs the math fn, disarms  - the
+  // hook fires every N instructions and aborts once we pass the per-call
+  // deadline. It must be CALLED FROM a doString chunk (see invoke()), not
+  // via the JS function bridge, for the hook to apply. `sethook`, the hook,
+  // and the deadline check are captured as upvalues then hidden, so the
+  // (sandboxed) math cannot reach or disable the watchdog.
+  if (watchdog) {
+    lua.global.set("__open_rgs_deadline_check", () => performance.now() > deadline);
+    await lua.doString(`
+      do
+        local sethook = debug.sethook
+        local check = __open_rgs_deadline_check
+        local function hook()
+          if check() then error("MATH_TIMEOUT: math exceeded its time budget", 0) end
+        end
+        function __open_rgs_invoke(fn, a, b)
+          sethook(hook, "", 100000)
+          local ok, res = pcall(fn, a, b)
+          sethook()
+          if not ok then error(res, 0) end
+          return res
+        end
+      end
+      __open_rgs_deadline_check = nil
+    `);
+  }
+
   // Lock down the global environment before the (untrusted) math file runs.
   // Math is a trust boundary: it must see ONLY host.rng_next for entropy and
   // must not reach the OS, the filesystem, dynamic code loading, the debug
@@ -229,9 +306,22 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
     end
   `);
 
-  // Apply transforms to the user's math source and evaluate.
+  // Apply transforms to the user's math source and evaluate. With the
+  // watchdog on, run module construction through the guarded invoker too  -
+  // a top-level `while true` at load time is a DoS as well.
   const transformedSource = applyTransforms(source, path);
-  await lua.doString(`__open_rgs_math = (function() ${transformedSource} end)()`);
+  if (watchdog) {
+    deadline = performance.now() + timeoutMs;
+    try {
+      await lua.doString(`__open_rgs_math = __open_rgs_invoke(function() ${transformedSource} end)`);
+    } catch (e) {
+      throw asTimeout(e) ?? e;
+    } finally {
+      deadline = Infinity;
+    }
+  } else {
+    await lua.doString(`__open_rgs_math = (function() ${transformedSource} end)()`);
+  }
   const api = lua.global.get("__open_rgs_math") as LuaApi | undefined;
   if (!api || typeof api !== "object") {
     throw new Error(`Lua math at ${path} did not return a table`);
@@ -253,9 +343,8 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
       contentHash,
       ...(expected ? { expected } : {}),
       marks,
-      play(prev: CarryState | undefined, ctx: SpinContext): RoundOutcome {
-        const raw = api.play!(prev, ctx);
-        return adaptRoundOutcome(raw);
+      play(prev: CarryState | undefined, ctx: SpinContext): RoundOutcome | Promise<RoundOutcome> {
+        return mapResult(invoke("play", [prev, ctx]), adaptRoundOutcome);
       },
     };
     return m;
@@ -273,20 +362,20 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
     contentHash,
     ...(expected ? { expected } : {}),
     marks,
-    open(prev: CarryState | undefined, ctx: SpinContext): OpenOutcome {
-      return adaptOpenOutcome(api.open!(prev, ctx));
+    open(prev: CarryState | undefined, ctx: SpinContext): OpenOutcome | Promise<OpenOutcome> {
+      return mapResult(invoke("open", [prev, ctx]), adaptOpenOutcome);
     },
-    step(state: RoundState, action: PlayerAction): StepOutcome {
-      return adaptStepOutcome(api.step!(state, action));
+    step(state: RoundState, action: PlayerAction): StepOutcome | Promise<StepOutcome> {
+      return mapResult(invoke("step", [state, action]), adaptStepOutcome);
     },
-    isTerminal(state: RoundState): boolean {
-      return Boolean(api.is_terminal!(state));
+    isTerminal(state: RoundState): boolean | Promise<boolean> {
+      return mapResult(invoke("is_terminal", [state]), (r) => Boolean(r));
     },
-    close(state: RoundState): CloseOutcome {
-      return adaptCloseOutcome(api.close!(state));
+    close(state: RoundState): CloseOutcome | Promise<CloseOutcome> {
+      return mapResult(invoke("close", [state]), adaptCloseOutcome);
     },
     autoclose: typeof api.autoclose === "function"
-      ? (state: RoundState) => adaptCloseOutcome(api.autoclose!(state))
+      ? (state: RoundState) => mapResult(invoke("autoclose", [state]), adaptCloseOutcome)
       : undefined,
   };
   return m;

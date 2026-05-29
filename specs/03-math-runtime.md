@@ -98,6 +98,16 @@ The loader:
 - Validates `kind` and the required functions exist for that kind.
 - Adapts return values: 1-indexed Lua tables -> JS arrays where needed.
 - Promotes `next_mode` (snake_case in Lua) to `nextMode` (camelCase in TS).
+- Bounds execution with a per-call watchdog (`loadLuaMath` `timeoutMs`,
+  default 1000ms; `0` disables for trusted bulk simulation). wasmoon runs
+  Lua synchronously on the event loop, so a runaway math (`while true do
+  end`) would block the whole server for every player with no JS timer able
+  to interrupt it. A Lua instruction hook  - armed on the executing thread by
+  invoking each entry point (and module construction) from inside a
+  `doString` chunk, so it actually applies  - aborts the call with
+  `MATH_TIMEOUT` once it passes the deadline. The hook, its `sethook`
+  handle, and the deadline check are captured as upvalues then hidden, and
+  the hook survives `debug = nil`, so sandboxed math cannot disable it.
 
 ## WASM runtime details (planned)
 

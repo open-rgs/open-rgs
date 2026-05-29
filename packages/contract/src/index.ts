@@ -733,6 +733,10 @@ export type RGSErrorCode =
   | "INVALID_ROUND"
   | "PLATFORM_UNAVAILABLE"
   | "MAX_WIN_REACHED"
+  /** Math exceeded its per-call execution budget and was aborted (see
+   *  loadLuaMath `timeoutMs`). Protects the single-threaded server from a
+   *  runaway/hostile math file. */
+  | "MATH_TIMEOUT"
   | "ROUND_ALREADY_OPEN"
   | "NO_ROUND_OPEN"
   | "INTERNAL_ERROR"
