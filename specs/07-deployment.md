@@ -150,8 +150,20 @@ Notes:
 - `livenessProbe` MUST hit `/livez` (always 200 if process is up)  - NOT
   `/healthz`, which goes 503 when the wallet is unhealthy. We don't
   want the wallet flapping to restart pods.
-- `readinessProbe` SHOULD hit `/healthz` so K8s pulls a pod out of
-  rotation when the wallet is down.
+- `readinessProbe` SHOULD hit `/readyz` (200 healthy / 503 when the wallet
+  is down) so K8s pulls a pod out of rotation when the wallet is down.
+  Use `/readyz`, not `/healthz`: probes are unauthenticated, while the
+  detailed `/healthz` requires the admin token (see Admin auth below) and
+  would 403 the probe.
+- **Admin auth.** `/admin/*` and the detailed `/healthz` require
+  `Authorization: Bearer <token>`; set it via `adminToken` /
+  `OPEN_RGS_ADMIN_TOKEN`. In production these routes fail closed (403)
+  without a token. In single-port mode admin shares the public client
+  port, so either set a token or run admin on a separate `adminPort` bound
+  to a private interface behind a default-deny NetworkPolicy. CORS is never
+  wildcard  - set `adminAllowedOrigins` for a browser dashboard. Routing is
+  exact; if your ingress serves admin under a prefix, declare it via
+  `adminRouteBasePath`.
 - No persistent volume  - the orchestrator owns no durable state.
 - Sticky sessions are nice-to-have (faster reconnect -> in-memory
   session cache hit) but NOT required for correctness.

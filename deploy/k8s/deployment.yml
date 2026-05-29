@@ -51,10 +51,12 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
-          # /healthz reflects wallet connectivity  - pull pod from rotation when
-          # the wallet is down, but don't restart the process.
+          # /readyz reflects wallet connectivity (200 healthy / 503 down) and
+          # is unauthenticated  - pull the pod from rotation when the wallet is
+          # down, without restarting it. (Use /readyz, not /healthz: the
+          # detailed /healthz requires the admin token and would 403 the probe.)
           readinessProbe:
-            httpGet: { path: /healthz, port: admin }
+            httpGet: { path: /readyz, port: admin }
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 2

@@ -30,8 +30,20 @@ export interface ServerConfig {
   version?: string;
   /** HTTP admin port. Default: same as transport port (single-port mode,
    *  routes mounted under /admin/* + /livez + /readyz + /healthz). Set
-   *  to a distinct port to spin up a separate admin Bun.serve. */
+   *  to a distinct port to spin up a separate admin Bun.serve  - ideally on
+   *  a private interface behind a default-deny NetworkPolicy. */
   adminPort?: number;
+  /** Bearer token required on /admin/* and the detailed /healthz. Falls back
+   *  to the OPEN_RGS_ADMIN_TOKEN env var. In production, if neither is set,
+   *  those routes fail closed (403)  - admin shares the public client port in
+   *  single-port mode, so it must not be open. */
+  adminToken?: string;
+  /** CORS origin allowlist for browser operator dashboards hitting /admin/*.
+   *  Default none (no CORS headers). Never wildcard. */
+  adminAllowedOrigins?: string[];
+  /** Exact base path your ingress serves admin under (one declared rewrite,
+   *  e.g. "/api"). Default "" -> exact canonical routes. */
+  adminRouteBasePath?: string;
   /** Override the env-detected dev flag. */
   isDev?: boolean;
   /** Bring your own metrics registry, or omit to use the standard one. */
@@ -143,6 +155,27 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const singlePort = cfg.adminPort === undefined;
   let separateAdmin: { stop: () => void } | undefined;
 
+  // Admin auth: token from config or env; required (fail-closed) in
+  // production. The audit's "every request is from a trusted operator"
+  // assumption is false when admin shares the public client port.
+  const adminToken = cfg.adminToken ?? process.env["OPEN_RGS_ADMIN_TOKEN"];
+  const requireAuth = !isDev;
+  const adminAuth = {
+    ...(adminToken ? { authToken: adminToken } : {}),
+    requireAuth,
+    ...(cfg.adminAllowedOrigins ? { allowedOrigins: cfg.adminAllowedOrigins } : {}),
+    ...(cfg.adminRouteBasePath ? { routeBasePath: cfg.adminRouteBasePath } : {}),
+  };
+  if (requireAuth && !adminToken) {
+    log.warn(
+      singlePort
+        ? "Production single-port mode with no admin token  - /admin/* and /healthz will 403. " +
+          "Set adminToken / OPEN_RGS_ADMIN_TOKEN, or bind admin to a private adminPort."
+        : "Production admin has no token  - /admin/* and /healthz will 403 until adminToken / OPEN_RGS_ADMIN_TOKEN is set.",
+      { "event.category": "process", "event.action": "admin_auth_unset" },
+    );
+  }
+
   if (singlePort) {
     const handler = createAdminHandler({
       manifest:     cfg.manifest,
@@ -150,6 +183,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       orchestrator,
       metrics,
       gameVersion,
+      ...adminAuth,
     });
     if (typeof (cfg.transport as { setExtraFetch?: unknown }).setExtraFetch === "function") {
       (cfg.transport as unknown as { setExtraFetch: (fn: typeof handler.fetch) => void }).setExtraFetch(handler.fetch);
@@ -171,6 +205,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       orchestrator,
       metrics,
       gameVersion,
+      ...adminAuth,
     });
   }
 
