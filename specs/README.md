@@ -19,7 +19,7 @@ before implementation.** When a spec and the code disagree, the spec wins
 |----|------|--------|-------|
 | 00 | [Overview](./00-overview.md)  - what we're building, who for | draft | core |
 | 01 | [Public Contracts](./01-public-contracts.md)  - MathModule, PlatformAdapter, ClientTransport, GameManifest | draft | core |
-| 02 | [Orchestrator](./02-orchestrator.md)  - round flows, sessions, FRC, autoclose | draft | core |
+| 02 | [Orchestrator](./02-orchestrator.md)  - round flows, sessions, promo, autoclose | draft | core |
 | 03 | [Math Runtime](./03-math-runtime.md)  - Lua via wasmoon, Zig->WASM, RNG seam | draft | runtime |
 | 04 | [Wire Protocol](./04-wire-protocol.md)  - binary-msgpack frames, error codes | draft | transport |
 | 05 | [Wallet Protocol](./05-platform-protocol.md)  - canonical operations, error vocab | draft | wallet |
@@ -28,6 +28,7 @@ before implementation.** When a spec and the code disagree, the spec wins
 | 08 | [Testing & Certification](./08-testing.md)  - simulator, fuzzer, RTP reports | draft | qa |
 | 09 | [Roadmap](./09-roadmap.md)  - done, in-flight, deferred, sequencing | living | core |
 | 10 | [Design Philosophy](./10-design-philosophy.md)  - KISS + anti-rot principles | living | core |
+| 12 | [Adapter Cookbook](./12-adapter-cookbook.md)  - step-by-step guide to writing a PlatformAdapter | living | core |
 
 ## Sub-corpora
 

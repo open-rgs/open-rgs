@@ -31,22 +31,22 @@ Outputs:
    `awaiting`.
 3. **Fresh path**: call `wallet.openSession(sid, conn.connectionId)`.
    Build `LocalSession` from the returned `SessionInfo`. Include any
-   pending FRC offer; mark it as offered to prevent re-prompt on the
+   pending promo offer; mark it as offered to prevent re-prompt on the
    same connection.
 4. Build `ClientResponseInit` with: balance, currency, allowedBets,
    defaultBetIndex, mode catalog (excluding `internal: true`),
-   optional FRC offer, optional resume payload.
+   optional promo offer, optional resume payload.
 
 ### `spin(req, conn)`  - simple round
 
 1. Look up session.
-2. Resolve mode: FRC override -> `session.nextMode` -> `req.mode` ->
+2. Resolve mode: promo override -> `session.nextMode` -> `req.mode` ->
    `manifest.defaultMode`.
 3. Validate the resolved mode is `kind: "simple"`. Otherwise
    `INVALID_MODE`.
 4. Compute bet: `allowedBets[betIndex] x priceMultiplier x stakeMultiplier`.
-   FRC active -> use campaign-locked bet, force priceMultiplier=1.
-5. Pre-flight balance check (skipped for FRC). Insufficient ->
+   promo active -> use promo-locked bet, force priceMultiplier=1.
+5. Pre-flight balance check (skipped for promo). Insufficient ->
    `INSUFFICIENT_BALANCE`.
 6. Call `math.play(session.carry, ctx)`. `ctx` is `{ mode, cheat?, params? }`.
 7. **Sanitize + cap the multiplier**, then compute `win = multiplier x bet`.
@@ -57,9 +57,9 @@ Outputs:
    `maxWinMultiplier` is clipped and the outcome stamped
    `max_win_reached`.
 8. Call `wallet.settleSimple({ bet, betIndex, priceMultiplier, win,
-   multiplier, type, roundState: outcome.carry ?? "", frcCampaignId? })`.
+   multiplier, type, roundState: outcome.carry ?? "", promoId? })`.
 9. On wallet success: update local balance, store `outcome.carry` and
-   `outcome.nextMode` on the session, apply any FRC update from the
+   `outcome.nextMode` on the session, apply any promo update from the
    receipt.
 10. Build `ClientResponseSpin` with `outcome.ops` forwarded as-is.
 
@@ -73,7 +73,7 @@ Outputs:
 5. Call `math.open(session.carry, ctx)`. Math returns `{ state, ops,
    awaiting? }`.
 6. Call `wallet.openComplex({ bet, betIndex, priceMultiplier,
-   initialState: open.state, frcCampaignId? })`.
+   initialState: open.state, promoId? })`.
 7. Stash an `OpenRound` on the session: `{ roundId, modeId, bet, state,
    awaiting?, actionLog: [], opsLog: [...open.ops], openedAt: now }`.
 8. Build `ClientResponseOpenRound`.
@@ -106,15 +106,15 @@ Outputs:
 5. Call `wallet.closeComplex({ roundId, finalState: state, win,
    multiplier, type })`.
 6. On success: update balance, set carry/nextMode for next round, apply
-   FRC update if any. Drop `openRound`.
+   promo update if any. Drop `openRound`.
 7. Build `ClientResponseCloseRound`.
 
-### `frcAccept(req, conn)`  - campaign accept/decline
+### `promoAccept(req, conn)`  - promo accept/decline
 
 1. Look up session.
-2. No FRC offer or completed -> `{ ok: false }`.
+2. No promo offer or completed -> `{ ok: false }`.
 3. `req.accept === false` -> mark declined, return `{ ok: true }`.
-4. `req.accept === true` -> activate FRC, return `{ ok: true, frc: {...} }`.
+4. `req.accept === true` -> activate promo, return `{ ok: true, promo: {...} }`.
 
 ### `autocloseRound(req)`  - external trigger
 
@@ -130,8 +130,8 @@ Documented in detail in **Spec 02 §Autoclose** below.
 
 Always evaluated in this order, first match wins:
 
-1. **FRC active** (`session.frc?.active === true`): force the manifest's
-   `defaultMode` at the campaign's locked bet.
+1. **promo active** (`session.promo?.active === true`): force the manifest's
+   `defaultMode` at the promo's locked bet.
 2. **Math `nextMode` override** (`session.nextMode` set by previous
    round's outcome): use it.
 3. **Client request** (`req.mode`): use if non-empty.
@@ -242,7 +242,7 @@ vs reject-new) is separate and still pending.
 
 - Every public method returns within the latency budget in **Spec 06**
   for the synthetic test workload.
-- Mode resolution always picks one of the four sources, with FRC
+- Mode resolution always picks one of the four sources, with promo
   winning over `nextMode` winning over request winning over default.
 - Mid-complex-round disconnection followed by reconnection within the
   same process produces an INIT response with a `resume` field
