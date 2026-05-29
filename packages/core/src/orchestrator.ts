@@ -101,6 +101,37 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     return clientToken ? deriveIdempotencyKey(sessionId, phase, clientToken) : genIdemKey();
   }
 
+  // ─── Per-session serialization ──────────────────────────────────────────
+  //
+  // JS is single-threaded, but every money op `await`s the math and the
+  // wallet, and an `await` yields the event loop. So two operations on the
+  // same session can interleave across their awaits:
+  //   • a client CLOSE racing an autoclose (event/admin) — both read
+  //     `s.openRound`, both call `closeComplex`;
+  //   • two concurrent spins — both pass the `bet > balance` check against
+  //     the same stale balance, then both settle → overspend.
+  // We chain each session's operations into a queue so at most one runs at
+  // a time. Once an op holds the lock it runs start-to-finish (including
+  // clearing `s.openRound`) before the next begins, so the "read then clear
+  // after the await" pattern becomes safe and a second close finds no open
+  // round. Autoclose from platform events goes through the same lock.
+  const sessionChains = new Map<string, Promise<unknown>>();
+
+  function runLocked<T>(sid: string | null | undefined, fn: () => Promise<T>): Promise<T> {
+    // No session id yet (e.g. a request missing sid) — nothing to serialize
+    // against; run directly and let the impl throw the proper error.
+    if (!sid) return fn();
+    const prev = sessionChains.get(sid) ?? Promise.resolve();
+    const run = prev.then(fn, fn); // run after prev settles, success or fail
+    const tail = run.then(() => {}, () => {}); // swallow so the chain never wedges
+    sessionChains.set(sid, tail);
+    // Drop the entry once the queue drains, so the map doesn't grow forever.
+    void tail.then(() => {
+      if (sessionChains.get(sid) === tail) sessionChains.delete(sid);
+    });
+    return run;
+  }
+
   // Wire platform events into local session cache.
   platform.onEvent((e) => {
     if (e.type === "balanceChanged") {
@@ -654,7 +685,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   //   • Admin HTTP POST /api/autoclose for operator scripts
   // NEVER by an in-process timer.
 
-  async function autocloseRound(req: AutocloseRequest): Promise<AutocloseResponse> {
+  // Locked wrapper — used by both the public API and the platform-event
+  // handler above, so an autoclose serializes against a client close of the
+  // same session.
+  function autocloseRound(req: AutocloseRequest): Promise<AutocloseResponse> {
+    return runLocked(req.sessionId, () => autocloseRoundImpl(req));
+  }
+
+  async function autocloseRoundImpl(req: AutocloseRequest): Promise<AutocloseResponse> {
     const s = sessions.get(req.sessionId);
     if (!s) return { closed: false, reason: "session-not-found" };
 
@@ -778,7 +816,20 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     metrics?.sessionsActive.dec();
   }
 
-  return { init, spin, openRound, stepRound, closeRound, promoAccept, autocloseRound, onDisconnect };
+  // Serialize every client-facing operation per session (autocloseRound is
+  // already wrapped above). The lock key is the session id the request
+  // targets; a request with no resolvable session id runs unlocked and
+  // throws the appropriate "missing session" error inside the impl.
+  return {
+    init: (req, conn) => runLocked(req.sid, () => init(req, conn)),
+    spin: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => spin(req, conn)),
+    openRound: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => openRound(req, conn)),
+    stepRound: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => stepRound(req, conn)),
+    closeRound: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => closeRound(req, conn)),
+    promoAccept: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => promoAccept(req, conn)),
+    autocloseRound,
+    onDisconnect,
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
