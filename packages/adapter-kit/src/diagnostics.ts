@@ -55,8 +55,12 @@ export function createDiagnostics(opts: DiagnosticsOptions): DiagnosticsHandle {
     extras: {},
   };
 
+  // The handle exposes every DiagnosticsState field as a live getter over
+  // the captured `state` (so `handle.connected` reflects the latest value,
+  // not a snapshot). Note: do NOT spread `...state` here — it would add own
+  // data properties that the getters below immediately shadow, which only
+  // misleads readers into thinking the spread supplies the values.
   return {
-    ...state,
     get connected() { return state.connected; },
     get reconnectAttempt() { return state.reconnectAttempt; },
     get rpcsInFlight() { return state.rpcsInFlight; },
