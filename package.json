@@ -18,9 +18,15 @@
     "test": "bun --filter '@open-rgs/simulator' test",
     "site:dev": "npm --workspace apps/site run dev",
     "site:build": "npm --workspace apps/site run build",
-    "site:preview": "npm --workspace apps/site run preview"
+    "site:preview": "npm --workspace apps/site run preview",
+    "changeset": "changeset",
+    "changeset:status": "changeset status --verbose",
+    "version-packages": "changeset version && bun install",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
     "@types/bun": "^1.3.14",
     "typescript": "^6.0.3"
   }
