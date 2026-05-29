@@ -295,11 +295,12 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INVALID_BET", `priceMultiplier must be an integer in [1, ${MAX_PRICE_MULTIPLIER}], got ${priceMultiplier}`);
     }
     const bet = baseBet * priceMultiplier * mode.stakeMultiplier;
-    // Every amount that crosses to the wallet is an integer minor unit; a
-    // fractional stakeMultiplier (or bad base) must not produce a fractional
-    // bet. (0 is allowed — free-round modes.)
-    if (!Number.isInteger(bet) || bet < 0) {
-      throw new RGSError("INVALID_BET", `computed bet must be a non-negative integer minor unit, got ${bet}`);
+    // Every amount that crosses to the wallet is an integer minor unit within
+    // the safe-integer range; a fractional stakeMultiplier/base must not
+    // produce a fractional bet, and a value past 2^53 silently loses
+    // precision (H1) — reject both. (0 is allowed — free-round modes.)
+    if (!Number.isSafeInteger(bet) || bet < 0) {
+      throw new RGSError("INVALID_BET", `computed bet must be a non-negative integer minor unit within the safe range, got ${bet}`);
     }
     return { bet, betIndex, priceMultiplier };
   }
