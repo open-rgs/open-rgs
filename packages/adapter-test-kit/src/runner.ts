@@ -26,9 +26,9 @@ export interface RunOptions {
   fixture?: Partial<ConformanceFixture>;
   /** Default 5_000ms. */
   perCheckTimeoutMs?: number;
-  /** Skip complex-round checks (use if your platform is simple-rounds-only). */
+  /** Skip complex-round checks (use for a simple-rounds-only wallet). */
   skipComplex?: boolean;
-  /** Skip event checks (use if your platform doesn't push events). */
+  /** Skip event checks (use for a wallet that doesn't push events). */
   skipEvents?: boolean;
 }
 

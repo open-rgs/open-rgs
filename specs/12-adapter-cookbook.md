@@ -15,7 +15,7 @@ into the matching skeleton in the appendix.
 
 | Upstream shape                                | Use                            | Notes                                                                       |
 |-----------------------------------------------|--------------------------------|------------------------------------------------------------------------------|
-| Persistent WS, JSON frames, correlation-id RPC | `WsClient` (adapter-kit)       | The your platform shape. See `your-provider-adapter` as the reference.                    |
+| Persistent WS, JSON frames, correlation-id RPC | `WsClient` (adapter-kit)       | The most common wallet shape; the kit's `WsClient` covers nearly all of it. |
 | Persistent WS, binary frames (msgpack / proto) | `WsClient` + your `encodeRequest`/`decodeFrame` | Same as above; do the binary codec inside the callbacks. |
 | REST endpoints (POST per call), polled events  | `HttpClient` + a small poller   | Most legacy operator APIs. See "REST + polled events" skeleton.            |
 | REST endpoints + SSE event channel             | `HttpClient` + EventSource      | Common in newer aggregators. See "REST + SSE" skeleton.                    |
@@ -57,7 +57,7 @@ into the matching skeleton in the appendix.
 
 ## Skeleton: WS + correlation-id RPC
 
-This is the your platform shape — the kit's `WsClient` does ~all of it.
+This is the most common wallet shape — the kit's `WsClient` does ~all of it.
 
 ```ts
 import { WsClient, ErrorMap, createDiagnostics, type Decoded } from "@open-rgs/adapter-kit";

@@ -3,7 +3,8 @@
 // and humans see consistent shapes across providers.
 
 export interface DiagnosticsOptions {
-  /** Adapter identity (e.g. "your-provider", "pragmatic", "everymatrix"). */
+  /** Adapter identity — your own short name for the wallet this adapter
+   *  targets (e.g. "acme-wallet"). Surfaced in diagnostics/logs. */
   adapter: string;
   /** Adapter version (semver). */
   version: string;

@@ -24,7 +24,7 @@ Outputs:
 
 ### `init(req, conn)`
 
-1. Reject if `wallet.isHealthy === false` → `GAMES_API_UNAVAILABLE`.
+1. Reject if `wallet.isHealthy === false` → `PLATFORM_UNAVAILABLE`.
 2. **Resume path**: if a `LocalSession` for `req.sid` already exists
    AND has `openRound`, reuse it. No second `wallet.openSession` call.
    Build `resume` payload from `openRound.opsLog` + `actionLog` +
