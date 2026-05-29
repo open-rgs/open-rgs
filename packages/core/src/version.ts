@@ -1,11 +1,13 @@
 // Single source of truth for @open-rgs/core's own version.
 //
-// MUST be bumped in lockstep with packages/core/package.json. The two
-// can't easily be auto-synced without a build step, so we keep them
-// adjacent and rely on the publish.sh script to catch drift (it reads
-// version from package.json for the npm publish — if it goes out and
-// CORE_VERSION here is stale, the /healthz response will lie).
+// Read straight from package.json so it can never drift — the previous
+// hardcoded constant went stale ("0.3.0" while the package was 0.5.1), so
+// /healthz and the startup banner lied about which core was live. npm
+// always ships package.json in the published tarball, and Bun resolves the
+// JSON import at runtime, so this is correct both in-repo and when consumed.
 //
 // Surfaced via /healthz so operators can confirm exactly which core
 // shipped with a deployed pod.
-export const CORE_VERSION = "0.3.0";
+import pkg from "../package.json";
+
+export const CORE_VERSION: string = pkg.version;
