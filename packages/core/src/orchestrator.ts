@@ -179,6 +179,16 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         "event.category": "orchestrator",
         "session.id": e.sessionId,
       }));
+    } else {
+      // An adapter emitting an unrecognised event type (e.g. the legacy
+      // "campaignGranted" instead of "promoGranted") would otherwise have
+      // its event silently dropped  - and free-round grants would vanish.
+      // Make the mismatch visible.
+      log.warn("Dropped unknown platform event type", {
+        "event.category": "orchestrator",
+        "event.action": "unknown_platform_event",
+        "platform.event_type": (e as { type?: string }).type ?? "(none)",
+      });
     }
   });
 
