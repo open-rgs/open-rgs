@@ -42,10 +42,16 @@ resolver, RGS closes with multiplier 0.
 
 **Costs:**
 
-- Wallets that don't naturally emit "close this round" events need
-  the adapter to derive one (e.g., from a `sessionClosed` cascade).
-- Operator must run their own scheduling for "this round has been
-  open 30 minutes, time to autoclose" if their wallet doesn't do it.
+- Every adapter MUST guarantee an autoclose backstop  - without an
+  in-process timer, an open round closes only on an external signal, so
+  the adapter is responsible for ensuring one always eventually arrives
+  (a wallet-native deadline, a `sessionClosed` cascade, or an
+  adapter-derived deadline). This is a hard conformance requirement, not
+  an optional nicety; see spec 05 "The wallet guarantees." An adapter
+  that can do none of these would leak open rounds forever.
+- Operators whose wallet has no native round deadline must run their own
+  scheduling (or configure the adapter's derived backstop) for "this
+  round has been open 30 minutes, time to autoclose."
 
 ## Alternatives considered
 
