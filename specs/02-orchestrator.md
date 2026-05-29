@@ -276,8 +276,11 @@ vs reject-new) is separate and still pending.
 
 ## Open questions
 
-- Should the orchestrator support multiple games in one process? Today
-  it's one manifest per `createServer`. **Deferred.**
+- Multiple games in one process: **decided against** (not deferred).
+  `createServer` takes one `manifest`  - one game per process  - and that
+  is the intended shape: in-process multi-tenancy isn't worth the
+  complexity (spec 10, "What we deliberately AVOID"). To run several
+  games, run several processes (spec 07, "Multi-game deployments").
 - Should we expose a "drain" mode (reject new INITs but let in-flight
   rounds finish) for graceful shutdown? **Pending.**
 - Cross-process resume needs a `wallet.getOpenRound(sessionId)` call.

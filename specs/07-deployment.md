@@ -197,19 +197,20 @@ math is in-tree.
 
 ## Multi-game deployments
 
-Currently `createServer` accepts one manifest per process. To run two
-games, run two processes on two ports, or build two images.
+`createServer` accepts **one manifest per process**  - one game per
+process. This is deliberate, not a missing feature: in-process
+multi-tenancy isn't worth its complexity (spec 10, "What we deliberately
+AVOID"; spec 02, "Open questions").
 
-Multi-game-per-process support is on the roadmap (see **Spec 09**).
-When it lands, deployment looks like:
+To run several games, run several single-game processes  - on separate
+ports, or as separate images  - and route to them at the edge (an ingress
+or reverse proxy mapping a path or host per game):
 
 ```ts
-await createServer({
-  manifests: [luckyDigits, gambleCherry],
-  wallet: new MyAdapter({ ... }),
-  transport: binaryTransport({ port: 80 }),
-});
-// -> /api/lucky-digits/wss   and   /api/gamble-cherry/wss
+// one process per game, each its own createServer:
+await createServer({ manifest: luckyDigits, platform, transport: binaryTransport({ port: 8081 }) });
+await createServer({ manifest: gambleCherry, platform, transport: binaryTransport({ port: 8082 }) });
+// edge routes /lucky-digits/* -> :8081, /gamble-cherry/* -> :8082
 ```
 
 ## Acceptance criteria
