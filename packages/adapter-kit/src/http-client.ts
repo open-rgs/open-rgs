@@ -47,11 +47,21 @@ export class HttpClient {
   }
 
   /** Issue a POST <baseUrl>/<method> with body=JSON. Throws on non-2xx
-   *  after retries; returns the parsed JSON body otherwise. */
-  async request<T = unknown>(method: string, body: unknown): Promise<T> {
+   *  after retries; returns the parsed JSON body otherwise.
+   *
+   *  Retries happen ONLY when the call is marked `{ idempotent: true }`.
+   *  A money RPC (settleSimple / openComplex / closeComplex) is NOT
+   *  idempotent unless its body carries a stable idempotency key the wallet
+   *  dedupes on — blindly resending a settle whose response was lost
+   *  double-charges. So such calls default to no retry; on a network failure
+   *  the outcome is UNKNOWN and the caller must reconcile, not blind-retry.
+   *  Mark a call idempotent only when a repeat is provably safe. */
+  async request<T = unknown>(method: string, body: unknown, callOpts?: { idempotent?: boolean }): Promise<T> {
     const path  = this.opts.pathFor ? this.opts.pathFor(method) : `/${method}`;
     const url   = this.opts.baseUrl.replace(/\/+$/, "") + path;
-    const retries = this.opts.retries ?? 0;
+    // Only idempotent calls may auto-retry — otherwise a lost response on a
+    // money RPC would be resent and double-processed.
+    const retries = callOpts?.idempotent ? (this.opts.retries ?? 0) : 0;
     const delay   = this.opts.retryDelayMs ?? ((n: number) => (n + 1) * 200);
     const timeoutMs = this.opts.timeoutMs ?? 8_000;
 
@@ -78,9 +88,15 @@ export class HttpClient {
         });
       } catch (e) {
         clearTimeout(t);
+        // A network failure / timeout means the request may have reached the
+        // server (response lost). For a non-retried (non-idempotent) call the
+        // outcome is UNKNOWN — say so, so the caller reconciles rather than
+        // blind-retrying and risking a double settle.
+        const unknownOutcome = !callOpts?.idempotent;
+        const hint = unknownOutcome ? " — outcome UNKNOWN, reconcile (do not blind-retry)" : "";
         if (isAbort(e)) {
           this.opts.diagnostics?.noteRpcDone(false);
-          throw new Error(`HTTP ${method} timed out after ${timeoutMs}ms`);
+          throw new Error(`HTTP ${method} timed out after ${timeoutMs}ms${hint}`);
         }
         lastErr = e;
         if (attempt < retries) {
@@ -88,6 +104,10 @@ export class HttpClient {
           continue;
         }
         this.opts.diagnostics?.noteRpcDone(false);
+        if (unknownOutcome) {
+          const base = lastErr instanceof Error ? lastErr.message : String(lastErr);
+          throw new Error(`HTTP ${method} network error${hint}: ${base}`);
+        }
         throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
       }
       clearTimeout(t);
