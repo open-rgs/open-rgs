@@ -1,27 +1,83 @@
 # Publishing `@open-rgs/*` packages to npm
 
 The 8 packages in `packages/` are MIT and published to the public npm
-registry under the `@open-rgs` scope.
+registry under the `@open-rgs` scope. Releases are driven by
+[Changesets](https://github.com/changesets/changesets): you describe
+changes in PRs, a bot opens a "version packages" PR, and merging it
+publishes.
 
 > Closed-source / NDA-licensed adapters built against this contract
 > are **not** published from this repo and **never** auto-publish from
 > any GitHub Action here.
 
-## One-time setup
+## The flow
 
-1. **Claim the `@open-rgs` org on npmjs.org.** Sign in with the owner
-   account, create the org (free for public scope packages).
-2. **Configure npm Trusted Publisher** (OIDC) for each package, per
-   the npm-publish workflow's `environment: npm-publish` binding and
-   the workflow filename `.github/workflows/npm-publish.yml`. This
-   replaces long-lived `NPM_TOKEN` secrets entirely.
-3. **Set up a GitHub Environment** named `npm-publish` on the repo,
-   with the publishing account as a required reviewer (optional, but
-   recommended).
+```
+PR with a changeset ──merge──▶ main
+                                 │  Release workflow sees pending changesets
+                                 ▼
+                    bot opens "chore: version packages" PR
+                    (bumps versions, writes CHANGELOGs)
+                                 │  you review + merge it
+                                 ▼
+                    Release workflow runs `changeset publish`
+                    ──▶ npm (OIDC + provenance) + GitHub Releases
+```
+
+1. **Add a changeset to any PR that ships a user-visible change.** From
+   the repo root:
+
+   ```bash
+   bun run changeset
+   ```
+
+   Pick the affected packages and the bump type (patch / minor / major),
+   write a one-line summary, and commit the generated `.changeset/*.md`.
+   `bun run changeset:status` shows what would be released.
+
+2. **Merge the PR.** The [`release` workflow](.github/workflows/release.yml)
+   runs on `main`. With pending changesets it opens (or updates) a
+   **"chore: version packages"** PR that applies the bumps, regenerates
+   each affected package's `CHANGELOG.md`, and deletes the consumed
+   changeset files.
+
+3. **Merge the "version packages" PR.** The workflow runs again, finds no
+   pending changesets, and publishes the bumped packages with
+   `changeset publish` — to npm with provenance, plus a GitHub Release
+   per version. Versioning is **independent per package**
+   (`.changeset/config.json` → `fixed: []`); a dependency bump cascades a
+   patch to its dependents.
+
+## Authentication — npm OIDC trusted publishing (no token)
+
+Publishing uses **npm OIDC trusted publishing**; there is no `NPM_TOKEN`
+secret. `changesets/action` detects OIDC from the workflow's
+`id-token: write` permission and lets `npm publish` do the handshake;
+`NPM_CONFIG_PROVENANCE=true` attaches a signed SLSA attestation.
+
+One-time setup on npmjs.com:
+
+1. **Own the `@open-rgs` org** (free for public scope).
+2. **Configure a Trusted Publisher for each package**
+   (`npmjs.com/package/@open-rgs/<name>/access`) pointing at:
+   - org/user: `open-rgs`
+   - repository: `open-rgs`
+   - workflow: **`release.yml`**
+   - environment: `npm-publish`
+3. **Create a GitHub Environment** named `npm-publish` on the repo
+   (optionally with the publishing account as a required reviewer).
+
+> ⚠️ The packages were originally published from `npm-publish.yml`. The
+> workflow is now `release.yml`, so the Trusted Publisher `workflow`
+> field **must be updated to `release.yml`** or OIDC publishes will be
+> rejected.
+
+The npm CLI must be ≥ 11.5.1 for trusted publishing; the workflow
+upgrades it (`npm install -g npm@latest`) before publishing.
 
 ## Per-package `publishConfig`
 
-Every package's `package.json` carries the minimal block:
+Every package's `package.json` carries:
 
 ```json
 "publishConfig": {
@@ -30,67 +86,20 @@ Every package's `package.json` carries the minimal block:
 }
 ```
 
-That's it. No `registry` field — let npm default to
-`registry.npmjs.org`. `provenance: true` enables the SLSA attestation
-that npm displays on trusted-publisher packages.
+No `registry` field — npm defaults to `registry.npmjs.org`.
 
-## Publish order
+## Manual publish (emergency / first bootstrap only)
 
-When publishing from scratch (or after a contract bump), order
-matters because dependents pin exact versions:
-
-```
-@open-rgs/contract         ← no @open-rgs deps
-@open-rgs/log              ← no @open-rgs deps
-@open-rgs/core             ← contract + log
-@open-rgs/platform-mock    ← contract
-@open-rgs/adapter-kit      ← contract + log
-@open-rgs/adapter-test-kit ← contract
-@open-rgs/simulator        ← contract
-@open-rgs/client           ← contract (+ core/platform-mock/log as devDeps)
-```
-
-A `scripts/publish.sh` helper publishes in this order, with `--dry-run`
-and `--only <pkg…>` support.
-
-## Manual local publish (bootstrap only)
-
-The FIRST publish of a brand-new package can only run from a local
-machine — npm's Trusted Publisher binding requires the package to exist
-before you can attach a trusted-publisher entry to it. The script reads
-auth from `NPM_TOKEN` (it writes a throwaway `.npmrc` for the run and
-never touches your global `~/.npmrc`), so set that — `npm login` alone
-is not enough:
+CI is the only routine path. If you ever must publish by hand — e.g. the
+very first publish of a brand-new package name, which can't use a Trusted
+Publisher until the package exists — log in and run `changeset publish`
+directly:
 
 ```bash
-export NPM_TOKEN=npm_xxxxxxxxxxxxxxxxxxxxxxxx   # granular token, read+write @open-rgs
+npm login          # 2FA-protected account with publish rights to @open-rgs
 bun install
-./scripts/publish.sh             # in-order publish
-./scripts/publish.sh --dry-run   # validate without uploading
+bun run release    # = changeset publish; skips versions already on npm
 ```
 
-Provenance attestation is CI-only (it needs an OIDC issuer), so a local
-bootstrap publishes without it; CI re-runs add provenance.
-
-After the first publish, configure Trusted Publishers on every
-package's page (`npmjs.com/package/<name>/access`) and switch
-subsequent releases to the CI workflow.
-
-> There is intentionally **no committed `.npmrc`** (and none is needed
-> to *consume* the packages — they're public on `registry.npmjs.org`).
-> A real `.npmrc` is git-ignored; publish auth comes from OIDC in CI or
-> `NPM_TOKEN` locally, never a checked-in file.
-
-## CI publish via OIDC
-
-Every push of a git tag matching `v*` triggers `.github/workflows/npm-publish.yml`.
-The workflow:
-
-1. Checks out the code at the tag's SHA
-2. Installs Bun
-3. Runs typecheck + tests
-4. Upgrades npm to ≥ 11.5.1 (Trusted Publisher requires it)
-5. Calls `npm publish --access public --provenance` for the packages
-   in dependency order
-
-Authentication is fully OIDC — no `NPM_TOKEN` secret in the repo.
+Provenance is CI-only (it needs an OIDC issuer), so a manual publish ships
+without it; the next CI release re-establishes provenance.

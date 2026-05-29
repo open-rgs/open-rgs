@@ -134,8 +134,12 @@ is a round calculator + wallet driver.
 
 ## Status
 
-`v0.x` — usable and in production, but the contract may break across
-minor bumps until `1.0`. Watch the GitHub releases for changelogs.
+`v1.0.0` — the first stable release, following a full
+production-readiness audit. The public contract (`@open-rgs/contract`
++ `@open-rgs/core`) follows semver from 1.0: a breaking change means a
+major bump, not a surprise. Releases and per-package changelogs are
+managed with [Changesets](https://github.com/changesets/changesets) —
+watch the GitHub releases.
 
 ## License
 
