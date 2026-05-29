@@ -148,6 +148,22 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   // Wire platform events into local session cache.
   platform.onEvent((e) => {
     if (e.type === "balanceChanged") {
+      // Drop an out-of-order/duplicate balance event so a stale value can't
+      // clobber a fresher one in the local cache (see PlatformEvent.seq).
+      const s = sessions.get(e.sessionId);
+      if (s && e.seq !== undefined) {
+        if (s.balanceSeq !== undefined && e.seq <= s.balanceSeq) {
+          log.debug("Ignoring stale balanceChanged", {
+            "event.category": "orchestrator",
+            "event.action": "stale_balance_event",
+            "session.id": e.sessionId,
+            "event.seq": e.seq,
+            "applied.seq": s.balanceSeq,
+          });
+          return;
+        }
+        s.balanceSeq = e.seq;
+      }
       sessions.setBalance(e.sessionId, e.balance);
     } else if (e.type === "sessionClosed") {
       // If the session has an in-flight round, autoclose it first so

@@ -53,3 +53,32 @@ describe("platform event handling (M14)", () => {
     expect(session.get("evt-unknown")?.promo).toBeUndefined();
   });
 });
+
+describe("balanceChanged ordering (M13)", () => {
+  const bal = (sessionId: string, balance: number, seq?: number): PlatformEvent =>
+    ({ type: "balanceChanged", sessionId, balance, reason: "test", ...(seq !== undefined ? { seq } : {}) });
+
+  test("a stale (lower-seq) balance event does not clobber a fresher one", async () => {
+    const { orch, platform, conn } = setup();
+    await orch.init({ sid: "evt-seq" }, conn);
+    platform.emit(bal("evt-seq", 500, 1));
+    platform.emit(bal("evt-seq", 700, 3));
+    platform.emit(bal("evt-seq", 999, 2)); // out-of-order/stale — must be ignored
+    expect(session.get("evt-seq")?.balance).toBe(700);
+  });
+
+  test("a duplicate seq is ignored", async () => {
+    const { orch, platform, conn } = setup();
+    await orch.init({ sid: "evt-dup" }, conn);
+    platform.emit(bal("evt-dup", 600, 5));
+    platform.emit(bal("evt-dup", 1, 5)); // same seq — ignored
+    expect(session.get("evt-dup")?.balance).toBe(600);
+  });
+
+  test("events without seq are applied (best-effort, in-order upstreams)", async () => {
+    const { orch, platform, conn } = setup();
+    await orch.init({ sid: "evt-noseq" }, conn);
+    platform.emit(bal("evt-noseq", 333));
+    expect(session.get("evt-noseq")?.balance).toBe(333);
+  });
+});
