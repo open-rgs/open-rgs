@@ -49,6 +49,13 @@ export interface SimulationReport {
     measured: number;   // total_win / total_bet
     declared: number;   // from manifest
     delta: number;      // measured - declared
+    /** Standard error of the measured RTP (stdDev of per-spin return / sqrtn). */
+    standardError: number;
+    /** 95% confidence interval [low, high] for the measured RTP. */
+    ci95: [number, number];
+    /** Certification verdict: declared within CI95 -> pass; within CI99 -> warn;
+     *  outside -> fail (measured RTP significantly differs from declared). */
+    verdict: "pass" | "warn" | "fail";
   };
   /** Fraction of spins with multiplier > 0. */
   hitRate: number;
@@ -110,7 +117,9 @@ export function mdReport(r: SimulationReport): string {
   lines.push("");
   lines.push(`> ${r.narrative}`);
   lines.push("");
+  const verdictIcon = r.rtp.verdict === "pass" ? "✓" : r.rtp.verdict === "warn" ? "⚠" : "✗";
   lines.push(`- **Measured RTP:** ${pct(r.rtp.measured)} (declared ${pct(r.rtp.declared)}, delta ${sign(r.rtp.delta)})`);
+  lines.push(`- **RTP certification:** ${verdictIcon} ${r.rtp.verdict.toUpperCase()}  - 95% CI [${pct(r.rtp.ci95[0])}, ${pct(r.rtp.ci95[1])}], SE ${pct(r.rtp.standardError)}`);
   lines.push(`- **Hit rate:** ${pct(r.hitRate)}`);
   lines.push(`- **Spins:** ${r.spins.toLocaleString()} . **Bet:** ${r.bet.unitsPerSpin}u/spin . **Time:** ${r.elapsedMs}ms`);
   lines.push(`- **Stake multiplier:** ${r.mode.stakeMultiplier}x . **Internal:** ${r.mode.internal ? "yes" : "no"}`);

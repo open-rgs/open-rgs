@@ -13,7 +13,7 @@
 import type {
   GameManifest, GameMode,
   SimpleMath, ComplexMath,
-  AwaitingHint, PlayerAction, SpinContext,
+  AwaitingHint, PlayerAction, SpinContext, CarryState,
   MarkSnapshot, MarkCollector,
   PlatformAdapter,
 } from "@open-rgs/contract";
@@ -103,6 +103,10 @@ async function simulateMode(
   const nextModeRoutes: Record<string, number> = {};
   let totalWin = 0;
   let totalSteps = 0;
+  // Cross-round carry threaded spin-to-spin, exactly as the orchestrator does
+  // it. Passing `undefined` every spin (the old behaviour) made any stateful
+  // game's measured RTP wrong. (H7)
+  let carry: CarryState | undefined;
 
   // Optional adapter integration  - when set, each spin is settled via
   // the real adapter so wire-protocol bugs (validator mismatches, auth
@@ -131,14 +135,15 @@ async function simulateMode(
     if (mode.math.kind === "simple") {
       const m = mode.math as SimpleMath;
       const ctx: SpinContext = { mode: modeId };
-      const outcome = await Promise.resolve(m.play(undefined, ctx));
+      const outcome = await Promise.resolve(m.play(carry, ctx));
       multiplier = outcome.multiplier;
       type = outcome.type;
       nextMode = outcome.nextMode;
+      carry = outcome.carry;
     } else {
       const m = mode.math as ComplexMath;
       const ctx: SpinContext = { mode: modeId };
-      const open = await Promise.resolve(m.open(undefined, ctx));
+      const open = await Promise.resolve(m.open(carry, ctx));
       let state = open.state;
       let awaiting: AwaitingHint | undefined = open.awaiting;
       let steps = 0;
@@ -155,6 +160,7 @@ async function simulateMode(
       multiplier = close.multiplier;
       type = close.type;
       nextMode = close.nextMode;
+      carry = close.carry;
     }
 
     multipliers[i] = multiplier;
@@ -211,6 +217,24 @@ async function simulateMode(
   const totalBet = spins * betPerSpin;
   const measuredRtp = totalBet === 0 ? 0 : totalWin / totalBet;
   const declaredRtp = mode.declaredRtp ?? mode.math.rtp;
+
+  // RTP certification verdict. The measured RTP is the mean per-spin return;
+  // its standard error is stdDev(per-spin multiplier)/sqrtn. We can then say
+  // whether the declared RTP is statistically consistent with what we
+  // measured: within the 95% CI -> pass; within 99% -> warn; outside -> fail.
+  const standardError = spins > 0 ? muStd / Math.sqrt(spins) : 0;
+  const ci95: [number, number] = [measuredRtp - 1.96 * standardError, measuredRtp + 1.96 * standardError];
+  const rtpDelta = Math.abs(declaredRtp - measuredRtp);
+  let rtpVerdict: "pass" | "warn" | "fail";
+  if (standardError === 0) {
+    rtpVerdict = rtpDelta < 1e-9 ? "pass" : "fail";
+  } else if (rtpDelta <= 1.96 * standardError) {
+    rtpVerdict = "pass";
+  } else if (rtpDelta <= 2.576 * standardError) {
+    rtpVerdict = "warn";
+  } else {
+    rtpVerdict = "fail";
+  }
 
   let hits = 0;
   for (const m of multipliers) if (m > 0) hits += 1;
@@ -320,6 +344,9 @@ async function simulateMode(
       measured: measuredRtp,
       declared: declaredRtp,
       delta: measuredRtp - declaredRtp,
+      standardError,
+      ci95,
+      verdict: rtpVerdict,
     },
     hitRate,
     multiplier: multiplierStats,
