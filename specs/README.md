@@ -35,8 +35,10 @@ before implementation.** When a spec and the code disagree, the spec wins
 - [adr/](./adr/) — Architectural Decision Records (six seeded: Bun
   runtime, integer minor units, external autoclose, adapter owns
   state, RGS-generated round IDs, stateless RGS).
-- [adapters/](./adapters/) — per-provider analysis as wallet/external
-  API specs arrive. First entry: `pgsoft.md`.
+- `adapters/` — reserved for per-provider analysis as real wallet /
+  external-API specs arrive (none committed yet; examples must stay
+  neutral, so any entry describes a generic wallet shape, not a named
+  provider's wire protocol).
 
 ## Spec template
 
