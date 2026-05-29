@@ -89,9 +89,12 @@ Outputs:
 4. Call `math.step(state, action)`. Math returns `{ state, ops, awaiting? }`.
 5. Update `openRound`: replace state, set/delete awaiting, append
    action to `actionLog`, append ops to `opsLog`.
-6. Optional audit: if `wallet.updateComplex` is defined, fire-and-forget
-   call with `{ sessionId, roundId, state }`. Failures logged, not
-   surfaced.
+6. Record the action into the tamper-evident game-cycle audit log (kind
+   `step`), and checkpoint to the wallet if `wallet.updateComplex` is
+   defined. The checkpoint honours `auditMode`: `best-effort` (default)
+   fires it and swallows failures; `mandatory` awaits it and **fails the
+   step** (`STEP_FAILED`) if dropped — for jurisdictions that require a
+   server-side action log, where a missing record can't be "best effort".
 7. **No money moves.** Build `ClientResponseStepRound` with `ops` and
    `awaiting?`.
 
