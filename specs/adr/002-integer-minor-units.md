@@ -32,8 +32,9 @@ in the integer convention — RGS doesn't need a precision lookup.
 
 - No float drift, no rounding bugs in the hot path.
 - Integer arithmetic for `win = multiplier × bet` is fast and exact
-  (subject to one float multiply if multiplier is non-integer; we
-  truncate or round once at the boundary, not throughout).
+  (subject to one float multiply if multiplier is non-integer; we round
+  once at the boundary — half to even, see below — not throughout).
+  Implemented in `@open-rgs/core`'s `settleAmount` (`money.ts`).
 - Adapters can persist as float in their own DB if they prefer; the
   conversion happens at the adapter boundary, not in core.
 - Crypto-friendly out of the box — no special-cased "is this BTC?"

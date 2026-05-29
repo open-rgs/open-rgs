@@ -22,6 +22,17 @@ import { mean, stdDev, percentileSorted } from "./stats.js";
 import { computeDeviations, narrate, type TargetDeviation } from "./deviation.js";
 import type { SimulationReport, DistributionStats } from "./report.js";
 
+/** Round to nearest integer, ties to even (banker's rounding) — the money
+ *  boundary rule from ADR-002. Mirrors @open-rgs/core's `roundHalfEven`;
+ *  duplicated here because the simulator deliberately has no core dep. */
+function roundHalfEven(x: number): number {
+  const floor = Math.floor(x);
+  const frac = x - floor;
+  if (frac < 0.5) return floor;
+  if (frac > 0.5) return floor + 1;
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
 export interface SimulateOptions {
   /** Spins to run per mode. Default 100_000. */
   spinsPerMode?: number;
@@ -154,19 +165,25 @@ async function simulateMode(
     if (adapter && adapterSession) {
       const tStart = performance.now();
       adapterRpcsSent += 1;
+      // The adapter is a real wallet expecting integer minor units, so the
+      // settled win must be rounded exactly as core's orchestrator does
+      // (round half to even, ADR-002) — not the raw float `multiplier ×
+      // bet`. (The theoretical `totalWin` above stays exact on purpose: it
+      // measures RTP, not what a wallet would actually credit.)
+      const winMinor = roundHalfEven(multiplier * betPerSpin);
       try {
         await adapter.settleSimple({
           sessionId:       adapterSession,
           bet:             betPerSpin,
           betIndex:        adapterBetIdx,
           priceMultiplier: betUnits,
-          win:             multiplier * betPerSpin,
+          win:             winMinor,
           multiplier,
           type,
           // Synthesize a per-spin audit envelope; core's orchestrator
           // does the same when math carry is absent.
           roundState: JSON.stringify({
-            type, multiplier, win: multiplier * betPerSpin, bet: betPerSpin, bet_index: adapterBetIdx,
+            type, multiplier, win: winMinor, bet: betPerSpin, bet_index: adapterBetIdx,
           }),
           ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
         });
