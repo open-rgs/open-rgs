@@ -196,6 +196,39 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
     end
   `);
 
+  // Lock down the global environment before the (untrusted) math file runs.
+  // Math is a trust boundary: it must see ONLY host.rng_next for entropy and
+  // must not reach the OS, the filesystem, dynamic code loading, the debug
+  // library (which can re-introspect/patch any function), or non-deterministic
+  // clocks. Overriding require() alone (above) left all of these reachable.
+  // Extensions are operator-configured and already ran their install step,
+  // so this guards the math file itself. NB: nil-ing Lua's `load`/`loadfile`
+  // does not affect our own evaluation, which goes through wasmoon's
+  // host-side loader (`lua.doString`), not the Lua globals.
+  await lua.doString(`
+    os = nil
+    io = nil
+    debug = nil
+    load = nil
+    loadstring = nil
+    loadfile = nil
+    dofile = nil
+    package = nil
+    collectgarbage = nil
+    -- Route Lua's built-in randomness through the injected host RNG so a
+    -- math file cannot silently bypass the auditable seam via math.random /
+    -- math.randomseed. Preserve the three Lua call signatures.
+    if math then
+      math.random = function(m, n)
+        local r = host.rng_next()        -- [0, 1) from the injected RNG
+        if m == nil then return r end
+        if n == nil then n = m; m = 1 end
+        return m + math.floor(r * (n - m + 1))
+      end
+      math.randomseed = function() end   -- no-op: seeding is the host's job
+    end
+  `);
+
   // Apply transforms to the user's math source and evaluate.
   const transformedSource = applyTransforms(source, path);
   await lua.doString(`__open_rgs_math = (function() ${transformedSource} end)()`);

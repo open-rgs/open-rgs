@@ -60,9 +60,16 @@ host.rng_next()          -- → number in [0, 1)
 host.log_debug(msg)      -- → nil; routes to ECS logger at debug level
 ```
 
-That's it. No `os.*`, no `io.*`, no `require`, no `package.path`. Math
-files cannot read files, open sockets, get the current time, or escape
-the sandbox.
+That's it. Before the math file is evaluated the loader locks down the
+global environment: `os`, `io`, `debug`, `load`, `loadstring`, `loadfile`,
+`dofile`, `package`, and `collectgarbage` are set to `nil`, and
+`math.random` / `math.randomseed` are replaced so all entropy is routed
+through `host.rng_next` (a math file cannot bypass the auditable RNG seam,
+nor read files, open sockets, or read a wall clock). The only module access
+is the overridden `require`, which resolves **only** explicitly registered
+extensions (never the host filesystem). This is the math trust boundary —
+it is a denylist of the known-dangerous Lua 5.4 surface; an `_ENV`
+allowlist is a possible future hardening.
 
 A math file's expected shape:
 
