@@ -3,6 +3,15 @@
 // In-memory PlatformAdapter for development and testing. Holds balances per
 // session, settles rounds locally, and supports optional promo-free-rounds
 // injection so you can exercise the promo code path without a real upstream.
+//
+// This is the wallet adapter authors copy to learn "what a correct wallet
+// does", so it models the safety posture a real wallet MUST have:
+//   • Idempotency: a repeated idempotencyKey returns the ORIGINAL receipt
+//     and moves money at most once (a lost-response retry must not double).
+//   • Monotonic round ids that never collide.
+//   • Amounts are non-negative integer minor units; anything else is rejected.
+//   • A promo (free-round) settle is allowed only against a non-empty pool.
+// A production wallet MUST do the same — especially the dedupe.
 
 import type {
   PlatformAdapter,
@@ -42,9 +51,25 @@ interface MockState {
   openRound?: { roundId: string; bet: number; finalState?: string };
 }
 
+/** Reject anything that isn't a non-negative integer in the currency's
+ *  minimal unit — the contract's hard rule. A fractional or negative amount
+ *  (e.g. an un-rounded win, or a negative settlement) must never be accepted
+ *  by a wallet; it corrupts the ledger. */
+function assertAmount(n: number, name: string): void {
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`InvalidAmount: ${name} must be a non-negative integer minor unit, got ${n}`);
+  }
+}
+
 export class MockPlatform implements PlatformAdapter {
   private state = new Map<string, MockState>();
   private handlers: ((e: PlatformEvent) => void)[] = [];
+  /** idempotencyKey → the receipt produced the first time we saw it. A
+   *  repeat returns this and moves no money. */
+  private receipts = new Map<string, RoundReceipt>();
+  /** Monotonic, collision-free round-id source (bumped on every id-producing
+   *  op, not just settles — two opens in the same ms must not share an id). */
+  private roundIdSeq = 0;
   private roundCounter = 0;
   private connected = false;
 
@@ -60,6 +85,7 @@ export class MockPlatform implements PlatformAdapter {
       connected: this.connected,
       sessions: this.state.size,
       rounds_settled: this.roundCounter,
+      idempotency_keys_seen: this.receipts.size,
     };
   }
 
@@ -95,9 +121,17 @@ export class MockPlatform implements PlatformAdapter {
   // ─── simple round ─────────────────────────────────────────────────────
 
   async settleSimple(req: SettleSimple): Promise<RoundReceipt> {
+    const dup = this.replay(req.idempotencyKey);
+    if (dup) return dup;
+
     const s = this.must(req.sessionId);
+    assertAmount(req.bet, "bet");
+    assertAmount(req.win, "win");
+
     const isPromo = Boolean(req.promoId);
-    if (!isPromo) {
+    if (isPromo) {
+      this.assertPromo(s, req.promoId!);
+    } else {
       if (req.bet > s.balance) throw new Error("InsufficientFunds");
       s.balance -= req.bet;
     }
@@ -106,28 +140,34 @@ export class MockPlatform implements PlatformAdapter {
     const roundId = this.nextRoundId();
 
     const receipt: RoundReceipt = { roundId, balance: s.balance };
-    if (s.promo && isPromo && s.promo.id === req.promoId) {
-      s.promo.remaining = Math.max(0, s.promo.remaining - 1);
-      receipt.promo = { remaining: s.promo.remaining };
-      if (s.promo.remaining === 0) s.promo = undefined;
-    }
+    if (isPromo) receipt.promo = this.consumePromo(s);
     this.emit({ type: "balanceChanged", sessionId: req.sessionId, balance: s.balance, reason: "spin" });
-    return receipt;
+    return this.remember(req.idempotencyKey, receipt);
   }
 
   // ─── complex round ────────────────────────────────────────────────────
 
   async openComplex(req: OpenComplex): Promise<RoundReceipt> {
+    const dup = this.replay(req.idempotencyKey);
+    if (dup) return dup;
+
     const s = this.must(req.sessionId);
+    assertAmount(req.bet, "bet");
+
     const isPromo = Boolean(req.promoId);
-    if (!isPromo) {
+    if (isPromo) {
+      this.assertPromo(s, req.promoId!);
+    } else {
       if (req.bet > s.balance) throw new Error("InsufficientFunds");
       s.balance -= req.bet;
     }
     const roundId = this.nextRoundId();
     s.openRound = { roundId, bet: req.bet };
+
+    const receipt: RoundReceipt = { roundId, balance: s.balance };
+    if (isPromo) receipt.promo = this.consumePromo(s);
     this.emit({ type: "balanceChanged", sessionId: req.sessionId, balance: s.balance, reason: "open" });
-    return { roundId, balance: s.balance };
+    return this.remember(req.idempotencyKey, receipt);
   }
 
   async updateComplex(_req: UpdateComplex): Promise<void> {
@@ -135,7 +175,11 @@ export class MockPlatform implements PlatformAdapter {
   }
 
   async closeComplex(req: CloseComplex): Promise<RoundReceipt> {
+    const dup = this.replay(req.idempotencyKey);
+    if (dup) return dup;
+
     const s = this.must(req.sessionId);
+    assertAmount(req.win, "win");
     if (!s.openRound || s.openRound.roundId !== req.roundId) {
       throw new Error("InvalidRoundOperation: roundId mismatch");
     }
@@ -144,10 +188,38 @@ export class MockPlatform implements PlatformAdapter {
     s.openRound = undefined;
     this.roundCounter++;
     this.emit({ type: "balanceChanged", sessionId: req.sessionId, balance: s.balance, reason: "close" });
-    return { roundId: req.roundId, balance: s.balance };
+    return this.remember(req.idempotencyKey, { roundId: req.roundId, balance: s.balance });
   }
 
   // ─── helpers ──────────────────────────────────────────────────────────
+
+  /** Idempotency dedupe: if we've settled this key before, return a copy of
+   *  the original receipt and move no money. */
+  private replay(key: string | undefined): RoundReceipt | undefined {
+    if (key === undefined) return undefined;
+    const prev = this.receipts.get(key);
+    return prev ? { ...prev, ...(prev.promo ? { promo: { ...prev.promo } } : {}) } : undefined;
+  }
+  private remember(key: string | undefined, receipt: RoundReceipt): RoundReceipt {
+    if (key !== undefined) {
+      this.receipts.set(key, { ...receipt, ...(receipt.promo ? { promo: { ...receipt.promo } } : {}) });
+    }
+    return receipt;
+  }
+
+  /** A promo settle is only valid against a matching, non-empty pool. */
+  private assertPromo(s: MockState, promoId: string): void {
+    if (!s.promo || s.promo.id !== promoId || s.promo.remaining <= 0) {
+      throw new Error("InvalidRoundOperation: promo pool empty or mismatched");
+    }
+  }
+  private consumePromo(s: MockState): { remaining: number } {
+    const promo = s.promo!;
+    promo.remaining = Math.max(0, promo.remaining - 1);
+    const remaining = promo.remaining;
+    if (remaining === 0) s.promo = undefined;
+    return { remaining };
+  }
 
   /** Test helper: grant a promo free-rounds pool to a session. */
   grantPromo(sessionId: string, promo: PromoFreeRounds): void {
@@ -193,6 +265,6 @@ export class MockPlatform implements PlatformAdapter {
   }
 
   private nextRoundId(): string {
-    return `r-${Date.now().toString(36)}-${(this.roundCounter).toString(36)}`;
+    return `r-${++this.roundIdSeq}`;
   }
 }
