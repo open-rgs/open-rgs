@@ -548,6 +548,13 @@ export interface LuaExtension {
 
 // ─── Client transport contract ──────────────────────────────────────────────
 
+/** Wire correlation-id key. The client stamps a unique id on each request
+ *  payload under this key; the transport echoes it on the matching response /
+ *  error frame. The client matches responses by this id (not just frame
+ *  type), so a late/duplicate response from a timed-out call can't resolve a
+ *  newer request. Reserved — math/clients must not use it for game data. */
+export const WIRE_CORRELATION_KEY = "$cid";
+
 export interface ClientRequestInit { sid: string }
 export interface ClientRequestSpin {
   sid?: string;

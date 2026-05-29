@@ -18,6 +18,14 @@ Each WebSocket message is one frame, binary, of the form:
 The first byte is a message type code. The remainder is a MessagePack
 encoding of the typed request or response.
 
+**Correlation id.** The client stamps a unique id on each request payload
+under the reserved key `$cid` (`WIRE_CORRELATION_KEY`); the transport echoes
+it on the matching response / error frame. The client matches responses by
+this id, not just by frame type — so a late or duplicate response from a
+timed-out request can't resolve a newer call. `PING`/`PONG` are unsolicited
+and carry no id; a pre-dispatch error (unparseable frame) may omit it. The
+client strips `$cid` before returning the response to callers.
+
 ## Message types
 
 | Code | Direction | Logical message            | Payload type |

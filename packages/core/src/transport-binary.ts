@@ -5,6 +5,7 @@
 import { encode, decode } from "@msgpack/msgpack";
 import {
   RGSError,
+  WIRE_CORRELATION_KEY,
   type ClientTransport,
   type OrchestratorAPI,
   type ConnectionMeta,
@@ -202,45 +203,51 @@ async function dispatch(
   api: OrchestratorAPI,
 ): Promise<void> {
   const conn = ws.data;
+  // Echo the request's correlation id on the response/error so the client
+  // matches by id (not just frame type) and a late response can't resolve a
+  // newer call.
+  const cid = correlationId(payload);
+  const reply = (t: number, resp: unknown): void => sendFrame(ws, t, withCid(resp, cid));
   try {
     switch (type) {
-      case MSG_INIT_REQUEST: {
-        const resp = await api.init(payload as Parameters<OrchestratorAPI["init"]>[0], conn);
-        return sendFrame(ws, MSG_INIT_RESPONSE, resp);
-      }
-      case MSG_SPIN_REQUEST: {
-        const resp = await api.spin(payload as Parameters<OrchestratorAPI["spin"]>[0], conn);
-        return sendFrame(ws, MSG_SPIN_RESPONSE, resp);
-      }
-      case MSG_OPEN_REQUEST: {
-        const resp = await api.openRound(payload as Parameters<OrchestratorAPI["openRound"]>[0], conn);
-        return sendFrame(ws, MSG_OPEN_RESPONSE, resp);
-      }
-      case MSG_STEP_REQUEST: {
-        const resp = await api.stepRound(payload as Parameters<OrchestratorAPI["stepRound"]>[0], conn);
-        return sendFrame(ws, MSG_STEP_RESPONSE, resp);
-      }
-      case MSG_CLOSE_REQUEST: {
-        const resp = await api.closeRound(payload as Parameters<OrchestratorAPI["closeRound"]>[0], conn);
-        return sendFrame(ws, MSG_CLOSE_RESPONSE, resp);
-      }
-      case MSG_PROMO_ACCEPT: {
-        const resp = await api.promoAccept(payload as Parameters<OrchestratorAPI["promoAccept"]>[0], conn);
-        return sendFrame(ws, MSG_PROMO_ACCEPT_RESP, resp);
-      }
+      case MSG_INIT_REQUEST:
+        return reply(MSG_INIT_RESPONSE, await api.init(payload as Parameters<OrchestratorAPI["init"]>[0], conn));
+      case MSG_SPIN_REQUEST:
+        return reply(MSG_SPIN_RESPONSE, await api.spin(payload as Parameters<OrchestratorAPI["spin"]>[0], conn));
+      case MSG_OPEN_REQUEST:
+        return reply(MSG_OPEN_RESPONSE, await api.openRound(payload as Parameters<OrchestratorAPI["openRound"]>[0], conn));
+      case MSG_STEP_REQUEST:
+        return reply(MSG_STEP_RESPONSE, await api.stepRound(payload as Parameters<OrchestratorAPI["stepRound"]>[0], conn));
+      case MSG_CLOSE_REQUEST:
+        return reply(MSG_CLOSE_RESPONSE, await api.closeRound(payload as Parameters<OrchestratorAPI["closeRound"]>[0], conn));
+      case MSG_PROMO_ACCEPT:
+        return reply(MSG_PROMO_ACCEPT_RESP, await api.promoAccept(payload as Parameters<OrchestratorAPI["promoAccept"]>[0], conn));
       case MSG_PING:
-        return sendFrame(ws, MSG_PONG, {});
+        return sendFrame(ws, MSG_PONG, {}); // unsolicited — no correlation id
       default:
-        return sendError(ws, "DECODE_ERROR", `Unknown msg type 0x${type.toString(16)}`);
+        return sendError(ws, "DECODE_ERROR", `Unknown msg type 0x${type.toString(16)}`, cid);
     }
   } catch (e) {
     if (e instanceof RGSError) {
-      sendError(ws, e.code, e.message);
+      sendError(ws, e.code, e.message, cid);
     } else {
       log.exception("Unhandled error in transport dispatch", e);
-      sendError(ws, "INTERNAL_ERROR", e instanceof Error ? e.message : String(e));
+      sendError(ws, "INTERNAL_ERROR", e instanceof Error ? e.message : String(e), cid);
     }
   }
+}
+
+/** Read the correlation id a client stamped on a request payload. */
+function correlationId(payload: unknown): unknown {
+  return payload && typeof payload === "object"
+    ? (payload as Record<string, unknown>)[WIRE_CORRELATION_KEY]
+    : undefined;
+}
+
+/** Stamp a correlation id onto a response payload (no-op if absent). */
+function withCid(resp: unknown, cid: unknown): unknown {
+  if (cid === undefined || resp === null || typeof resp !== "object") return resp;
+  return { ...(resp as Record<string, unknown>), [WIRE_CORRELATION_KEY]: cid };
 }
 
 function sendFrame(ws: { send: (b: Uint8Array) => void }, type: number, payload: unknown): void {
@@ -268,6 +275,6 @@ function sendFrame(ws: { send: (b: Uint8Array) => void }, type: number, payload:
   ws.send(frame);
 }
 
-function sendError(ws: { send: (b: Uint8Array) => void }, code: RGSErrorCode, message: string): void {
-  sendFrame(ws, MSG_ERROR, { code, message });
+function sendError(ws: { send: (b: Uint8Array) => void }, code: RGSErrorCode, message: string, cid?: unknown): void {
+  sendFrame(ws, MSG_ERROR, withCid({ code, message }, cid));
 }
