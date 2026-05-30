@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/platform-mock",
-  "version": "0.3.1",
+  "version": "1.0.0",
   "description": "In-memory PlatformAdapter for open-rgs development and testing. Includes promo free-rounds and autoclose-event helpers.",
   "license": "MIT",
   "engines": {
@@ -35,6 +35,6 @@
     "platform-adapter"
   ],
   "dependencies": {
-    "@open-rgs/contract": "0.3.1"
+    "@open-rgs/contract": "1.0.0"
   }
 }
