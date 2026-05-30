@@ -157,15 +157,22 @@ Notes:
   Use `/readyz`, not `/healthz`: probes are unauthenticated, while the
   detailed `/healthz` requires the admin token (see Admin auth below) and
   would 403 the probe.
+- **Ingress prefix (`adminRouteBasePath`).** If a public ingress mounts
+  admin under a prefix (e.g. `/api/<game-id>/*`) and forwards *without*
+  rewriting it, set `adminRouteBasePath: "/api/<game-id>"` in
+  `createServer`. Each canonical route then matches in BOTH the
+  prefixed (`/api/<game-id>/livez`) and the bare (`/livez`) shape — so
+  the public ingress sees the prefixed form while k8s probes and the
+  Docker HEALTHCHECK keep hitting the pod IP at the bare paths shown
+  above. Matching stays EXACT (`===`) for both shapes; no suffix
+  collisions.
 - **Admin auth.** `/admin/*` and the detailed `/healthz` require
   `Authorization: Bearer <token>`; set it via `adminToken` /
   `OPEN_RGS_ADMIN_TOKEN`. In production these routes fail closed (403)
   without a token. In single-port mode admin shares the public client
   port, so either set a token or run admin on a separate `adminPort` bound
   to a private interface behind a default-deny NetworkPolicy. CORS is never
-  wildcard — set `adminAllowedOrigins` for a browser dashboard. Routing is
-  exact; if your ingress serves admin under a prefix, declare it via
-  `adminRouteBasePath`.
+  wildcard — set `adminAllowedOrigins` for a browser dashboard.
 - No persistent volume — the orchestrator owns no durable state.
 - Sticky sessions are nice-to-have (faster reconnect → in-memory
   session cache hit) but NOT required for correctness.
