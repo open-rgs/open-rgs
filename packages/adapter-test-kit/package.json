@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/adapter-test-kit",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Conformance test suite for PlatformAdapter implementations. Hand it any adapter; get back a checklist of what works.",
   "license": "MIT",
   "engines": {
@@ -39,6 +39,6 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@open-rgs/contract": "0.3.1"
+    "@open-rgs/contract": "1.0.0"
   }
 }

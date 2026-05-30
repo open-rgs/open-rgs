@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/contract",
-  "version": "0.3.1",
+  "version": "1.0.0",
   "description": "Public type contracts for open-rgs: MathModule, WalletProvider, ClientTransport, GameManifest. Zero runtime, zero deps.",
   "license": "MIT",
   "engines": {
@@ -22,6 +22,16 @@
     "access": "public",
     "provenance": true
   },
-  "files": ["src", "README.md"],
-  "keywords": ["rgs", "remote-game-server", "slot", "gambling", "open-rgs", "math-module"]
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "rgs",
+    "remote-game-server",
+    "slot",
+    "gambling",
+    "open-rgs",
+    "math-module"
+  ]
 }
