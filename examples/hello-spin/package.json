@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@open-rgs/core": "^1.0.0",
+    "@open-rgs/core": "^1.0.1",
     "@open-rgs/contract": "^1.0.0",
     "@open-rgs/platform-mock": "^1.0.0"
   },
