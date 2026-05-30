@@ -22,7 +22,8 @@
     "changeset": "changeset",
     "changeset:status": "changeset status --verbose",
     "version-packages": "changeset version && bun install",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "snapshot": "changeset version --snapshot snapshot && changeset publish --no-git-tag --tag snapshot"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",
