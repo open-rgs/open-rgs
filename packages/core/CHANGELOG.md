@@ -1,5 +1,21 @@
 # @open-rgs/core
 
+## 1.0.1
+
+### Patch Changes
+
+- [#76](https://github.com/open-rgs/open-rgs/pull/76) [`d08b205`](https://github.com/open-rgs/open-rgs/commit/d08b205fcd3dfec10cba6543cc4cf54155cf63c9) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Admin handler now matches each canonical route in BOTH the prefixed
+  (`adminRouteBasePath + route`) and the bare (`route`) shape when
+  `adminRouteBasePath` is configured.
+
+  Why: a public ingress that mounts admin under `/api/<service>/*` and
+  forwards without rewriting sends the prefixed path, while k8s
+  livenessProbe/readinessProbe and the Docker HEALTHCHECK hit the pod
+  IP directly with the bare path. Previously you had to pick one — now
+  both work from the same image. Matching is still EXACT (`===`) for
+  both shapes, so the `/wss/admin/autoclose` suffix-injection hole the
+  audit closed stays closed.
+
 ## 1.0.0
 
 ### Major Changes
