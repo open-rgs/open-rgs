@@ -1,5 +1,25 @@
 # @open-rgs/core
 
+## 1.1.0
+
+### Minor Changes
+
+- [#78](https://github.com/open-rgs/open-rgs/pull/78) [`f2d9731`](https://github.com/open-rgs/open-rgs/commit/f2d9731a8822e915944999b24a8bb2d66d912b0a) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Add `adminPublicHealthz` (alias `publicHealthz` on `AdminConfig`) to
+  serve `/healthz` WITHOUT auth even when `requireAuth` is on. Same JSON
+  shape, same diagnostics — just no Bearer token required.
+
+  Use this when an operator dashboard or external uptime prober needs
+  to read `/healthz` from somewhere that can't inject a token (a
+  browser, a third-party prober, a CI smoke test that doesn't ship the
+  operator secret), and you've accepted that core/game/math versions,
+  uptime, session count, and platform connection state are public.
+  `/admin/*` is unaffected — still gated when `requireAuth` is on or a
+  token is configured.
+
+  For plain "is it up?" probes prefer `/readyz` (already always open,
+  returns 503 when the platform is down). This flag opens the rich
+  diagnostic too. Default false — back-compatible.
+
 ## 1.0.1
 
 ### Patch Changes
