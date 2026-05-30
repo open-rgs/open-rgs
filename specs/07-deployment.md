@@ -173,6 +173,14 @@ Notes:
   port, so either set a token or run admin on a separate `adminPort` bound
   to a private interface behind a default-deny NetworkPolicy. CORS is never
   wildcard  - set `adminAllowedOrigins` for a browser dashboard.
+- **Public `/healthz` (opt-in).** Set `adminPublicHealthz: true` (or
+  `publicHealthz: true` directly on an `AdminConfig`) when a dashboard
+  or external uptime prober needs to read `/healthz` from somewhere
+  that can't inject a token. Same JSON shape, no auth  - exposes
+  core/game/math versions, uptime, session COUNT, and platform
+  connection state. `/admin/*` stays gated. For probe-level
+  "is it up?" checks prefer `/readyz` (always open, 503 when the
+  platform is down). Default false.
 - No persistent volume  - the orchestrator owns no durable state.
 - Sticky sessions are nice-to-have (faster reconnect -> in-memory
   session cache hit) but NOT required for correctness.
