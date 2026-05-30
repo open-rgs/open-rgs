@@ -28,7 +28,15 @@ export interface LocalPromo {
 export interface OpenRound {
   roundId: string;
   modeId: string;
+  /** base × priceMultiplier (integer minor units). Wire-safe; sent
+   *  through every platform call as `bet`. Does NOT include the mode's
+   *  stakeMultiplier — that rides on `priceMultiplier` instead. */
   bet: number;
+  /** bet × stakeMultiplier — what was actually debited from the player.
+   *  May be fractional for stake-adjusted modes (e.g. ante 1.25× on a
+   *  1-unit base = 1.25). Used for balance check, max-win cap, win
+   *  calculation, and the audit log's "amount paid" field. */
+  effectiveCost: number;
   state: RoundState;
   awaiting?: AwaitingHint;
   /** Action log for replay-on-reconnect. */

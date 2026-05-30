@@ -20,7 +20,15 @@ class MiniPlatform implements PlatformAdapter {
   async openSession(sessionId: string): Promise<SessionInfo> {
     return { sessionId, currency: "USD", currencyDecimals: 2, balance: this.balance, allowedBets: [100], defaultBetIndex: 0 };
   }
-  async settleSimple(req: SettleSimple): Promise<RoundReceipt> { this.balance = this.balance - req.bet + req.win; return { roundId: `s${++this.seq}`, balance: this.balance }; }
+  async settleSimple(req: SettleSimple): Promise<RoundReceipt> {
+    // Real platforms derive the debit from (bet × priceMultiplier),
+    // where priceMultiplier now carries the mode's stakeMultiplier
+    // (see orchestrator computeBet). Mirror that here so a
+    // stakeMultiplier=0 free-round mode actually debits 0.
+    const cost = req.bet * (req.priceMultiplier ?? 1);
+    this.balance = this.balance - cost + req.win;
+    return { roundId: `s${++this.seq}`, balance: this.balance };
+  }
   async openComplex(): Promise<RoundReceipt> { return { roundId: "r", balance: this.balance }; }
   async closeComplex(): Promise<RoundReceipt> { return { roundId: "r", balance: this.balance }; }
   onEvent(_h: (e: PlatformEvent) => void) {}
@@ -57,10 +65,17 @@ describe("free-spin funding (H4)", () => {
 
   test("a 0-bet losing round is fine (free spin that didn't win)", async () => {
     const { orch, conn } = setup();
-    await orch.init({ sid: "h4-loss" }, conn);
+    const init = await orch.init({ sid: "h4-loss" }, conn);
+    const balBefore = init.balance;
     const r = await orch.spin({ mode: "fs-loss" }, conn);
-    expect(r.bet).toBe(0);
+    // Wire `bet` is base × priceMultiplier (no stake fold) → 100 even
+    // for a stakeMultiplier=0 free-round mode. The actual debit is
+    // bet × stakeMultiplier = 0 — verified via the unchanged balance
+    // below — and the platform sees priceMultiplier × stake = 0 so
+    // its ledger records the free-round nature too.
+    expect(r.bet).toBe(100);
     expect(r.win).toBe(0);
+    expect(r.balance).toBe(balBefore);
   });
 
   test("a normally-staked winning round is unaffected", async () => {
