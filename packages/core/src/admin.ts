@@ -69,6 +69,17 @@ export interface AdminConfig {
   /** When true and no authToken is configured, sensitive routes fail closed
    *  (403) instead of serving openly. createServer sets this in production. */
   requireAuth?: boolean;
+  /** When true, `/healthz` is served WITHOUT auth — same JSON shape, but no
+   *  Bearer token required. Use this when an operator dashboard or external
+   *  uptime checker needs to read /healthz from somewhere that can't
+   *  inject a token (browser, third-party prober), and you've accepted
+   *  that core/game/math versions, uptime, session COUNT, and platform
+   *  connection state are public. `/admin/*` is unaffected — still gated.
+   *
+   *  For probe-level "is it up?" semantics, prefer `/readyz` (always open,
+   *  returns 503 when the platform is down). `/healthz` is the rich
+   *  diagnostic; this flag just opens the rich one too. Default false. */
+  publicHealthz?: boolean;
   /** Exact base path prepended to every canonical route — one declared
    *  ingress rewrite (e.g. "/api"). Default "" → exact canonical paths. */
   routeBasePath?: string;
@@ -120,9 +131,11 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       // ── Auth gate for sensitive routes (detailed /healthz + /admin/*) ──
       // /admin/* matches in both prefixed and bare shapes, same rule as
       // canonical routes above — internal callers hit /admin/*, the
-      // external ingress hits ${base}/admin/*.
+      // external ingress hits ${base}/admin/*. /healthz is sensitive
+      // unless the deployer opted into `publicHealthz: true` (operator
+      // dashboard / external prober use case).
       const sensitive =
-        matches("/healthz")
+        (matches("/healthz") && !cfg.publicHealthz)
         || path.startsWith(`${base}/admin/`)
         || (base !== "" && path.startsWith("/admin/"));
       if (sensitive) {

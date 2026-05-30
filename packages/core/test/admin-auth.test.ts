@@ -66,6 +66,44 @@ describe("admin auth (C8)", () => {
   });
 });
 
+describe("admin publicHealthz opt-in", () => {
+  test("publicHealthz=true opens /healthz even when requireAuth is on", async () => {
+    const h = handler({ requireAuth: true, publicHealthz: true });
+    const res = (await get(h, "/healthz"))!;
+    expect(res.status).toBe(200);
+    const body = await res.json() as { status?: string };
+    expect(body.status).toBeDefined();
+  });
+
+  test("publicHealthz=true does NOT open /admin/* — still gated", async () => {
+    const h = handler({ requireAuth: true, publicHealthz: true });
+    expect((await get(h, "/admin/sessions"))!.status).toBe(403);
+    expect((await get(h, "/admin/manifest"))!.status).toBe(403);
+    const autoclose = await h.fetch(new Request("http://x/admin/autoclose", { method: "POST", body: "{}" }));
+    expect(autoclose!.status).toBe(403);
+  });
+
+  test("publicHealthz=true with a token also lets unauthed /healthz through", async () => {
+    // Belt-and-braces: even with a token set, the opt-in wins on /healthz.
+    // Useful when an operator dashboard reads /healthz from a browser
+    // (no token) while CI/CLI still uses the token for /admin/*.
+    const h = handler({ authToken: "s3cret", publicHealthz: true });
+    expect((await get(h, "/healthz"))!.status).toBe(200);
+    expect((await get(h, "/admin/sessions"))!.status).toBe(401);  // /admin still gated
+  });
+
+  test("publicHealthz=true honours adminRouteBasePath dual-shape match", async () => {
+    // base = "/api" (the istio-rewrite case): both /api/healthz and the
+    // bare /healthz should resolve open.
+    const h = handler({ requireAuth: true, publicHealthz: true, routeBasePath: "/api" });
+    expect((await get(h, "/api/healthz"))!.status).toBe(200);
+    expect((await get(h, "/healthz"))!.status).toBe(200);
+    // /admin/* prefixed and bare still 403:
+    expect((await get(h, "/api/admin/sessions"))!.status).toBe(403);
+    expect((await get(h, "/admin/sessions"))!.status).toBe(403);
+  });
+});
+
 describe("admin /admin/logs ?limit handling (L5)", () => {
   test("a non-numeric ?limit doesn't break the route", async () => {
     const h = handler({ requireAuth: false });
