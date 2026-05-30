@@ -35,7 +35,7 @@ PR with a changeset --merge--> main
    write a one-line summary, and commit the generated `.changeset/*.md`.
    `bun run changeset:status` shows what would be released.
 
-2. **Merge the PR.** The [`release` workflow](.github/workflows/release.yml)
+2. **Merge the PR.** The [release workflow](.github/workflows/npm-publish.yml)
    runs on `main`. With pending changesets it opens (or updates) a
    **"chore: version packages"** PR that applies the bumps, regenerates
    each affected package's `CHANGELOG.md`, and deletes the consumed
@@ -62,18 +62,31 @@ One-time setup on npmjs.com:
    (`npmjs.com/package/@open-rgs/<name>/access`) pointing at:
    - org/user: `open-rgs`
    - repository: `open-rgs`
-   - workflow: **`release.yml`**
+   - workflow: **`npm-publish.yml`**
    - environment: `npm-publish`
 3. **Create a GitHub Environment** named `npm-publish` on the repo
    (optionally with the publishing account as a required reviewer).
 
-> ⚠️ The packages were originally published from `npm-publish.yml`. The
-> workflow is now `release.yml`, so the Trusted Publisher `workflow`
-> field **must be updated to `release.yml`** or OIDC publishes will be
-> rejected.
+> The release workflow file is named `npm-publish.yml` on purpose: npm
+> OIDC trusted publishing pins the **workflow filename**, and the
+> existing Trusted Publisher entries already point at `npm-publish.yml`
+> (that's how the 0.x versions were published). Keeping the name means
+> no Trusted Publisher change is needed  - the changesets flow inherits
+> the proven OIDC identity.
 
 The npm CLI must be >= 11.5.1 for trusted publishing; the workflow
 upgrades it (`npm install -g npm@latest`) before publishing.
+
+### Test the publish path without a real release
+
+To exercise the full OIDC + provenance + `changeset publish` path
+without touching `latest` or burning a real version, run the release
+workflow manually with the **`snapshot`** input
+(`Actions -> Release -> Run workflow -> snapshot: true`). It runs
+`bun run snapshot`, which stamps throwaway `0.0.0-snapshot-<timestamp>`
+versions and publishes them under the `snapshot` dist-tag. Install one
+with `npm i @open-rgs/<name>@snapshot`. `latest` and the real `1.0.0`
+are untouched; snapshot versions can be left or `npm unpublish`ed.
 
 ## Per-package `publishConfig`
 
