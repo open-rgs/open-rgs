@@ -87,10 +87,34 @@ describe("admin routing is exact (C8)", () => {
     expect(await get(h, "/api/example-game/admin/autoclose")).toBeUndefined();
   });
 
-  test("a declared routeBasePath matches exactly", async () => {
+  test("a declared routeBasePath matches the prefixed path", async () => {
     const h = handler({ authToken: "s3cret", routeBasePath: "/api" });
     expect((await get(h, "/api/admin/sessions", { authorization: "Bearer s3cret" }))!.status).toBe(200);
-    expect(await get(h, "/admin/sessions", { authorization: "Bearer s3cret" })).toBeUndefined();
+    expect((await get(h, "/api/livez"))!.status).toBe(200);
+    expect((await get(h, "/api/readyz"))!.status).toBe(200);
+  });
+
+  test("with a routeBasePath, the bare path also matches (k8s probes + Docker HEALTHCHECK hit the pod directly)", async () => {
+    // The ingress mounts admin at /api/* and forwards without stripping
+    //  - that's the prefixed-path case above. But k8s livenessProbe /
+    // readinessProbe and `docker ps` health hit the pod IP straight
+    // through, so they see /livez not /api/livez. Both shapes must
+    // resolve so a single image works under either deployment topology.
+    const h = handler({ authToken: "s3cret", routeBasePath: "/api" });
+    expect((await get(h, "/livez"))!.status).toBe(200);
+    expect((await get(h, "/readyz"))!.status).toBe(200);
+    expect((await get(h, "/admin/sessions", { authorization: "Bearer s3cret" }))!.status).toBe(200);
+  });
+
+  test("with a routeBasePath, suffix-injected paths still fail (C8 hole stays closed)", async () => {
+    // The audit closed a suffix-matching hole. Even with both prefixed
+    // and bare shapes accepted, neither of these is `===` to any route,
+    // so they must NOT reach the handler.
+    const h = handler({ authToken: "s3cret", routeBasePath: "/api" });
+    expect(await get(h, "/wss/api/admin/sessions", { authorization: "Bearer s3cret" })).toBeUndefined();
+    expect(await get(h, "/api/foo/admin/sessions", { authorization: "Bearer s3cret" })).toBeUndefined();
+    expect(await get(h, "/api/admin/sessionsX",   { authorization: "Bearer s3cret" })).toBeUndefined();
+    expect(await get(h, "/wss/admin/sessions",    { authorization: "Bearer s3cret" })).toBeUndefined();
   });
 });
 
