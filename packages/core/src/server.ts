@@ -45,6 +45,11 @@ export interface ServerConfig {
   /** Exact base path your ingress serves admin under (one declared rewrite,
    *  e.g. "/api"). Default "" → exact canonical routes. */
   adminRouteBasePath?: string;
+  /** Serve /healthz WITHOUT auth — for operator dashboards or external
+   *  uptime probers that can't inject an admin token. /admin/* stays
+   *  gated. Default false. See AdminConfig.publicHealthz for the
+   *  trade-offs. Prefer /readyz for plain "is it up?" checks. */
+  adminPublicHealthz?: boolean;
   /** Override the env-detected dev flag. */
   isDev?: boolean;
   /** Enable the dev-only forced-outcome cheat path (client sends a cheat in
@@ -201,6 +206,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     requireAuth,
     ...(cfg.adminAllowedOrigins ? { allowedOrigins: cfg.adminAllowedOrigins } : {}),
     ...(cfg.adminRouteBasePath ? { routeBasePath: cfg.adminRouteBasePath } : {}),
+    ...(cfg.adminPublicHealthz ? { publicHealthz: true } : {}),
   };
   if (requireAuth && !adminToken) {
     log.warn(
