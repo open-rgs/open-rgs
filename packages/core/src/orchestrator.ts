@@ -275,12 +275,13 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     modeId: string,
     requestedBetIndex: number | undefined,
     requestedPriceMultiplier: number | undefined,
-  ): { bet: number; betIndex: number; priceMultiplier: number; promoId?: string } {
+  ): { bet: number; betIndex: number; priceMultiplier: number; effectiveCost: number; promoId?: string } {
     const promoOv = promo.activeOverride(s, modeId);
     if (promoOv) {
       const idx = s.allowedBets.indexOf(promoOv.bet);
       if (idx < 0) throw new RGSError("INVALID_BET", "Promo-locked bet not in allowedBets");
-      return { bet: promoOv.bet, betIndex: idx, priceMultiplier: 1, promoId: promoOv.promoId };
+      // Promo-overridden free rounds skip stake fold by definition.
+      return { bet: promoOv.bet, betIndex: idx, priceMultiplier: 1, effectiveCost: promoOv.bet, promoId: promoOv.promoId };
     }
     const betIndex = requestedBetIndex ?? s.defaultBetIndex;
     if (!Number.isInteger(betIndex) || betIndex < 0 || betIndex >= s.allowedBets.length) {
@@ -294,15 +295,27 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     if (!Number.isInteger(priceMultiplier) || priceMultiplier < 1 || priceMultiplier > MAX_PRICE_MULTIPLIER) {
       throw new RGSError("INVALID_BET", `priceMultiplier must be an integer in [1, ${MAX_PRICE_MULTIPLIER}], got ${priceMultiplier}`);
     }
-    const bet = baseBet * priceMultiplier * mode.stakeMultiplier;
-    // Every amount that crosses to the wallet is an integer minor unit within
-    // the safe-integer range; a fractional stakeMultiplier/base must not
-    // produce a fractional bet, and a value past 2^53 silently loses
-    // precision (H1)  - reject both. (0 is allowed  - free-round modes.)
+    // `bet` stays integer minor units: base x client priceMultiplier
+    // (both integers). The mode's stakeMultiplier  - which can be
+    // fractional, e.g. 1.25 for ante  - is NOT folded into bet. That
+    // would have broken bets with fractional stakes (1 x 1.25 = 1.25
+    // != integer) and made every adapter that reads `bet` directly see
+    // a stake-blended number it didn't ask for. Instead the stake
+    // rides on the platform-side `priceMultiplier` (priceMul x stake)
+    // and is applied to wins via `effectiveCost` below. Audit H1's
+    // "wire bet is integer minor units" invariant is preserved.
+    const bet = baseBet * priceMultiplier;
     if (!Number.isSafeInteger(bet) || bet < 0) {
       throw new RGSError("INVALID_BET", `computed bet must be a non-negative integer minor unit within the safe range, got ${bet}`);
     }
-    return { bet, betIndex, priceMultiplier };
+    // effectiveCost = what's actually debited from the player. May be
+    // fractional in minor units; the platform sees (bet_index,
+    // priceMultiplier x stake) and computes its own debit at full
+    // currency precision. Used for balance check, max-win cap input,
+    // win calc, and the audit log's "amount paid" field  - never sent
+    // on the wire as `bet`.
+    const effectiveCost = bet * mode.stakeMultiplier;
+    return { bet, betIndex, priceMultiplier, effectiveCost };
   }
 
   function modeCatalogForClient() {
@@ -488,8 +501,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     const betInfo = computeBet(s, mode, requestedMode, req.betIndex, req.priceMultiplier);
 
-    if (!betInfo.promoId && betInfo.bet > s.balance) {
-      throw new RGSError("INSUFFICIENT_BALANCE", `bet ${betInfo.bet} > balance ${s.balance}`);
+    if (!betInfo.promoId && betInfo.effectiveCost > s.balance) {
+      throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
     // Dev cheats (when enabled) ride inside params.cheat  - never a
@@ -506,13 +519,15 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // client can render a CONGRATULATIONS-YOU-MAXED-OUT screen.
     const cappedOutcome = applyMaxWinCap(
       outcome,
-      betInfo.bet,
+      betInfo.effectiveCost,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    // Money is integer minor units; the multiplier is a float, so round
-    // the product half-to-even at this one boundary (ADR-002).
-    const win = settleAmount(cappedOutcome.multiplier, betInfo.bet);
-    assertFundedWin(betInfo.bet, cappedOutcome.multiplier);
+    // Win = multiplier x what was actually paid. For ante/buy modes
+    // that's the fractional effectiveCost; settleAmount rounds the
+    // product half-to-even at this one boundary (ADR-002) so the win
+    // crossing the wallet is integer minor units.
+    const win = settleAmount(cappedOutcome.multiplier, betInfo.effectiveCost);
+    assertFundedWin(betInfo.effectiveCost, cappedOutcome.multiplier);
 
     let receipt;
     try {
@@ -597,8 +612,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     }
 
     const betInfo = computeBet(s, mode, requestedMode, req.betIndex, req.priceMultiplier);
-    if (!betInfo.promoId && betInfo.bet > s.balance) {
-      throw new RGSError("INSUFFICIENT_BALANCE", `bet ${betInfo.bet} > balance ${s.balance}`);
+    if (!betInfo.promoId && betInfo.effectiveCost > s.balance) {
+      throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
     const ctx = buildSpinContext(requestedMode, undefined, req.params);
@@ -627,6 +642,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       roundId: receipt.roundId,
       modeId: requestedMode,
       bet: betInfo.bet,
+      effectiveCost: betInfo.effectiveCost,
       state: open.state,
       ...(open.awaiting ? { awaiting: open.awaiting } : {}),
       actionLog: [],
@@ -733,11 +749,11 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     const cappedClose = applyMaxWinCapClose(
       closeResult,
-      open.bet,
+      open.effectiveCost,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = settleAmount(cappedClose.multiplier, open.bet);
-    assertFundedWin(open.bet, cappedClose.multiplier);
+    const win = settleAmount(cappedClose.multiplier, open.effectiveCost);
+    assertFundedWin(open.effectiveCost, cappedClose.multiplier);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -884,11 +900,11 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // from math.autoclose() (or a cap-exceeding one) would settle unguarded.
     const cappedClose = applyMaxWinCapClose(
       closeResult,
-      open.bet,
+      open.effectiveCost,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = settleAmount(cappedClose.multiplier, open.bet);
-    assertFundedWin(open.bet, cappedClose.multiplier);
+    const win = settleAmount(cappedClose.multiplier, open.effectiveCost);
+    assertFundedWin(open.effectiveCost, cappedClose.multiplier);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({

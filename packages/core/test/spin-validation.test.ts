@@ -78,6 +78,98 @@ describe("priceMultiplier validation (M4)", () => {
   });
 });
 
+describe("fractional stakeMultiplier  - stake rides on priceMultiplier, not bet", () => {
+  // The orchestrator used to compute `bet = base x priceMul x stakeMul`.
+  // For a fractional stake like ante 1.25x on a 1-unit base, that produced
+  // bet = 1.25 which failed the integer-minor-units assertion (audit H1)
+  // and made spin() throw INVALID_BET. The fix: stake stays out of bet,
+  // rides on priceMultiplier instead. Bet stays integer; platform sees
+  // bet (integer) + priceMultiplier (with stake fold) and computes its
+  // own debit at currency precision.
+
+  class CostTrackingPlatform implements PlatformAdapter {
+    isHealthy = true;
+    diagnostics = {};
+    balance = 100_000;
+    lastBet: number | null = null;
+    lastPriceMultiplier: number | null = null;
+    private seq = 0;
+    async connect() {}
+    disconnect() {}
+    async openSession(sessionId: string): Promise<SessionInfo> {
+      return { sessionId, currency: "USD", currencyDecimals: 2, balance: this.balance, allowedBets: [100], defaultBetIndex: 0 };
+    }
+    async settleSimple(req: SettleSimple): Promise<RoundReceipt> {
+      this.lastBet = req.bet;
+      this.lastPriceMultiplier = req.priceMultiplier ?? 1;
+      const cost = req.bet * (req.priceMultiplier ?? 1);
+      this.balance = this.balance - cost + req.win;
+      return { roundId: `s${++this.seq}`, balance: this.balance };
+    }
+    async openComplex(): Promise<RoundReceipt> { return { roundId: "r", balance: this.balance }; }
+    async closeComplex(): Promise<RoundReceipt> { return { roundId: "r", balance: this.balance }; }
+    onEvent(_h: (e: PlatformEvent) => void) {}
+  }
+
+  const tenX: SimpleMath = { kind: "simple", name: "10x", version: "1", rtp: 1, play: () => ({ multiplier: 10, ops: [], type: "win" }) };
+
+  function setupFracStake() {
+    const platform = new CostTrackingPlatform();
+    const manifest = defineGame({
+      id: "g", declaredRtp: 1, defaultMode: "base", maxWinMultiplier: 5000,
+      modes: {
+        base:  { math: tenX, stakeMultiplier: 1 },
+        ante:  { math: tenX, stakeMultiplier: 1.25 },  // fractional  - the failing case
+        buy:   { math: tenX, stakeMultiplier: 59 },    // integer-but-large buy mode
+      },
+    });
+    const orch = createOrchestrator({ manifest, platform });
+    const conn: ConnectionMeta = { connectionId: "c1", sessionId: null, demo: false };
+    return { orch, platform, conn };
+  }
+
+  test("ante (1.25 stake) on a 100-base bet no longer throws INVALID_BET", async () => {
+    const { orch, platform, conn } = setupFracStake();
+    await orch.init({ sid: "frac-ante" }, conn);
+    const r = await orch.spin({ mode: "ante" }, conn);
+
+    // Wire `bet` is the integer base x priceMul (= 100 x 1).
+    expect(r.bet).toBe(100);
+    // win = 10 (mult) x 125 (effectiveCost = bet x stake = 100 x 1.25) = 1250.
+    expect(r.win).toBe(1250);
+    // Platform sees bet=100, priceMultiplier=1.25 (priceMul x stake).
+    expect(platform.lastBet).toBe(100);
+    expect(platform.lastPriceMultiplier).toBe(1.25);
+    // Balance: -125 (cost) + 1250 (win) = +1125 from starting 100_000.
+    expect(r.balance).toBe(101_125);
+  });
+
+  test("buy mode (stake 59) debits 59x and computes win against the stake-adjusted bet", async () => {
+    const { orch, platform, conn } = setupFracStake();
+    await orch.init({ sid: "frac-buy" }, conn);
+    const r = await orch.spin({ mode: "buy" }, conn);
+
+    expect(r.bet).toBe(100);                  // base x priceMul (no stake)
+    expect(platform.lastBet).toBe(100);       // wire bet stays integer
+    expect(platform.lastPriceMultiplier).toBe(59);  // stake on priceMul
+    expect(r.win).toBe(59_000);               // 10 x (100 x 59)
+    expect(r.balance).toBe(100_000 - 5_900 + 59_000);
+  });
+
+  test("explicit priceMultiplier from the client composes with stake", async () => {
+    const { orch, platform, conn } = setupFracStake();
+    await orch.init({ sid: "frac-compose" }, conn);
+    // Client sends priceMultiplier=3 on an ante (stake 1.25)  - total
+    // priceMul x stake = 3.75. bet = base x 3 = 300 (integer).
+    const r = await orch.spin({ mode: "ante", priceMultiplier: 3 }, conn);
+    expect(r.bet).toBe(300);
+    expect(platform.lastBet).toBe(300);
+    expect(platform.lastPriceMultiplier).toBe(3.75);
+    // win = 10 x (300 x 1.25) = 3750.
+    expect(r.win).toBe(3750);
+  });
+});
+
 describe("spin rejects an open complex round (M5)", () => {
   test("a simple spin during an open complex round is rejected", async () => {
     const { orch, conn } = setup();
