@@ -12,12 +12,17 @@
 //     wants a separate admin port. createServer prefers single-port.
 //
 // Path matching:
-//   Routes match EXACTLY against `routeBasePath + canonicalRoute`
-//   (routeBasePath defaults to ""). Suffix matching was a security hole:
-//   any path *ending* in a route (e.g. `/wss/admin/autoclose`) resolved to
-//   the handler, defeating prefix-based ingress allowlists. If your ingress
-//   serves admin under a prefix (e.g. `/api`), declare it once via
-//   `routeBasePath` so matching stays exact.
+//   Each canonical route matches in two EXACT shapes when `routeBasePath`
+//   is configured: `routeBasePath + route` (what an ingress that mounts
+//   admin under e.g. `/api/<service>/*` without stripping forwards) AND
+//   the bare `route` (what k8s probes and the Docker HEALTHCHECK hit on
+//   the pod IP directly, bypassing the ingress). Both lookups are `===`
+//   — no suffix matching, so the `/wss/admin/autoclose` hole stays
+//   closed (it equals neither `/api/foo/admin/autoclose` nor
+//   `/admin/autoclose`).
+//
+//   When `routeBasePath` is empty (default), only the bare form
+//   matches — same behaviour as before.
 //
 // Auth:
 //   `/admin/*` and the detailed `/healthz` require `Authorization: Bearer
@@ -92,9 +97,13 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       const url  = new URL(req.url);
       const path = url.pathname;
 
-      // Exact match against the (optionally prefixed) canonical route — no
-      // suffix matching, which let `/wss/admin/autoclose` reach the handler.
-      const matches = (route: string): boolean => path === base + route;
+      // Exact match against either the prefixed or the bare canonical
+      // route. Prefix matches the ingress (no-rewrite); bare matches
+      // k8s probes + Docker HEALTHCHECK hitting the pod directly. Both
+      // are `===` — no suffix matching, so the `/wss/admin/*` hole the
+      // audit closed stays closed.
+      const matches = (route: string): boolean =>
+        path === base + route || (base !== "" && path === route);
 
       if (req.method === "OPTIONS") return cors(new Response(null, { status: 204 }), req);
 
@@ -109,7 +118,13 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       }
 
       // ── Auth gate for sensitive routes (detailed /healthz + /admin/*) ──
-      const sensitive = matches("/healthz") || path.startsWith(`${base}/admin/`);
+      // /admin/* matches in both prefixed and bare shapes, same rule as
+      // canonical routes above — internal callers hit /admin/*, the
+      // external ingress hits ${base}/admin/*.
+      const sensitive =
+        matches("/healthz")
+        || path.startsWith(`${base}/admin/`)
+        || (base !== "" && path.startsWith("/admin/"));
       if (sensitive) {
         const denied = authGate(req);
         if (denied) return cors(denied, req);
