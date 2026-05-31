@@ -559,6 +559,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
       }));
     } catch (e) {
+      // No-Money-No-Honey, logged: the bet was declined, so NO money moved and
+      // NO carry was persisted. Record the failed attempt (win=0, no round id
+      // yet) so the audit trail shows a `failed-bet`, never a phantom `settled`.
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: "", kind: "settle",
+        type: cappedOutcome.type, bet: betInfo.bet, win: 0, multiplier: 0, reason: "",
+        outcomeStatus: "failed-bet",
+      });
       throw translate(e, "SPIN_FAILED");
     }
 
@@ -570,6 +578,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     recordAudit(mode, {
       sessionId: s.sessionId, roundId: receipt.roundId, kind: "settle",
       type: cappedOutcome.type, bet: betInfo.bet, win, multiplier: cappedOutcome.multiplier, reason: "",
+      outcomeStatus: cappedOutcome.type === "max_win_reached" ? "settled-max-win" : "settled",
     });
 
     // Capture promo state for the response BEFORE applyUpdate may drain
@@ -634,6 +643,13 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
       }));
     } catch (e) {
+      // No-Money-No-Honey: the open's debit was declined -> no round opened, no
+      // state kept. Log the failed attempt rather than leaving a silent gap.
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: "", kind: "open",
+        type: "open", bet: betInfo.bet, win: 0, multiplier: 0, reason: "",
+        outcomeStatus: "failed-bet",
+      });
       throw translate(e, "OPEN_FAILED");
     }
 
@@ -652,6 +668,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     recordAudit(mode, {
       sessionId: s.sessionId, roundId: receipt.roundId, kind: "open",
       type: "open", bet: betInfo.bet, win: 0, multiplier: 0, reason: "",
+      outcomeStatus: "opened",
     });
 
     return {
@@ -784,6 +801,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     recordAudit(mode, {
       sessionId: s.sessionId, roundId: receipt.roundId, kind: "close",
       type: cappedClose.type, bet: open.bet, win, multiplier: cappedClose.multiplier, reason: "",
+      outcomeStatus: cappedClose.type === "max_win_reached" ? "settled-max-win" : "settled",
     });
     s.openRound = undefined;
 
@@ -943,6 +961,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     recordAudit(mode, {
       sessionId: s.sessionId, roundId: receipt.roundId, kind: "autoclose",
       type: cappedClose.type, bet: open.bet, win, multiplier: cappedClose.multiplier, reason: req.reason,
+      outcomeStatus: "autoclosed",
     });
     s.openRound = undefined;
 

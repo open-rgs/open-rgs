@@ -6,7 +6,7 @@ export { settleAmount, roundHalfEven } from "./money.js";
 export { deriveIdempotencyKey, uuidV4 } from "./idempotency.js";
 export {
   createAuditLog, verifyChain, memoryAuditSink, jsonlStdoutAuditSink, AUDIT_GENESIS_HASH,
-  type AuditLog, type AuditSink, type AuditEvent, type AuditInput,
+  type AuditLog, type AuditSink, type AuditEvent, type AuditInput, type RoundOutcomeStatus,
 } from "./audit-log.js";
 export { binaryTransport } from "./transport-binary.js";
 export { loadLuaMath, type LoadLuaMathOptions } from "./lua-math.js";

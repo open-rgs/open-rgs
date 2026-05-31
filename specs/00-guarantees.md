@@ -40,6 +40,13 @@ is declined writes **nothing**: no balance change, and no state change.
   precedes (or is independent of) the money movement. If your adapter stores
   state, store it in the **same transaction** as the balance change. See
   [[2 . One Round, One Record]] for the reverse direction.
+- **Auditable:** every money-moving round logs a named `outcomeStatus`
+  (`RoundOutcomeStatus`) in the tamper-evident audit log  - `settled`,
+  `settled-max-win`, `opened`, `autoclosed`, and crucially `failed-bet`: a
+  declined bet logs `failed-bet` with `win = 0` and is **never** a `settled`.
+  So "no money, no honey" is not just a code property, it's visible in the
+  audit trail  - an auditor can confirm no phantom settle exists for a round
+  whose money never moved.
 
 ## 2 . One Round, One Record
 

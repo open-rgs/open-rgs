@@ -111,3 +111,58 @@ describe("orchestrator records audit events (C10)", () => {
     expect(verifyChain(sink.events)).toBe(-1);
   });
 });
+
+describe("orchestrator stamps a round-outcome status (No-Money-No-Honey taxonomy)", () => {
+  test("a normal settle is stamped 'settled'", async () => {
+    const sink = memoryAuditSink();
+    const manifest = defineGame({ id: "g", declaredRtp: 1, defaultMode: "base", maxWinMultiplier: 1000, modes: { base: { math: simpleMath, stakeMultiplier: 1 } } });
+    const orch = createOrchestrator({ manifest, platform: new MiniPlatform(), auditLog: createAuditLog(sink) });
+    const conn: ConnectionMeta = { connectionId: "c1", sessionId: null, demo: false };
+    await orch.init({ sid: "st-1" }, conn);
+    await orch.spin({ betIndex: 0 }, conn);
+    expect(sink.events[0]!.outcomeStatus).toBe("settled");
+  });
+
+  test("open is 'opened', close is 'settled'", async () => {
+    const sink = memoryAuditSink();
+    const manifest = defineGame({ id: "g", declaredRtp: 1, defaultMode: "cx", maxWinMultiplier: 1000, modes: { cx: { math: complexMath, stakeMultiplier: 1 } } });
+    const orch = createOrchestrator({ manifest, platform: new MiniPlatform(), auditLog: createAuditLog(sink) });
+    const conn: ConnectionMeta = { connectionId: "c1", sessionId: null, demo: false };
+    await orch.init({ sid: "st-2" }, conn);
+    await orch.openRound({ mode: "cx" }, conn);
+    await orch.closeRound({}, conn);
+    expect(sink.events.map((e) => e.outcomeStatus)).toEqual(["opened", "settled"]);
+  });
+
+  test("a max-win-capped settle is stamped 'settled-max-win'", async () => {
+    const sink = memoryAuditSink();
+    // math wins 100x but the cap is 5x -> capped, type becomes max_win_reached.
+    const bigWin: SimpleMath = { kind: "simple", name: "big", version: "1", rtp: 1, contentHash: "f00d", play: () => ({ multiplier: 100, ops: [], type: "win" }) };
+    const manifest = defineGame({ id: "g", declaredRtp: 1, defaultMode: "base", maxWinMultiplier: 5, modes: { base: { math: bigWin, stakeMultiplier: 1 } } });
+    const orch = createOrchestrator({ manifest, platform: new MiniPlatform(), auditLog: createAuditLog(sink) });
+    const conn: ConnectionMeta = { connectionId: "c1", sessionId: null, demo: false };
+    await orch.init({ sid: "st-3" }, conn);
+    await orch.spin({ betIndex: 0 }, conn);
+    expect(sink.events[0]!.outcomeStatus).toBe("settled-max-win");
+  });
+
+  test("a declined bet logs 'failed-bet' with win=0  - and NO 'settled' (No Money, No Honey)", async () => {
+    const sink = memoryAuditSink();
+    // Platform that rejects every settle (e.g. insufficient funds upstream).
+    class RejectingPlatform extends MiniPlatform {
+      override async settleSimple(): Promise<RoundReceipt> { throw new Error("InsufficientFunds"); }
+    }
+    const manifest = defineGame({ id: "g", declaredRtp: 1, defaultMode: "base", maxWinMultiplier: 1000, modes: { base: { math: simpleMath, stakeMultiplier: 1 } } });
+    const orch = createOrchestrator({ manifest, platform: new RejectingPlatform(), auditLog: createAuditLog(sink) });
+    const conn: ConnectionMeta = { connectionId: "c1", sessionId: null, demo: false };
+    await orch.init({ sid: "st-4" }, conn);
+    await expect(orch.spin({ betIndex: 0 }, conn)).rejects.toThrow();
+
+    expect(sink.events.length).toBe(1);
+    const e = sink.events[0]!;
+    expect(e.outcomeStatus).toBe("failed-bet");
+    expect(e.win).toBe(0);                         // no money credited
+    expect(sink.events.some((ev) => ev.outcomeStatus === "settled")).toBe(false);
+    expect(verifyChain(sink.events)).toBe(-1);     // still a valid chain
+  });
+});

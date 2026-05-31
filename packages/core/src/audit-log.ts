@@ -23,6 +23,29 @@ import { createHash } from "node:crypto";
 
 export const AUDIT_GENESIS_HASH = "0".repeat(64);
 
+/** The engine's named verdict on a round's money  - the No-Money-No-Honey
+ *  taxonomy (Guarantee 1). Independent of the math's free-form outcome `type`.
+ *  Mirrors the status lifecycle a production wallet keeps (opened / closed /
+ *  failed / autoclosed / rejected), so an auditor reads one vocabulary.
+ *
+ *  - `opened`        - complex round's debit recorded; win still pending.
+ *  - `settled`       - money moved normally (a simple settle, or a complex close).
+ *  - `settled-max-win`  - settled, but the win hit the max-win cap (Guarantee 7).
+ *  - `failed-bet`    - the bet was declined / the open failed; NO money moved and
+ *                     NO state was kept. This is No-Money-No-Honey, logged.
+ *  - `failed-win`    - the win credit failed after the bet was taken (a wallet
+ *                     fault mid-round); flagged for reconciliation.
+ *  - `autoclosed`    - the round was closed by an external autoclose trigger.
+ *  - `rejected`      - the round was refused before any money moved. */
+export type RoundOutcomeStatus =
+  | "opened"
+  | "settled"
+  | "settled-max-win"
+  | "failed-bet"
+  | "failed-win"
+  | "autoclosed"
+  | "rejected";
+
 export interface AuditEvent {
   /** Monotonic per-log sequence (1-based). */
   seq: number;
@@ -33,6 +56,13 @@ export interface AuditEvent {
   kind: "settle" | "open" | "step" | "close" | "autoclose";
   /** Outcome type tag from math (e.g. "win", "loss", "max_win_reached"). */
   type: string;
+  /** Named round-outcome status  - the engine's verdict on what happened to the
+   *  money, independent of the math's free-form `type`. Makes the No-Money-No-
+   *  Honey principle auditable: a declined bet logs `failed-bet` with win=0 and
+   *  is never a `settled`. See specs/00-guarantees.md (Guarantee 1) and the
+   *  RoundOutcomeStatus vocabulary. Optional for back-compat with hand-built
+   *  AuditInput; defaults to "settled" when omitted. */
+  outcomeStatus?: RoundOutcomeStatus;
   bet: number;
   win: number;
   multiplier: number;
@@ -68,6 +98,10 @@ function hashEvent(prevHash: string, e: Omit<AuditEvent, "hash">): string {
   const ordered = [
     e.seq, e.ts, e.sessionId, e.roundId, e.kind, e.type,
     e.bet, e.win, e.multiplier, e.mathName, e.mathVersion, e.mathContentHash, e.reason,
+    // Appended at the tail so existing field positions are unchanged. Defaulted
+    // here so an event written without an explicit status hashes identically to
+    // one stamped "settled"  - back-compat for hand-built AuditInput.
+    e.outcomeStatus ?? "settled",
   ];
   return createHash("sha256").update(prevHash + "\n" + JSON.stringify(ordered)).digest("hex");
 }
@@ -78,7 +112,11 @@ export function createAuditLog(sink: AuditSink, opts?: { genesisHash?: string })
   return {
     record(input, now) {
       seq += 1;
-      const withoutHash: Omit<AuditEvent, "hash"> = { ...input, seq, ts: now, prevHash };
+      // Store an explicit status so persisted events are self-describing
+      // (hashEvent applies the same default, so this doesn't change the hash).
+      const withoutHash: Omit<AuditEvent, "hash"> = {
+        ...input, outcomeStatus: input.outcomeStatus ?? "settled", seq, ts: now, prevHash,
+      };
       const hash = hashEvent(prevHash, withoutHash);
       const event: AuditEvent = { ...withoutHash, hash };
       prevHash = hash;
