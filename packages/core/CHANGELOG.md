@@ -1,5 +1,45 @@
 # @open-rgs/core
 
+## 1.3.0
+
+### Minor Changes
+
+- [`a414783`](https://github.com/open-rgs/open-rgs/commit/a41478386a0f2ba44dbf632405f73be0d0e105bc) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Add an opt-in transport replay guard - Guarantee 6 ("At Most Once") enforced at
+  the socket, so replay-safety no longer depends solely on the wallet deduping.
+
+  Enable with `binaryTransport({ replayGuard: true })`. Each request then carries a
+  per-connection monotonically increasing integer under the reserved key `$seq`
+  (`WIRE_OPSEQ_KEY`, new export from `@open-rgs/contract`). The transport processes
+  `last+1`, **replays the cached response** for an exact re-send of `last` (a
+  dropped-response retry -> no re-run, no double settle), and **rejects** a gap or a
+  missing/non-integer sequence.
+
+  Off by default and fully backward-compatible: a client that doesn't stamp `$seq`
+  is unaffected. `PING` is exempt. This is the standard monotonic-sequence dedup
+  pattern for an at-least-once message channel, applied at the socket so it
+  backstops the wallet's own idempotency. Spec: `specs/04-wire-protocol.md`.
+
+- [`0ccfded`](https://github.com/open-rgs/open-rgs/commit/0ccfdedc09a00247aa0208e8c275dcb458a72e94) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Stamp a named `RoundOutcomeStatus` on every audit event, making Guarantee 1
+  ("No Money, No Honey") auditable. The engine's verdict on the money - `settled`,
+  `settled-max-win`, `opened`, `autoclosed`, `failed-bet`, `failed-win`,
+  `rejected` - is recorded independently of the math's free-form `type`, giving the
+  audit log an explicit money-outcome lifecycle rather than just the math's tag.
+
+  The load-bearing case: a **declined bet now logs `failed-bet` with `win = 0`**
+  (in the settle and open failure paths) and is **never** recorded as `settled` -
+  so an auditor can confirm no phantom settlement exists for a round whose money
+  never moved.
+
+  `outcomeStatus` is optional on `AuditInput` and defaults to `settled` when
+  omitted, so hand-built audit inputs and the hash chain stay backward-compatible
+  (the field is appended at the tail of the hashed tuple). New export:
+  `RoundOutcomeStatus`. Specs: `00-guarantees.md` (Guarantee 1).
+
+### Patch Changes
+
+- Updated dependencies [[`a414783`](https://github.com/open-rgs/open-rgs/commit/a41478386a0f2ba44dbf632405f73be0d0e105bc), [`eebbc29`](https://github.com/open-rgs/open-rgs/commit/eebbc29e47bd084ab576b95e2450c1b661e416fc)]:
+  - @open-rgs/contract@1.1.0
+
 ## 1.2.0
 
 ### Minor Changes
@@ -23,7 +63,7 @@ integer minor unit ... got 1.25` because the orchestrator folded stake
       win calculation (`settleAmount(multiplier, effectiveCost)`), and the
       audit log's "what was paid" semantic.
   - The wire `priceMultiplier` passed to platforms remains
-    `clientPriceMul x stakeMultiplier` (unchanged)  - that's where the
+    `clientPriceMul x stakeMultiplier` (unchanged) - that's where the
     stake fold lives. A wallet computes its own debit at
     `bet x priceMultiplier` with currency-precision handling.
   - `platform-mock` updated to debit `bet x priceMultiplier` (was just
@@ -40,7 +80,7 @@ integer minor unit ... got 1.25` because the orchestrator folded stake
     them) need no changes; adapters that read `bet` as cost must multiply
     by `priceMultiplier`.
 
-  Free-round modes (`stakeMultiplier: 0`) still debit 0  - effective cost
+  Free-round modes (`stakeMultiplier: 0`) still debit 0 - effective cost
   collapses correctly and the H4 funded-win guard still rejects winning
   multipliers on a 0-cost mode.
 
@@ -54,19 +94,19 @@ integer minor unit ... got 1.25` because the orchestrator folded stake
 
 - [#78](https://github.com/open-rgs/open-rgs/pull/78) [`f2d9731`](https://github.com/open-rgs/open-rgs/commit/f2d9731a8822e915944999b24a8bb2d66d912b0a) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Add `adminPublicHealthz` (alias `publicHealthz` on `AdminConfig`) to
   serve `/healthz` WITHOUT auth even when `requireAuth` is on. Same JSON
-  shape, same diagnostics  - just no Bearer token required.
+  shape, same diagnostics - just no Bearer token required.
 
   Use this when an operator dashboard or external uptime prober needs
   to read `/healthz` from somewhere that can't inject a token (a
   browser, a third-party prober, a CI smoke test that doesn't ship the
   operator secret), and you've accepted that core/game/math versions,
   uptime, session count, and platform connection state are public.
-  `/admin/*` is unaffected  - still gated when `requireAuth` is on or a
+  `/admin/*` is unaffected - still gated when `requireAuth` is on or a
   token is configured.
 
   For plain "is it up?" probes prefer `/readyz` (already always open,
   returns 503 when the platform is down). This flag opens the rich
-  diagnostic too. Default false  - back-compatible.
+  diagnostic too. Default false - back-compatible.
 
 ## 1.0.1
 
@@ -79,7 +119,7 @@ integer minor unit ... got 1.25` because the orchestrator folded stake
   Why: a public ingress that mounts admin under `/api/<service>/*` and
   forwards without rewriting sends the prefixed path, while k8s
   livenessProbe/readinessProbe and the Docker HEALTHCHECK hit the pod
-  IP directly with the bare path. Previously you had to pick one  - now
+  IP directly with the bare path. Previously you had to pick one - now
   both work from the same image. Matching is still EXACT (`===`) for
   both shapes, so the `/wss/admin/autoclose` suffix-injection hole the
   audit closed stays closed.
@@ -88,7 +128,7 @@ integer minor unit ... got 1.25` because the orchestrator folded stake
 
 ### Major Changes
 
-- [#72](https://github.com/open-rgs/open-rgs/pull/72) [`a076f76`](https://github.com/open-rgs/open-rgs/commit/a076f76b9f2a7c02070dd350d15ed13b3ddefd29) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - open-rgs 1.0.0  - first stable release.
+- [#72](https://github.com/open-rgs/open-rgs/pull/72) [`a076f76`](https://github.com/open-rgs/open-rgs/commit/a076f76b9f2a7c02070dd350d15ed13b3ddefd29) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - open-rgs 1.0.0 - first stable release.
 
   This release follows a full production-readiness audit; every Critical, High, Medium, and Low finding has been resolved. Highlights:
 
