@@ -67,6 +67,73 @@ describe("MockPlatform rejects bad amounts (H12)", () => {
   });
 });
 
+describe("MockPlatform reversal  - Guarantee 2, One Round One Record", () => {
+  // Carry rides the settle (Guarantee 1) and reverses WITH the money (Guarantee 2).
+  const spin = (over: Partial<SettleSimple>): SettleSimple => settle({ win: 0, idempotencyKey: undefined, ...over });
+
+  test("reversing a round restores BOTH balance and carry to pre-round", async () => {
+    const p = new MockPlatform({ startingBalance: 1000, currency: "USD" });
+    await p.connect(); await p.openSession("s1", "c1");
+    // Round 1: bet 100, win 0, carry "progress=1".
+    const r1 = await p.settleSimple(spin({ bet: 100, win: 0, roundState: JSON.stringify({ progress: 1 }) }));
+    expect(p.balanceOf("s1")).toBe(900);
+    const rev = await p.reverseRound({ sessionId: "s1", roundId: r1.roundId, reason: "chargeback" });
+    expect(rev.reversed).toBe(true);
+    expect(rev.balance).toBe(1000);          // money restored
+    expect(rev.carry).toBeUndefined();        // carry restored to pre-round (none)
+    expect(p.balanceOf("s1")).toBe(1000);
+  });
+
+  test("OUT-OF-ORDER reversal is rejected  - no over-refund (the bug this guarantee forbids)", async () => {
+    const p = new MockPlatform({ startingBalance: 1000, currency: "USD" });
+    await p.connect(); await p.openSession("s1", "c1");
+    const a = await p.settleSimple(spin({ bet: 100, win: 0 })); // 1000 -> 900
+    const b = await p.settleSimple(spin({ bet: 100, win: 0 })); // 900 -> 800
+    const c = await p.settleSimple(spin({ bet: 100, win: 0 })); // 800 -> 700
+    // Try to reverse the OLDEST (a) while b and c sit on top. Must refuse  -
+    // restoring a's pre-state (1000) would silently refund b and c too.
+    const bad = await p.reverseRound({ sessionId: "s1", roundId: a.roundId, reason: "x" });
+    expect(bad.reversed).toBe(false);
+    expect(bad.reason).toBe("not-latest-round");
+    expect(p.balanceOf("s1")).toBe(700);     // untouched  - no over-refund
+    // Latest-first works: reverse c, then b, then a.
+    expect((await p.reverseRound({ sessionId: "s1", roundId: c.roundId, reason: "x" })).balance).toBe(800);
+    expect((await p.reverseRound({ sessionId: "s1", roundId: b.roundId, reason: "x" })).balance).toBe(900);
+    expect((await p.reverseRound({ sessionId: "s1", roundId: a.roundId, reason: "x" })).balance).toBe(1000);
+  });
+
+  test("reversing the same round twice is a safe no-op (no double credit)", async () => {
+    const p = new MockPlatform({ startingBalance: 1000, currency: "USD" });
+    await p.connect(); await p.openSession("s1", "c1");
+    const r = await p.settleSimple(spin({ bet: 100, win: 0 }));
+    const first = await p.reverseRound({ sessionId: "s1", roundId: r.roundId, reason: "x", idempotencyKey: "rev1" });
+    const again = await p.reverseRound({ sessionId: "s1", roundId: r.roundId, reason: "x", idempotencyKey: "rev1" });
+    expect(first.reversed).toBe(true);
+    expect(again.balance).toBe(first.balance);
+    expect(p.balanceOf("s1")).toBe(1000);    // not 1100  - reversed once
+  });
+
+  test("a complex round reverses money AND the carry it committed", async () => {
+    const p = new MockPlatform({ startingBalance: 1000, currency: "USD" });
+    await p.connect(); await p.openSession("s1", "c1");
+    const open = await p.openComplex({ sessionId: "s1", bet: 100, betIndex: 0, priceMultiplier: 1, initialState: "{}", idempotencyKey: "o1" }); // 1000 -> 900
+    await p.closeComplex({ sessionId: "s1", roundId: open.roundId, finalState: "{}", carry: JSON.stringify({ meter: 9 }), win: 300, multiplier: 3, type: "win", idempotencyKey: "cl1" }); // 900 -> 1200, carry meter=9
+    expect(p.balanceOf("s1")).toBe(1200);
+    const rev = await p.reverseRound({ sessionId: "s1", roundId: open.roundId, reason: "chargeback" });
+    expect(rev.reversed).toBe(true);
+    expect(rev.balance).toBe(1000);          // both debit and credit undone
+    expect(rev.carry).toBeUndefined();        // meter=9 gone  - no rollback farming
+  });
+
+  test("reversing an unknown round is a safe no-op", async () => {
+    const p = new MockPlatform({ startingBalance: 1000, currency: "USD" });
+    await p.connect(); await p.openSession("s1", "c1");
+    const rev = await p.reverseRound({ sessionId: "s1", roundId: "r-nope", reason: "x" });
+    expect(rev.reversed).toBe(false);
+    expect(p.balanceOf("s1")).toBe(1000);
+  });
+});
+
 describe("MockPlatform guards the promo pool (H12)", () => {
   test("a promo settle with no pool is rejected (no free settle)", async () => {
     const p = new MockPlatform({ startingBalance: 1000, currency: "USD" });

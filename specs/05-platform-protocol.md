@@ -53,6 +53,7 @@ rounding modes.
 | `openComplex` | Debit `bet`. Returns `roundId` referenceable by close/update. |
 | `updateComplex` | NO money movement. Pure audit/state-persistence. Idempotent. |
 | `closeComplex` | Credit `win` against the open round. Final transaction. |
+| `reverseRound` | OPTIONAL. Undo a settled round  - money AND carry  - latest-first. |
 
 The orchestrator guarantees:
 
@@ -89,6 +90,35 @@ The wallet guarantees:
   the admin endpoint.
 - `BalanceChangedEvent` is emitted whenever the balance changes for any
   reason (round settle, deposit, withdrawal, manual adjustment).
+
+### Reversal (optional)  - Guarantee 2, "One Round, One Record"
+
+`reverseRound` is **optional** and **wallet-initiated**: it exists for
+chargebacks, reconciliation reversals, and operator corrections. The RGS never
+originates a reversal  - it's the wallet's tool for undoing a settlement it has
+decided was wrong. Implement it only if your upstream supports reversal; omit
+the method otherwise.
+
+When implemented, it MUST honour Guarantee 2 (`specs/00-guarantees.md`):
+
+- **Whole-record.** A round is the balance delta *and* the carry it produced.
+  A reversal restores **both**  - the pre-round balance and the pre-round carry  -
+  in one atomic step. Undoing the money while leaving the carry advanced (or
+  vice-versa) is the rollback-farming exploit this guarantee forbids: a player
+  keeps meta-counter progress for a round whose money was refunded.
+- **Latest-first.** Only the most recent un-reversed round of a session may be
+  reversed. Reversing an *older* round while newer rounds sit on top would
+  restore a pre-state that predates them and silently over-refund  - so an
+  adapter MUST reject that (`reversed: false`, `reason: "not-latest-round"`),
+  never apply it. A wallet reversing a span reverses newest-to-oldest.
+- **No-op, not error, when nothing to reverse.** An unknown or already-reversed
+  round returns `{ reversed: false, reason }` and moves no money  - reversing
+  twice must not credit twice. Idempotency-key dedupe applies as elsewhere.
+
+The reference `@open-rgs/platform-mock` implements this correctly (a per-session
+LIFO stack of `(roundId, balanceBefore, carryBefore)` snapshots); the
+conformance suite asserts the whole-record, latest-first, and no-double-credit
+properties.
 
 ### Health
 

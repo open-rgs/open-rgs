@@ -513,6 +513,54 @@ export interface RoundReceipt {
   promo?: { remaining: number };
 }
 
+/** Reverse (roll back) an already-settled round  - a chargeback, a
+ *  reconciliation reversal, an operator correction. This is a WALLET-initiated
+ *  operation (the wallet knows when a settlement must be undone); the RGS does
+ *  not originate reversals. It's optional on the adapter  - implement it only if
+ *  your upstream supports reversal.
+ *
+ *  GUARANTEE 2  - "One Round, One Record" (specs/00-guarantees.md). A round is
+ *  one record: the balance delta AND the carry it produced. A reversal MUST
+ *  undo BOTH halves atomically:
+ *    - restore the balance to what it was before the round, AND
+ *    - restore the cross-round carry/state to what it was before the round.
+ *  Undoing the money while leaving the carry advanced (or vice-versa) is the
+ *  rollback-farming exploit this guarantee exists to forbid  - e.g. a player
+ *  keeps progress on a meta-counter for a round whose money was refunded.
+ *
+ *  ORDER  - reversal is LATEST-FIRST. Only the most recent un-reversed round of
+ *  a session may be reversed; an adapter MUST reject an attempt to reverse an
+ *  older round while newer rounds sit on top of it (restoring an old round's
+ *  pre-state would silently discard the newer rounds and over-refund). A wallet
+ *  reversing a span of rounds reverses them newest-to-oldest. */
+export interface ReverseRound {
+  sessionId: string;
+  /** The round to reverse. MUST be the latest un-reversed round on the session. */
+  roundId: string;
+  /** Why  - for the wallet's audit trail (e.g. "chargeback", "operator-correction"). */
+  reason: string;
+  /** Idempotency key. A repeated reversal of the same round is a no-op that
+   *  returns the same receipt  - reversing twice must not credit twice. */
+  idempotencyKey?: string;
+}
+
+export interface ReverseReceipt {
+  roundId: string;
+  /** Balance after the reversal  - restored to the round's pre-settle value. */
+  balance: number;
+  /** Whether a reversal actually happened. `false` (with `reason`) when there
+   *  was nothing to reverse (unknown/already-reversed round)  - a safe no-op,
+   *  never an error that moves money. */
+  reversed: boolean;
+  /** Present when `reversed` is false: why it was a no-op
+   *  (e.g. "round-not-found", "already-reversed", "not-latest-round"). */
+  reason?: string;
+  /** The carry restored by the reversal (the session's carry as it stood
+   *  BEFORE the reversed round). RGS uses this to resync its view; the wallet
+   *  remains the source of truth and returns it again on next openSession. */
+  carry?: CarryState;
+}
+
 export type PlatformEvent =
   /** `seq` (optional) is a per-session monotonically increasing version the
    *  adapter stamps on balance changes. When present, the orchestrator
@@ -546,6 +594,13 @@ export interface PlatformAdapter {
   updateComplex?(req: UpdateComplex): Promise<void>;
   /** Close a complex round (credit win). */
   closeComplex(req: CloseComplex): Promise<RoundReceipt>;
+
+  /** Reverse an already-settled round (chargeback / reconciliation). Optional  -
+   *  implement only if your upstream supports reversal. MUST undo money AND
+   *  carry together, latest-first; see {@link ReverseRound} (Guarantee 2,
+   *  "One Round, One Record"). The reference @open-rgs/platform-mock implements
+   *  it correctly and the conformance suite checks it. */
+  reverseRound?(req: ReverseRound): Promise<ReverseReceipt>;
 
   onEvent(handler: (e: PlatformEvent) => void): void;
 }
