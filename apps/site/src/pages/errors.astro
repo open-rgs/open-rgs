@@ -27,7 +27,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         <tr><td class="mono">SESSION_NOT_FOUND</td><td>platform <code>openSession</code> rejected the id</td></tr>
         <tr><td class="mono">SESSION_INVALID</td><td>session exists but is closed / blocked / expired</td></tr>
         <tr><td class="mono">INSUFFICIENT_BALANCE</td><td>pre-flight check failed for the requested bet</td></tr>
-        <tr><td class="mono">INVALID_BET</td><td><code>betIndex</code> out of range, or bet <= 0</td></tr>
+        <tr><td class="mono">INVALID_BET</td><td><code>betIndex</code> out of range, or bet 0 or less</td></tr>
         <tr><td class="mono">INVALID_MODE</td><td>mode id unknown, internal, or wrong <code>kind</code></td></tr>
         <tr><td class="mono">INVALID_ACTION</td><td>STEP action.type doesn't match <code>awaiting.type</code></td></tr>
         <tr><td class="mono">INVALID_ROUND</td><td>CLOSE on a non-terminal round, or STEP on a terminal one</td></tr>
