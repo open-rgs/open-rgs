@@ -6,7 +6,8 @@ before implementation.** When a spec and the code disagree, the spec wins
 
 ## How to use
 
-- Read **00-overview.md** first for the system in one screen.
+- Read **00-guarantees.md** first for the safety properties you can rely on.
+- Read **00-overview.md** next for the system in one screen.
 - Read **01-public-contracts.md** for the four interfaces every integrator
   cares about.
 - Pick the spec for the area you're working on.
@@ -17,6 +18,7 @@ before implementation.** When a spec and the code disagree, the spec wins
 
 | #  | Spec | Status | Owner |
 |----|------|--------|-------|
+| 00 | [The Seven Guarantees](./00-guarantees.md)  - the safety properties open-rgs holds **by construction** (read first) | living | core |
 | 00 | [Overview](./00-overview.md)  - what we're building, who for | draft | core |
 | 01 | [Public Contracts](./01-public-contracts.md)  - MathModule, PlatformAdapter, ClientTransport, GameManifest | draft | core |
 | 02 | [Orchestrator](./02-orchestrator.md)  - round flows, sessions, promo, autoclose | draft | core |

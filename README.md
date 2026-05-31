@@ -82,6 +82,29 @@ return {
 Four parts, each one interface in `@open-rgs/contract`. Swap any of
 them without touching the others.
 
+## The Seven Guarantees
+
+open-rgs holds seven safety properties **by construction**  - so you can rely
+on them without reading the source. They're enforced under the hood, in core,
+not left to each game or adapter author to get right.
+
+1. **No Money, No Honey**  - game state is never persisted unless the money for
+   it moved. A round that's abandoned or whose bet is declined writes nothing.
+2. **One Round, One Record**  - money and game-state commit together and revert
+   together (latest-first, whole-record). No rollback farming.
+3. **Blind Math**  - the math never sees the bet, balance, clock, or I/O. It's a
+   pure `(state, rng) -> outcome`. Bet-switch exploits are impossible by design.
+4. **The House Computes, The Client Asks**  - outcomes are server-authoritative;
+   the client supplies only which bet and which action, never a win or seed.
+5. **Fail Closed**  - under uncertainty (NaN multiplier, unfunded win, missing
+   certified RNG in prod) the engine refuses to pay rather than guessing.
+6. **At Most Once**  - a replayed or raced request moves money at most once.
+7. **Bounded Payout**  - every win is capped, and the cap is enforced by the
+   engine, never trusted from the math.
+
+Full detail  - what enforces each, what it prevents, and how an integrator must
+not break it  - in **[specs/00-guarantees.md](specs/00-guarantees.md)**.
+
 ## Packages
 
 | Package | Purpose |

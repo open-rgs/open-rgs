@@ -13,6 +13,24 @@
 // - Game integrators compose maths into a GameManifest via defineGame().
 //
 // Zero runtime, zero deps.
+//
+// -- The Seven Guarantees ----------------------------------------------------
+// open-rgs holds seven safety properties by construction; this contract is
+// where several of them are anchored. See specs/00-guarantees.md for the full
+// statement of each (promise / enforcement / what it prevents / how not to
+// break it). In brief:
+//   1. No Money, No Honey   - state is persisted only with the money that
+//      earned it (carry rides the settle; nothing is written before it).
+//   2. One Round, One Record  - money + carry commit and revert as one unit,
+//      latest-first.
+//   3. Blind Math  - SpinContext carries no bet/balance; math is pure.
+//   4. House Computes, Client Asks  - requests carry intent, never results.
+//   5. Fail Closed  - bad values fail the round; the engine never pays on a guess.
+//   6. At Most Once  - idempotency keys + per-session serialization make a
+//      replayed/raced request settle once.
+//   7. Bounded Payout  - the max-win cap is enforced by the engine, not the math.
+// Integrators implementing PlatformAdapter are responsible for upholding 1, 2,
+// and the wallet half of 6 (dedupe on idempotencyKey)  - noted at each method.
 
 // --- Round outputs ----------------------------------------------------------
 
