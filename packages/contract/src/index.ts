@@ -663,6 +663,16 @@ export interface LuaExtension {
  *  newer request. Reserved  - math/clients must not use it for game data. */
 export const WIRE_CORRELATION_KEY = "$cid";
 
+/** Wire operation-sequence key. When the transport's replay guard is enabled,
+ *  the client stamps a per-connection monotonically increasing integer under
+ *  this key on every request. The transport processes `last+1`, replays the
+ *  cached response for a re-sent `last` (a duplicate  - e.g. a retry after a
+ *  dropped response), and rejects a gap. This makes Guarantee 6 ("At Most
+ *  Once") hold at the socket without depending on the wallet to dedupe.
+ *  Reserved  - math/clients must not use it for game data. Optional: omit it and
+ *  the guard is simply inactive (default), preserving back-compatible clients. */
+export const WIRE_OPSEQ_KEY = "$seq";
+
 export interface ClientRequestInit { sid: string }
 export interface ClientRequestSpin {
   sid?: string;

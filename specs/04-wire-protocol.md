@@ -26,6 +26,27 @@ timed-out request can't resolve a newer call. `PING`/`PONG` are unsolicited
 and carry no id; a pre-dispatch error (unparseable frame) may omit it. The
 client strips `$cid` before returning the response to callers.
 
+**Operation sequence (replay guard, optional).** Guarantee 6 ("At Most Once",
+`specs/00-guarantees.md`) holds at the orchestrator regardless  - per-session
+operation serialization plus idempotency keys to the wallet. The transport adds
+an **opt-in** second line of defence so replay-safety doesn't depend on the
+wallet deduping: enable `binaryTransport({ replayGuard: true })` and each
+request must carry a per-connection monotonically increasing integer under the
+reserved key `$seq` (`WIRE_OPSEQ_KEY`). The transport then:
+
+- **processes** `last + 1` (and remembers its response bytes),
+- **replays** the cached response for an exact re-send of `last`  - a
+  dropped-response retry gets the original answer with no re-run and no second
+  settle,
+- **rejects** (`INVALID_FORMAT`) a gap, or a frame missing/with a non-integer
+  `$seq`.
+
+`PING` is exempt (no sequence, moves no state). The guard is **off by default**:
+a client that doesn't stamp `$seq` is unaffected, so this is backward
+compatible. A client that opts in MUST stamp every frame  - mixing is rejected,
+by design. This mirrors the operation-sequence dedup a production wallet
+gateway runs at its socket.
+
 ## Message types
 
 | Code | Direction | Logical message            | Payload type |

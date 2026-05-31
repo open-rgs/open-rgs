@@ -6,6 +6,7 @@ import { encode, decode } from "@msgpack/msgpack";
 import {
   RGSError,
   WIRE_CORRELATION_KEY,
+  WIRE_OPSEQ_KEY,
   type ClientTransport,
   type OrchestratorAPI,
   type ConnectionMeta,
@@ -39,6 +40,12 @@ export const MSG_ERROR              = 0xff;
 
 interface WsData extends ConnectionMeta {
   connectedAt: number;
+  /** Replay-guard state (only used when cfg.replayGuard is on). The highest
+   *  operation-sequence processed on this connection, and the encoded response
+   *  bytes for it  - so an exact re-send (a retry after a dropped response)
+   *  replays the same bytes instead of re-running the round. */
+  lastOpSeq: number;
+  lastOpResponse?: Uint8Array;
 }
 
 export interface BinaryTransportConfig {
@@ -54,6 +61,15 @@ export interface BinaryTransportConfig {
    *  admin / probe routes on the same port. Returning undefined falls
    *  through to the built-in 404 (after the /livez fallback). */
   extraFetch?: (req: Request) => Promise<Response | undefined> | Response | undefined;
+  /** Enable the per-connection operation-sequence replay guard (Guarantee 6,
+   *  "At Most Once", at the socket). Off by default  - back-compatible with
+   *  clients that don't stamp `$seq`. When on, each request must carry a
+   *  monotonically increasing integer under `WIRE_OPSEQ_KEY`: the transport
+   *  processes `last+1`, REPLAYS the cached response for a re-sent `last`
+   *  (a dropped-response retry -> no re-run, no double settle), and REJECTS a
+   *  gap or a frame missing the sequence. A client that opts in must stamp
+   *  every frame; mixing is rejected, by design. */
+  replayGuard?: boolean;
 }
 
 /** ClientTransport extended with a setter for the optional admin
@@ -90,6 +106,7 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
               sessionId: null,
               demo: false,
               connectedAt: 0,
+              lastOpSeq: 0,
             };
             const upgraded = srv.upgrade(req, { data });
             if (upgraded) return undefined;
@@ -110,6 +127,7 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
           maxPayloadLength: MAX_FRAME_BYTES,
           open(ws) {
             ws.data.connectedAt = Date.now();
+            ws.data.lastOpSeq = 0;
             cfg.onConnect?.();
             log.info("Client connected", {
               "event.category": "transport",
@@ -132,9 +150,31 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
             } catch (e) {
               return sendError(ws, "DECODE_ERROR", `Frame decode failed: ${e}`);
             }
+
+            // Replay guard (Guarantee 6, opt-in). PING is exempt  - it carries no
+            // sequence and moves no state.
+            let capture: ((bytes: Uint8Array) => void) | undefined;
+            if (cfg.replayGuard && type !== MSG_PING) {
+              const decision = checkOpSeq(ws.data, payload);
+              if (decision.kind === "duplicate") {
+                // Exact re-send of the last op  - replay the cached bytes, do not
+                // re-run the round. (A retry after a dropped response.)
+                if (ws.data.lastOpResponse) ws.send(ws.data.lastOpResponse);
+                return;
+              }
+              if (decision.kind === "error") {
+                return sendError(ws, "INVALID_FORMAT", decision.message, correlationId(payload));
+              }
+              // kind === "process": remember this seq, and capture the response
+              // bytes so a later duplicate can be replayed.
+              ws.data.lastOpSeq = decision.seq;
+              ws.data.lastOpResponse = undefined;
+              capture = (b) => { ws.data.lastOpResponse = b; };
+            }
+
             inflight++;
             try {
-              await dispatch(ws, type, payload, api);
+              await dispatch(ws, type, payload, api, capture);
             } finally {
               inflight--;
             }
@@ -201,13 +241,14 @@ async function dispatch(
   type: number,
   payload: unknown,
   api: OrchestratorAPI,
+  capture?: (bytes: Uint8Array) => void,
 ): Promise<void> {
   const conn = ws.data;
   // Echo the request's correlation id on the response/error so the client
   // matches by id (not just frame type) and a late response can't resolve a
   // newer call.
   const cid = correlationId(payload);
-  const reply = (t: number, resp: unknown): void => sendFrame(ws, t, withCid(resp, cid));
+  const reply = (t: number, resp: unknown): void => sendFrame(ws, t, withCid(resp, cid), capture);
   try {
     switch (type) {
       case MSG_INIT_REQUEST:
@@ -225,7 +266,7 @@ async function dispatch(
       case MSG_PING:
         return sendFrame(ws, MSG_PONG, {}); // unsolicited  - no correlation id
       default:
-        return sendError(ws, "DECODE_ERROR", `Unknown msg type 0x${type.toString(16)}`, cid);
+        return sendError(ws, "DECODE_ERROR", `Unknown msg type 0x${type.toString(16)}`, cid, capture);
     }
   } catch (e) {
     const err = e instanceof RGSError
@@ -241,13 +282,35 @@ async function dispatch(
         "error.code": err.code,
         "correlation.id": cid === undefined ? "" : String(cid),
       });
-      sendError(ws, err.code, `internal error (ref: ${cid === undefined ? "n/a" : String(cid)})`, cid);
+      sendError(ws, err.code, `internal error (ref: ${cid === undefined ? "n/a" : String(cid)})`, cid, capture);
     } else {
       // Controlled-vocabulary errors (INVALID_BET, INSUFFICIENT_BALANCE, ...)
       // carry author-written, non-sensitive messages  - safe to surface.
-      sendError(ws, err.code, err.message, cid);
+      sendError(ws, err.code, err.message, cid, capture);
     }
   }
+}
+
+/** Replay-guard decision for one inbound frame. */
+type OpSeqResult =
+  | { kind: "process"; seq: number }
+  | { kind: "duplicate" }
+  | { kind: "error"; message: string };
+
+/** Per-connection operation-sequence check (Guarantee 6 at the socket).
+ *  expected = last+1 -> process; exact re-send of last -> duplicate (replay
+ *  cached response); anything else (gap, missing, non-integer) -> error. */
+function checkOpSeq(data: WsData, payload: unknown): OpSeqResult {
+  const raw = payload && typeof payload === "object"
+    ? (payload as Record<string, unknown>)[WIRE_OPSEQ_KEY]
+    : undefined;
+  if (typeof raw !== "number" || !Number.isInteger(raw)) {
+    return { kind: "error", message: `replay guard on: each request must carry an integer ${WIRE_OPSEQ_KEY}` };
+  }
+  const expected = data.lastOpSeq + 1;
+  if (raw === expected) return { kind: "process", seq: raw };
+  if (raw === data.lastOpSeq) return { kind: "duplicate" };
+  return { kind: "error", message: `expected operation sequence ${expected}, got ${raw}` };
 }
 
 /** Error codes whose `message` may contain internal detail (wrapped Lua /
@@ -269,7 +332,9 @@ function withCid(resp: unknown, cid: unknown): unknown {
   return { ...(resp as Record<string, unknown>), [WIRE_CORRELATION_KEY]: cid };
 }
 
-function sendFrame(ws: { send: (b: Uint8Array) => void }, type: number, payload: unknown): void {
+// `capture`, when present (replay guard on), receives the exact bytes sent so a
+// later duplicate op-seq can replay them verbatim without re-running the round.
+function sendFrame(ws: { send: (b: Uint8Array) => void }, type: number, payload: unknown, capture?: (b: Uint8Array) => void): void {
   const body = encode(payload);
   if (1 + body.byteLength > MAX_FRAME_BYTES) {
     // A runaway ops array (Op is forwarded untouched) must not produce an
@@ -285,15 +350,17 @@ function sendFrame(ws: { send: (b: Uint8Array) => void }, type: number, payload:
     const errFrame = new Uint8Array(1 + errBody.byteLength);
     errFrame[0] = MSG_ERROR;
     errFrame.set(errBody, 1);
+    capture?.(errFrame);
     ws.send(errFrame);
     return;
   }
   const frame = new Uint8Array(1 + body.byteLength);
   frame[0] = type;
   frame.set(body, 1);
+  capture?.(frame);
   ws.send(frame);
 }
 
-function sendError(ws: { send: (b: Uint8Array) => void }, code: RGSErrorCode, message: string, cid?: unknown): void {
-  sendFrame(ws, MSG_ERROR, withCid({ code, message }, cid));
+function sendError(ws: { send: (b: Uint8Array) => void }, code: RGSErrorCode, message: string, cid?: unknown, capture?: (b: Uint8Array) => void): void {
+  sendFrame(ws, MSG_ERROR, withCid({ code, message }, cid), capture);
 }
