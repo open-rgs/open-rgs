@@ -44,8 +44,9 @@ reserved key `$seq` (`WIRE_OPSEQ_KEY`). The transport then:
 `PING` is exempt (no sequence, moves no state). The guard is **off by default**:
 a client that doesn't stamp `$seq` is unaffected, so this is backward
 compatible. A client that opts in MUST stamp every frame  - mixing is rejected,
-by design. This mirrors the operation-sequence dedup a production wallet
-gateway runs at its socket.
+by design. It's the standard monotonic-sequence dedup for an at-least-once
+message channel, applied at the socket so it backstops the wallet's own
+idempotency rather than relying on it.
 
 ## Message types
 

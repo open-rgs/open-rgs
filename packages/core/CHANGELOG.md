@@ -24,8 +24,8 @@ integer minor unit ... got 1.25` because the orchestrator folded stake
       audit log's "what was paid" semantic.
   - The wire `priceMultiplier` passed to platforms remains
     `clientPriceMul x stakeMultiplier` (unchanged)  - that's where the
-    stake fold lives. Platforms (a wallet et al.) compute their own debit
-    at `bet x priceMultiplier` with currency-precision handling.
+    stake fold lives. A wallet computes its own debit at
+    `bet x priceMultiplier` with currency-precision handling.
   - `platform-mock` updated to debit `bet x priceMultiplier` (was just
     `bet`) so the bundled dev wallet honours the new semantics.
 

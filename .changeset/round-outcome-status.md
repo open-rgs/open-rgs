@@ -5,8 +5,8 @@
 Stamp a named `RoundOutcomeStatus` on every audit event, making Guarantee 1
 ("No Money, No Honey") auditable. The engine's verdict on the money  - `settled`,
 `settled-max-win`, `opened`, `autoclosed`, `failed-bet`, `failed-win`,
-`rejected`  - is recorded independently of the math's free-form `type`, mirroring
-the status lifecycle a production wallet keeps.
+`rejected`  - is recorded independently of the math's free-form `type`, giving the
+audit log an explicit money-outcome lifecycle rather than just the math's tag.
 
 The load-bearing case: a **declined bet now logs `failed-bet` with `win = 0`**
 (in the settle and open failure paths) and is **never** recorded as `settled`  -

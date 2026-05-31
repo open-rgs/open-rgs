@@ -14,5 +14,6 @@ dropped-response retry -> no re-run, no double settle), and **rejects** a gap or
 missing/non-integer sequence.
 
 Off by default and fully backward-compatible: a client that doesn't stamp `$seq`
-is unaffected. `PING` is exempt. Mirrors the operation-sequence dedup a
-production wallet gateway runs at its own socket. Spec: `specs/04-wire-protocol.md`.
+is unaffected. `PING` is exempt. This is the standard monotonic-sequence dedup
+pattern for an at-least-once message channel, applied at the socket so it
+backstops the wallet's own idempotency. Spec: `specs/04-wire-protocol.md`.

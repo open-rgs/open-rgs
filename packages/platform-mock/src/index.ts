@@ -169,10 +169,9 @@ export class MockPlatform implements PlatformAdapter {
       // Debit = bet x priceMultiplier. The orchestrator now keeps `bet`
       // at base x clientPriceMul (integer minor units) and folds the
       // mode's stakeMultiplier into `priceMultiplier` so it rides on the
-      // wire. Platforms with their own currency-precision handling
-      // (a wallet et al.) recompute the debit; our mock does the same so
-      // ante-style fractional debits + free-round (stake=0) modes both
-      // settle correctly.
+      // wire. A wallet with its own currency-precision handling recomputes
+      // the debit; our mock does the same so ante-style fractional debits +
+      // free-round (stake=0) modes both settle correctly.
       const cost = req.bet * (req.priceMultiplier ?? 1);
       if (cost > s.balance) throw new Error("InsufficientFunds");
       s.balance -= cost;

@@ -24,9 +24,9 @@ import { createHash } from "node:crypto";
 export const AUDIT_GENESIS_HASH = "0".repeat(64);
 
 /** The engine's named verdict on a round's money  - the No-Money-No-Honey
- *  taxonomy (Guarantee 1). Independent of the math's free-form outcome `type`.
- *  Mirrors the status lifecycle a production wallet keeps (opened / closed /
- *  failed / autoclosed / rejected), so an auditor reads one vocabulary.
+ *  taxonomy (Guarantee 1). Independent of the math's free-form outcome `type`,
+ *  it gives the audit log an explicit money-outcome lifecycle (opened / settled
+ *  / failed / autoclosed / rejected) so an auditor reads one vocabulary.
  *
  *  - `opened`        - complex round's debit recorded; win still pending.
  *  - `settled`       - money moved normally (a simple settle, or a complex close).
