@@ -1,5 +1,13 @@
 # @open-rgs/core
 
+## 1.3.1
+
+### Patch Changes
+
+- [#14](https://github.com/open-rgs/open-rgs/pull/14) [`389d8cc`](https://github.com/open-rgs/open-rgs/commit/389d8cc0c293a6c0540a2e85b0f811c663d1b9b4) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - perf(core): session-cache eviction no longer snapshots and sorts the whole map on the INIT hot path
+
+  At `MAX_CACHED_SESSIONS` capacity, `put()` previously copied every session into an array, filtered, and full-sorted by `createdAt` (O(n log n) plus a large transient allocation) on every INIT. It now walks the `Map` in insertion (creation) order and drops the oldest idle sessions in O(evicted) with no allocation. Behaviour is unchanged: sessions with an open round are never evicted, and the cache is trimmed to the same low-water mark.
+
 ## 1.3.0
 
 ### Minor Changes
