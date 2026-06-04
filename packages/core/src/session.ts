@@ -102,15 +102,21 @@ export function all(): readonly LocalSession[] { return [...sessions.values()]; 
 export function size(): number { return sessions.size; }
 
 /** Evict the oldest IDLE (no open round) sessions down to a low-water mark.
- *  Returns the number evicted. */
+ *  Returns the number evicted.
+ *
+ *  This runs on the INIT hot path whenever the cache sits at capacity, so it
+ *  must not snapshot or sort the whole map. A Map iterates in insertion
+ *  order, and `put` inserts a session once when it's created, so walking from
+ *  the front visits the oldest sessions first  - the same victims the previous
+ *  copy-filter-sort produced, but in O(evicted) with no transient array.
+ *  Deleting the current entry mid-iteration is well-defined for Map and does
+ *  not disturb the walk. */
 function evictIdleOverflow(): number {
   const lowWater = Math.floor(MAX_CACHED_SESSIONS * 0.9);
-  const idle = [...sessions.values()]
-    .filter((s) => !s.openRound)
-    .sort((a, b) => a.createdAt - b.createdAt);
   let removed = 0;
-  for (const s of idle) {
+  for (const s of sessions.values()) {
     if (sessions.size <= lowWater) break;
+    if (s.openRound) continue; // never evict a debited, in-flight round
     sessions.delete(s.sessionId);
     removed++;
   }
