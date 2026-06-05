@@ -43,6 +43,17 @@ These are well above realistic player loads (10K concurrent players x
 30 spins/sec/player = 300K spins/sec spread across cores). The point
 is having headroom for tuning runs and simulator workloads.
 
+The `@open-rgs/simulator` CLI parallelises big certification runs with
+`--shards N`: N independently-seeded worker processes (one per core),
+each running `spins / N`, with the per-shard reports merged. The merge
+is exact for RTP / CI / verdict / hit-rate / contributions / deviations
+and the multiplier mean / stdDev / min / max; only the distribution
+percentiles are count-weighted across shards (flagged in the report).
+Sharding requires a seedable factory manifest so each shard draws an
+independent substream  - a static manifest is refused. This is the
+in-stack way to use all cores today; a standalone Zig simulator binary
+(below) is the future path for billion-spin runs.
+
 ## Bun usage  - what makes the orchestrator fast
 
 ### Runtime choice rationale

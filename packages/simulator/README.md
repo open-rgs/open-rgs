@@ -29,6 +29,31 @@ function export is called with `{ seed }` so it can seed the math RNG.
 Reports are written to `--out` (default `./reports`) in the chosen
 `--format` (default `all`).
 
+### Sharding across cores (`--shards N`)
+
+For big certification runs, `--shards N` splits the spins across **N
+independently-seeded worker processes** (one per core) and merges the
+results  - near-linear speedup with core count:
+
+```bash
+bunx open-rgs-sim ./src/manifest.ts --spins 8000000 --shards 8
+```
+
+Each shard runs `spins / N` spins with its own derived seed, so the
+shards draw **independent RNG substreams**. This requires the module to
+export a **factory** `({ seed }) => GameManifest` so each shard can be
+re-seeded; a static manifest export is **refused** with a clear error,
+because every shard would otherwise replay the identical stream and the
+result would be a bogus, over-confident number.
+
+The merged report is **exact** for the cert-critical numbers  - measured
+RTP, standard error, 95% CI, verdict, hit rate, outcome-type counts, RTP
+contributions, deviations, and the multiplier mean / stdDev / min / max.
+The only approximated values are the distribution **percentiles**
+(multiplier and observation p50..p99), which are count-weighted across
+shards; merged reports carry `sharded.percentilesApproximate` and the
+markdown notes it. Use `--shards 1` (the default) for exact percentiles.
+
 ## Use
 
 Write a `simulate.ts` next to your game's `index.ts`:
@@ -135,5 +160,7 @@ class yet  - write your own loop using the orchestrator's
 - Free-round campaigns aren't simulated either  - those are platform-
   side, and the simulator skips the platform adapter entirely.
 - The whole reel-distribution is held in memory (`number[]` of length
-  `spinsPerMode`) so percentile and stddev can be computed. 100k spins
-  ~= 800kB. For 10M-spin runs, refactor to streaming quantile sketches.
+  `spinsPerMode`) **per process** so percentile and stddev can be
+  computed. 100k spins ~= 800kB; `--shards N` cuts per-process memory to
+  `spinsPerMode / N`. For very large single-process runs, refactor to
+  streaming quantile sketches.
