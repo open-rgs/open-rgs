@@ -53,6 +53,51 @@ zig build-exe play.zig -target wasm32-freestanding -fno-entry -rdynamic \
   -OReleaseSmall -femit-bin=play.wasm
 ```
 
+## Simulating options (RTP is policy-relative)
+
+A game with choices has **no single RTP** — only an RTP *per policy*. Here the
+policy is "climb up to N rungs, then cash out". Two ways to measure it:
+
+**Kernel self-play (blazing).** `maths/play.zig` also exports
+`sim_ladder(spins, seedHi, seedLo, stopLevel, outP)` — it self-plays the whole
+policy loop *inside* the kernel (no per-step JS↔WASM crossing) and writes the
+same 6×f64 aggregate the simulator's batch tier consumes. Sweep the policy:
+
+```bash
+bun examples/cash-ladder/src/sweep.ts
+```
+
+```
+  stop@   RTP      hit-rate   Mrounds/s
+    0    100.00%    100.0%        711   <- optimal (don't gamble)
+    1    96.00%     75.0%        291
+    2    92.15%     56.3%        179
+    ...
+   12    61.14%      3.2%         80
+```
+
+50M self-played rounds *per policy point* in a fraction of a second. The curve
+makes the design legible: each climb bleeds ~4% (the house edge compounds), so
+the optimal policy is to not climb at all. That is the point of a sweep — the
+"RTP" you certify depends entirely on the player's strategy.
+
+**Host-driven policy (flexible).** When the choice is among *step options*
+(e.g. blackjack hit / stand / double), pass a strategy function to the per-spin
+simulator instead — it sees the public context (`awaiting` + the latest `ops`)
+at each decision, never the opaque state:
+
+```ts
+import { simulate, type StrategyFn } from "@open-rgs/simulator";
+
+const policy: StrategyFn = ({ awaiting, ops }) =>
+  ({ type: awaiting.type, value: decide(ops) }); // your policy reads public ops
+
+const [report] = await simulate(manifest, { complexStrategy: policy });
+```
+
+This tier runs *arbitrary* policies (even an optimal solver) at ~100k–1M
+rounds/sec; the kernel tier is for a *fixed* policy at ~native speed.
+
 ## Wire it into a game
 
 ```ts

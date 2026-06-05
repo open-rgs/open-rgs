@@ -13,7 +13,7 @@
 import type {
   GameManifest, GameMode,
   SimpleMath, ComplexMath,
-  AwaitingHint, PlayerAction, SpinContext, CarryState,
+  AwaitingHint, PlayerAction, SpinContext, CarryState, Op,
   MarkSnapshot, MarkCollector,
   PlatformAdapter,
 } from "@open-rgs/contract";
@@ -33,6 +33,28 @@ function roundHalfEven(x: number): number {
   return floor % 2 === 0 ? floor : floor + 1;
 }
 
+/** Public context a complex-round strategy sees at each decision point - exactly
+ *  what a real client has: the `awaiting` hint plus the latest public `ops` the
+ *  math emitted (its projection of the round). NOT the opaque `state` blob; a
+ *  strategy acts only on what a player can actually see. */
+export interface StrategyContext {
+  awaiting: AwaitingHint;
+  /** The most recent open()/step() `ops` - the math's public view of the round. */
+  ops: Op[];
+  /** 0-based decision index within the current round. */
+  step: number;
+  /** The simulator's seeded PRNG, so strategy randomness stays reproducible. */
+  rng: () => number;
+}
+
+/** A complex-round policy: given the public context, choose the next action.
+ *  This is how you model "keep gambling N times", blackjack basic strategy,
+ *  an optimal solver, etc. */
+export type StrategyFn = (ctx: StrategyContext) => PlayerAction;
+
+/** Built-in names or a custom policy function. */
+export type ComplexStrategy = "first" | "random" | StrategyFn;
+
 export interface SimulateOptions {
   /** Spins to run per mode. Default 100_000. */
   spinsPerMode?: number;
@@ -44,8 +66,10 @@ export interface SimulateOptions {
   includeInternal?: boolean;
   /** Complex-round step strategy. Default "first".
    *  - "first":  always pick awaiting.options[0]
-   *  - "random": pick from awaiting.options uniformly (seeded  - see seed) */
-  complexStrategy?: "first" | "random";
+   *  - "random": pick from awaiting.options uniformly (seeded  - see seed)
+   *  - a StrategyFn: your own policy, called at each decision with the public
+   *    context (awaiting + latest public ops + step index + the sim rng). */
+  complexStrategy?: ComplexStrategy;
   /** Seed for the simulator's *own* PRNG (drives "random" strategy and
    *  any tie-breaking). Does NOT seed the math  - see top-of-file note. */
   seed?: number;
@@ -146,13 +170,15 @@ async function simulateMode(
       const open = await Promise.resolve(m.open(carry, ctx));
       let state = open.state;
       let awaiting: AwaitingHint | undefined = open.awaiting;
+      let lastOps: Op[] = open.ops;
       let steps = 0;
       while (steps < maxSteps && !(await Promise.resolve(m.isTerminal(state)))) {
         if (!awaiting) break;
-        const action = pickAction(awaiting, complexStrategy, stratRng);
+        const action = pickAction(awaiting, lastOps, steps, complexStrategy, stratRng);
         const step = await Promise.resolve(m.step(state, action));
         state = step.state;
         awaiting = step.awaiting;
+        lastOps = step.ops;
         steps += 1;
       }
       totalSteps += steps;
@@ -378,9 +404,12 @@ async function simulateMode(
 
 function pickAction(
   awaiting: AwaitingHint,
-  strategy: "first" | "random",
+  ops: Op[],
+  step: number,
+  strategy: ComplexStrategy,
   rng: () => number,
 ): PlayerAction {
+  if (typeof strategy === "function") return strategy({ awaiting, ops, step, rng });
   const options = awaiting.options;
   if (!options || options.length === 0) {
     return { type: awaiting.type };

@@ -217,3 +217,87 @@ export fn close(state_p: i32, state_l: i32, out_p: i32, out_max: i32) i32 {
 export fn autoclose(state_p: i32, state_l: i32, out_p: i32, out_max: i32) i32 {
     return close(state_p, state_l, out_p, out_max);
 }
+
+// --- in-VM batch self-play (the simulator's fast tier for OPTIONS) -------
+// The whole policy loop runs INSIDE the kernel, so sweeping the "stop at level
+// N" policy needs no per-step JS<->WASM crossing - the same trick the simple
+// sim_batch uses, now with the player's policy baked in. RTP is policy-relative,
+// so this answers "what RTP if the player climbs N rungs?" at ~native speed.
+
+fn rotl(x: u64, comptime k: u6) u64 {
+    return (x << k) | (x >> @as(u6, @intCast(@as(u32, 64) - @as(u32, k))));
+}
+const Xoshiro = struct {
+    s: [4]u64 = .{ 0, 0, 0, 0 },
+    fn seed(self: *Xoshiro, hi: u32, lo: u32) void {
+        var st: u64 = (@as(u64, hi) << 32) | @as(u64, lo);
+        var i: usize = 0;
+        while (i < 4) : (i += 1) {
+            st +%= 0x9e3779b97f4a7c15;
+            var z = st;
+            z = (z ^ (z >> 30)) *% 0xbf58476d1ce4e5b9;
+            z = (z ^ (z >> 27)) *% 0x94d049bb133111eb;
+            self.s[i] = z ^ (z >> 31);
+        }
+    }
+    fn next(self: *Xoshiro) f64 {
+        const result = rotl(self.s[0] +% self.s[3], 23) +% self.s[0];
+        const t = self.s[1] << 17;
+        self.s[2] ^= self.s[0];
+        self.s[3] ^= self.s[1];
+        self.s[1] ^= self.s[2];
+        self.s[0] ^= self.s[3];
+        self.s[2] ^= t;
+        self.s[3] = rotl(self.s[3], 45);
+        return @as(f64, @floatFromInt(result >> 11)) / 9007199254740992.0;
+    }
+};
+
+fn writeF64LE(out: [*]u8, at: usize, v: f64) void {
+    const bits: u64 = @bitCast(v);
+    var k: usize = 0;
+    while (k < 8) : (k += 1) out[at + k] = @intCast((bits >> @as(u6, @intCast(k * 8))) & 0xff);
+}
+
+// Self-play `spins` rounds under the policy "climb until level == stop_level"
+// (bust with prob P_BUST per climb). Uses the SAME integer payout math as
+// step(), so the measured RTP is the served game's. Writes 6 little-endian f64:
+// count, sum, sumsq, min, max, hits - the aggregate reportFromAggregate consumes.
+export fn sim_ladder(spins: u32, seed_hi: u32, seed_lo: u32, stop_level: u32, out_p: i32) void {
+    var rng = Xoshiro{};
+    rng.seed(seed_hi, seed_lo);
+    var count: f64 = 0;
+    var sum: f64 = 0;
+    var sumsq: f64 = 0;
+    var mn: f64 = 1e308;
+    var mx: f64 = 0;
+    var hits: f64 = 0;
+    var i: u32 = 0;
+    while (i < spins) : (i += 1) {
+        var level: u32 = 0;
+        var mult_x1000: u32 = 1000;
+        var busted = false;
+        while (level < stop_level) {
+            if (rng.next() < P_BUST) {
+                busted = true;
+                break;
+            }
+            level += 1;
+            mult_x1000 = @intCast((@as(u64, mult_x1000) * @as(u64, GROWTH_X1000)) / 1000);
+        }
+        const ret: f64 = if (busted) 0 else @as(f64, @floatFromInt(mult_x1000)) / 1000.0;
+        count += 1;
+        sum += ret;
+        sumsq += ret * ret;
+        if (ret > mx) mx = ret;
+        if (ret < mn) mn = ret;
+        if (ret > 0) hits += 1;
+    }
+    const out: [*]u8 = @ptrFromInt(@as(usize, @intCast(out_p)));
+    writeF64LE(out, 0, count);
+    writeF64LE(out, 8, sum);
+    writeF64LE(out, 16, sumsq);
+    writeF64LE(out, 24, if (count > 0) mn else 0);
+    writeF64LE(out, 32, mx);
+    writeF64LE(out, 40, hits);
+}
