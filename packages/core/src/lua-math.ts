@@ -13,7 +13,7 @@
 
 import { LuaFactory, type LuaEngine } from "wasmoon";
 import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import { RGSError } from "@open-rgs/contract";
 import type {
   SimpleMath, ComplexMath, MathModule,
@@ -45,17 +45,21 @@ interface LuaApi {
 export interface LoadLuaMathOptions {
   /** Random source for the math VM  - `() => number` in `[0, 1)`.
    *
-   *  REQUIRED for real-money use. A certified RGS must determine outcomes
-   *  from an auditable CSPRNG; `Math.random` (V8 xorshift128+) is
-   *  non-cryptographic, unseedable, and explicitly disallowed by GLI-19 /
-   *  GLI-11. When omitted, `loadLuaMath` FAILS CLOSED under
-   *  `NODE_ENV=production` (throws) rather than silently using `Math.random`.
-   *  Outside production it falls back to `Math.random` with a loud warning,
-   *  which is fine for simulation, local dev, and examples only. */
+   *  Determines outcomes, so it must be cryptographically secure. When
+   *  omitted, open-rgs defaults to {@link cryptoRng}  - the system CSPRNG via
+   *  WebCrypto (BoringSSL/OpenSSL, the same source Bun's `crypto` uses)  -
+   *  NEVER `Math.random` (V8 xorshift128+, non-cryptographic and unseedable).
+   *  Under `NODE_ENV=production` with no `rng`, `loadLuaMath` FAILS CLOSED
+   *  (throws) so the operator picks its certified/approved source consciously;
+   *  pass `{ rng: cryptoRng }` to use the system CSPRNG in production. A
+   *  jurisdiction-certified RGS injects its approved (auditable, seed-commit)
+   *  RNG here. */
   rng?: () => number;
-  /** Escape hatch: permit the `Math.random` fallback even under
-   *  `NODE_ENV=production` (e.g. an offline, non-real-money tooling job).
-   *  Defaults to `false`  - production fails closed without an injected rng. */
+  /** Escape hatch: permit booting WITHOUT an injected rng under
+   *  `NODE_ENV=production` (the secure {@link cryptoRng} default is then used),
+   *  and permit a tagged simulator-only PRNG in production. Defaults to
+   *  `false`  - production fails closed without an explicit rng choice. For
+   *  offline, non-real-money tooling only. */
   allowInsecureRng?: boolean;
   /** Per-call wall-clock budget (ms) for every math entry point
    *  (play/open/step/close/autoclose) and for load-time evaluation. wasmoon
@@ -76,9 +80,26 @@ export interface LoadLuaMathOptions {
   marks?: boolean;
 }
 
-/** Resolve the math RNG, failing closed in production when none is injected.
- *  A real-money RGS must not determine outcomes from `Math.random`; in
- *  production we refuse to boot without an explicit (certified) source. */
+/** Cryptographically-secure default RNG, backed by the system CSPRNG (Bun /
+ *  Node WebCrypto -> BoringSSL/OpenSSL `RAND_bytes`, the same source Bun's
+ *  `crypto` uses). Returns a uniform 53-bit float in `[0, 1)`. This is
+ *  open-rgs's secure default for outcome determination  - unpredictable and
+ *  unseedable, unlike `Math.random` (V8 xorshift128+).
+ *
+ *  It is a CSPRNG, NOT necessarily a *certified/auditable* RNG (no seed-commit
+ *  or consumed-value log). Jurisdictions that mandate a certified source should
+ *  inject their approved RNG via `loadLuaMath({ rng })`. */
+export function cryptoRng(): number {
+  const u = new Uint32Array(2);
+  webcrypto.getRandomValues(u);
+  // 53 random bits: all 32 of u[0] shifted up by 21, plus the top 21 of u[1].
+  return (u[0]! * 0x20_0000 + (u[1]! >>> 11)) / 0x20_0000_0000_0000;
+}
+
+/** Resolve the math RNG. Defaults to the secure system CSPRNG ({@link
+ *  cryptoRng})  - never `Math.random`. In production with no injected rng we
+ *  fail closed (throw) so the operator chooses its certified/approved source
+ *  consciously rather than us picking silently. */
 function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => number {
   const isProduction = process.env["NODE_ENV"] === "production";
   if (opts?.rng) {
@@ -97,19 +118,23 @@ function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => n
   }
   if (isProduction && !opts?.allowInsecureRng) {
     throw new Error(
-      `loadLuaMath(${path}): no rng provided. A production RGS must inject a ` +
-      `certified CSPRNG for outcome determination  - refusing to fall back to ` +
-      `Math.random (non-auditable, GLI-19/GLI-11 disallowed). Pass { rng } or, ` +
-      `for non-real-money tooling only, { allowInsecureRng: true }.`,
+      `loadLuaMath(${path}): no rng provided. A production RGS must choose its ` +
+      `outcome RNG consciously  - pass { rng: cryptoRng } to use the secure system ` +
+      `CSPRNG (WebCrypto -> BoringSSL), or inject a certified/approved source. ` +
+      `(We refuse to default silently in production, even to a secure CSPRNG; ` +
+      `outside production cryptoRng is the default. { allowInsecureRng: true } ` +
+      `permits the default for non-real-money tooling.)`,
     );
   }
-  log.warn("loadLuaMath: no rng injected  - falling back to Math.random. " +
-    "NOT auditable; do not use for real-money play.", {
+  log.warn("loadLuaMath: no rng injected  - defaulting to the system CSPRNG " +
+    "(cryptoRng / WebCrypto -> BoringSSL). Secure and unpredictable, but not a " +
+    "certified/auditable source  - inject your approved RNG for real-money " +
+    "certification.", {
     "event.category": "process",
-    "event.action": "rng_insecure_fallback",
+    "event.action": "rng_crypto_default",
     "math.path": path,
   });
-  return Math.random;
+  return cryptoRng;
 }
 
 /** Load a Lua math file and adapt it to MathModule. */

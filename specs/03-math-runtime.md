@@ -29,20 +29,26 @@ Math NEVER ships its own PRNG. The host provides one:
 - **WASM**: import `host.rng_next` declared as `(): f64`.
 - **TS**: a `random: () => number` argument injected at construction.
 
-The host implementation is **injected at boot** via
-`loadLuaMath(path, { rng })`. There is no real-money default:
+The host implementation can be **injected at boot** via
+`loadLuaMath(path, { rng })`. The default is a secure CSPRNG  - **never
+`Math.random`**:
 
-- Production: a certified RNG (e.g. a CSPRNG or a jurisdiction-approved
-  RNG sidecar) wrapped behind a synchronous `rng.next()`. **Required**  -
-  `loadLuaMath` fails closed (throws) under `NODE_ENV=production` when no
-  `rng` is injected; it will not silently use `Math.random` (non-crypto,
-  unseedable, GLI-19/GLI-11 disallowed).
+- Default: `cryptoRng`, the system CSPRNG via WebCrypto (`getRandomValues`
+  -> BoringSSL/OpenSSL, the same source Bun's `crypto` uses). Exported from
+  `@open-rgs/core`. Secure and unpredictable, but a CSPRNG  - not necessarily
+  a *certified/auditable* RNG (no seed-commit or consumed-value log).
+- Production: must choose the source **consciously**. `loadLuaMath` fails
+  closed (throws) under `NODE_ENV=production` when no `rng` is injected  -
+  even though a secure default exists  - so the operator picks deliberately.
+  Pass `{ rng: cryptoRng }` to use the system CSPRNG, or inject a
+  jurisdiction-certified (auditable) source. `Math.random` (non-crypto,
+  unseedable, GLI-19/GLI-11 disallowed) is never used.
 - Dev / examples: when no `rng` is injected outside production,
-  `loadLuaMath` falls back to `Math.random` with a loud warning. Acceptable
-  for local play only; an offline tooling job can opt in explicitly with
-  `{ allowInsecureRng: true }`.
+  `loadLuaMath` uses `cryptoRng` with a one-line warning. An offline tooling
+  job can also opt out of the prod fail-closed with `{ allowInsecureRng: true }`.
 - Testing / simulation: a seeded PRNG (e.g. `mulberry32` from
-  `@open-rgs/simulator`) for reproducible RTP runs.
+  `@open-rgs/simulator`) for reproducible RTP runs (refused in production
+  unless `allowInsecureRng`).
 
 Math produces byte-identical outputs for byte-identical RNG sequences,
 because no other source of nondeterminism is exposed.

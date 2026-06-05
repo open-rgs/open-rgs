@@ -9,7 +9,7 @@ export {
   type AuditLog, type AuditSink, type AuditEvent, type AuditInput, type RoundOutcomeStatus,
 } from "./audit-log.js";
 export { binaryTransport } from "./transport-binary.js";
-export { loadLuaMath, type LoadLuaMathOptions } from "./lua-math.js";
+export { loadLuaMath, cryptoRng, type LoadLuaMathOptions } from "./lua-math.js";
 export { startAdmin } from "./admin.js";
 export { log } from "./log.js";
 export { Registry, DEFAULT_BUCKETS, type Counter, type Gauge, type Histogram } from "./metrics.js";
