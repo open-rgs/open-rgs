@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { simulate, type StrategyFn } from "../../../packages/simulator/src/index.js";
 import { defineGame } from "../../../packages/contract/src/index.js";
 import { makeBlackjack, handTotal } from "../src/blackjack.js";
-import { basicStrategy, mimicDealer, alwaysHit } from "../src/strategy.js";
+import { basicStrategy, mimicDealer, alwaysHit, bucketLabel } from "../src/strategy.js";
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -43,5 +43,17 @@ describe("blackjack: RTP is policy-relative", () => {
     expect(basic).toBeGreaterThan(mimic); // optimal beats mimic-the-dealer
     expect(mimic).toBeGreaterThan(0.9); // mimic ~94%
     expect(hit).toBeLessThan(0.5); // always-hit busts -> bleeds
+  }, 30_000);
+
+  test("play-flow graph captures the decision buckets", async () => {
+    const math = makeBlackjack(mulberry32(42));
+    const manifest = defineGame({
+      id: "blackjack", declaredRtp: 0.99, defaultMode: "default",
+      modes: { default: { math, stakeMultiplier: 1 } },
+    });
+    const [r] = await simulate(manifest, { spinsPerMode: 30_000, complexStrategy: basicStrategy, flow: { label: bucketLabel } });
+    expect(r!.flow).toBeDefined();
+    expect(r!.flow!.edges.some((e) => e.from.includes("stiff"))).toBe(true); // hard 12-16
+    expect(r!.flow!.edges.some((e) => e.to.startsWith("■"))).toBe(true); // reaches an outcome
   }, 30_000);
 });

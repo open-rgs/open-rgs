@@ -21,6 +21,7 @@ import { mulberry32 } from "./rng.js";
 import { mean, stdDev, percentileSorted } from "./stats.js";
 import { computeDeviations, narrate, type TargetDeviation } from "./deviation.js";
 import type { SimulationReport, DistributionStats } from "./report.js";
+import { createFlowRecorder, type FlowLabel, type FlowRecorder } from "./flow.js";
 
 /** Round to nearest integer, ties to even (banker's rounding)  - the money
  *  boundary rule from ADR-002. Mirrors @open-rgs/core's `roundHalfEven`;
@@ -76,6 +77,12 @@ export interface SimulateOptions {
   /** Safety cap on steps per complex round to avoid infinite loops in
    *  buggy maths. Default 1000. */
   maxStepsPerRound?: number;
+  /** Record a play-flow graph (a Markov chain of how rounds were played) onto
+   *  `report.flow`, rendered as a Mermaid chart + transition table by mdReport.
+   *  `true` labels decision nodes by `awaiting.type`; pass `{ label }` to bucket
+   *  nodes from the public context (awaiting + ops) for a richer chart.
+   *  Complex modes only. */
+  flow?: boolean | { label?: FlowLabel };
   /** OPTIONAL platform adapter. When set, each generated spin is
    *  settled via `adapter.settleSimple(...)` (or close/openComplex
    *  for complex maths) so adapter-shape mismatches surface during
@@ -120,6 +127,8 @@ async function simulateMode(
   const stratRng = mulberry32(opts.seed ?? 0);
   const maxSteps = opts.maxStepsPerRound ?? 1000;
   const complexStrategy = opts.complexStrategy ?? "first";
+  const flowLabel: FlowLabel = (typeof opts.flow === "object" && opts.flow.label) ? opts.flow.label : (c) => c.awaiting.type;
+  const flowRec: FlowRecorder | undefined = opts.flow && mode.math.kind === "complex" ? createFlowRecorder() : undefined;
   const marks: MarkCollector | undefined = mode.math.marks;
 
   const multipliers: number[] = new Array<number>(spins);
@@ -172,9 +181,11 @@ async function simulateMode(
       let awaiting: AwaitingHint | undefined = open.awaiting;
       let lastOps: Op[] = open.ops;
       let steps = 0;
+      const path: Array<{ label: string; action: string }> = [];
       while (steps < maxSteps && !(await Promise.resolve(m.isTerminal(state)))) {
         if (!awaiting) break;
         const action = pickAction(awaiting, lastOps, steps, complexStrategy, stratRng);
+        if (flowRec) path.push({ label: flowLabel({ awaiting, ops: lastOps, step: steps }), action: String(action["value"] ?? action.type) });
         const step = await Promise.resolve(m.step(state, action));
         state = step.state;
         awaiting = step.awaiting;
@@ -187,6 +198,7 @@ async function simulateMode(
       type = close.type;
       nextMode = close.nextMode;
       carry = close.carry;
+      if (flowRec) flowRec.round(path, type);
     }
 
     multipliers[i] = multiplier;
@@ -387,6 +399,7 @@ async function simulateMode(
     ...(mode.math.kind === "complex"
       ? { complex: { averageStepsPerRound: spins === 0 ? 0 : totalSteps / spins } }
       : {}),
+    ...(flowRec ? { flow: flowRec.graph() } : {}),
     ...(adapter
       ? { adapter: {
           rpcsSent:    adapterRpcsSent,

@@ -3,6 +3,7 @@
 // object is what an LLM eats.
 
 import type { TargetDeviation } from "./deviation.js";
+import { flowToMermaid, flowToMarkovTable, type FlowGraph } from "./flow.js";
 
 export interface DistributionStats {
   min: number;
@@ -86,6 +87,10 @@ export interface SimulationReport {
   complex?: {
     averageStepsPerRound: number;
   };
+  /** Play-flow graph (a Markov chain of how rounds were played). Present only
+   *  when simulate() was run with `flow`. Rendered as a Mermaid chart +
+   *  transition table by mdReport. */
+  flow?: FlowGraph;
   /** Platform-adapter call stats. Only present when the simulator
    *  was run with a real (or test) PlatformAdapter in options. Counts
    *  each spin's settleSimple/closeComplex round trip. */
@@ -236,6 +241,19 @@ export function mdReport(r: SimulationReport): string {
     lines.push("## Complex-round stats");
     lines.push("");
     lines.push(`- Average steps per round: **${r.complex.averageStepsPerRound.toFixed(2)}**`);
+    lines.push("");
+  }
+
+  if (r.flow && r.flow.edges.length > 0) {
+    lines.push("## Play flow (Markov chain)");
+    lines.push("");
+    lines.push("How rounds were actually played - decision nodes, the action taken, and the transition probability:");
+    lines.push("");
+    lines.push("```mermaid");
+    lines.push(flowToMermaid(r.flow));
+    lines.push("```");
+    lines.push("");
+    lines.push(flowToMarkovTable(r.flow));
     lines.push("");
   }
 
