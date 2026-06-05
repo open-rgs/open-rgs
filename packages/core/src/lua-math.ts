@@ -18,12 +18,14 @@ import { RGSError } from "@open-rgs/contract";
 import type {
   SimpleMath, ComplexMath, MathModule,
   RoundOutcome, OpenOutcome, StepOutcome, CloseOutcome,
-  CarryState, RoundState, SpinContext, PlayerAction, Op,
-  LuaExtension, LuaVm,
-  MathExpectations, MarkCollector, MathTarget,
+  CarryState, RoundState, SpinContext, PlayerAction,
+  LuaExtension, LuaVm, MarkCollector,
 } from "@open-rgs/contract";
 import { log } from "./log.js";
 import { createMarkCollector, noopMarkCollector } from "./marks.js";
+import {
+  adaptExpectations, adaptRoundOutcome, adaptOpenOutcome, adaptStepOutcome, adaptCloseOutcome,
+} from "./math-adapt.js";
 
 const factory = new LuaFactory();
 
@@ -151,7 +153,11 @@ export function cryptoRng(): number {
  *  cryptoRng})  - never `Math.random`. In production with no injected rng we
  *  fail closed (throw) so the operator chooses its certified/approved source
  *  consciously rather than us picking silently. */
-function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => number {
+export function resolveRng(
+  path: string,
+  opts: { rng?: () => number; allowInsecureRng?: boolean } | undefined,
+  who = "loadLuaMath",
+): () => number {
   const isProduction = process.env["NODE_ENV"] === "production";
   if (opts?.rng) {
     // Reject a simulator-only PRNG (e.g. mulberry32) for production outcome
@@ -159,7 +165,7 @@ function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => n
     const tagged = (opts.rng as { __insecureSimulatorRng?: boolean }).__insecureSimulatorRng;
     if (isProduction && tagged && !opts.allowInsecureRng) {
       throw new Error(
-        `loadLuaMath(${path}): the injected rng is a simulator-only PRNG ` +
+        `${who}(${path}): the injected rng is a simulator-only PRNG ` +
         `(mulberry32 or similar)  - non-cryptographic and predictable, not for ` +
         `real-money outcome determination. Inject a certified CSPRNG, or pass ` +
         `{ allowInsecureRng: true } for non-real-money tooling only.`,
@@ -169,7 +175,7 @@ function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => n
   }
   if (isProduction && !opts?.allowInsecureRng) {
     throw new Error(
-      `loadLuaMath(${path}): no rng provided. A production RGS must choose its ` +
+      `${who}(${path}): no rng provided. A production RGS must choose its ` +
       `outcome RNG consciously  - pass { rng: cryptoRng } to use the secure system ` +
       `CSPRNG (WebCrypto -> BoringSSL), or inject a certified/approved source. ` +
       `(We refuse to default silently in production, even to a secure CSPRNG; ` +
@@ -177,10 +183,10 @@ function resolveRng(path: string, opts: LoadLuaMathOptions | undefined): () => n
       `permits the default for non-real-money tooling.)`,
     );
   }
-  log.warn("loadLuaMath: no rng injected  - defaulting to the system CSPRNG " +
-    "(cryptoRng / WebCrypto -> BoringSSL). Secure and unpredictable, but not a " +
-    "certified/auditable source  - inject your approved RNG for real-money " +
-    "certification.", {
+  log.warn(`${who}: no rng injected  - defaulting to the system CSPRNG ` +
+    `(cryptoRng / WebCrypto -> BoringSSL). Secure and unpredictable, but not a ` +
+    `certified/auditable source  - inject your approved RNG for real-money ` +
+    `certification.`, {
     "event.category": "process",
     "event.action": "rng_crypto_default",
     "math.path": path,
@@ -548,117 +554,4 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
       : undefined,
   };
   return m;
-}
-
-function adaptExpectations(raw: unknown): MathExpectations | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const o = raw as Record<string, unknown>;
-  const out: MathExpectations = {};
-
-  const hr = adaptTarget(o["hit_rate"]) ?? adaptTarget(o["hitRate"]);
-  if (hr) out.hitRate = hr;
-
-  out.rate            = adaptTargetMap(o["rate"]);
-  out.rtpContribution = adaptTargetMap(o["rtp_contribution"]) ?? adaptTargetMap(o["rtpContribution"]);
-  out.tagShare        = adaptTargetMap(o["tag_share"]) ?? adaptTargetMap(o["tagShare"]);
-
-  // Strip empty maps.
-  if (out.rate            && Object.keys(out.rate).length === 0)            delete out.rate;
-  if (out.rtpContribution && Object.keys(out.rtpContribution).length === 0) delete out.rtpContribution;
-  if (out.tagShare        && Object.keys(out.tagShare).length === 0)        delete out.tagShare;
-
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
-function adaptTarget(raw: unknown): MathTarget | undefined {
-  if (raw == null) return undefined;
-  if (typeof raw === "number") return { target: raw };
-  if (typeof raw !== "object") return undefined;
-  const o = raw as Record<string, unknown>;
-  if (typeof o["target"] !== "number") return undefined;
-  const t: MathTarget = { target: Number(o["target"]) };
-  if (typeof o["tolerance"] === "number") t.tolerance = Number(o["tolerance"]);
-  return t;
-}
-
-function adaptTargetMap(raw: unknown): Record<string, MathTarget> | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const out: Record<string, MathTarget> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    const t = adaptTarget(v);
-    if (t) out[k] = t;
-  }
-  return out;
-}
-
-// --- Lua -> TS adapters ------------------------------------------------------
-// Lua tables come back as objects. Arrays come back as 1-indexed objects
-// or proper arrays depending on shape; we normalise both.
-
-function asArray<T = unknown>(v: unknown): T[] {
-  if (Array.isArray(v)) return v as T[];
-  if (v && typeof v === "object") {
-    // Lua 1-indexed table. Collect numeric keys in order.
-    const obj = v as Record<string, unknown>;
-    const out: T[] = [];
-    for (let i = 1; ; i++) {
-      const key = String(i);
-      if (!(key in obj)) break;
-      out.push(obj[key] as T);
-    }
-    if (out.length > 0) return out;
-  }
-  return [];
-}
-
-function adaptRoundOutcome(raw: unknown): RoundOutcome {
-  const o = raw as Record<string, unknown>;
-  return {
-    multiplier: Number(o["multiplier"] ?? 0),
-    ops: asArray<Op>(o["ops"]),
-    type: String(o["type"] ?? "spin"),
-    carry: o["carry"] === undefined ? undefined : String(o["carry"]),
-    nextMode: o["next_mode"] === undefined ? undefined : String(o["next_mode"]),
-  };
-}
-
-function adaptOpenOutcome(raw: unknown): OpenOutcome {
-  const o = raw as Record<string, unknown>;
-  return {
-    state: String(o["state"] ?? ""),
-    ops: asArray<Op>(o["ops"]),
-    awaiting: adaptAwaiting(o["awaiting"]),
-  };
-}
-
-function adaptStepOutcome(raw: unknown): StepOutcome {
-  const o = raw as Record<string, unknown>;
-  return {
-    state: String(o["state"] ?? ""),
-    ops: asArray<Op>(o["ops"]),
-    awaiting: adaptAwaiting(o["awaiting"]),
-  };
-}
-
-function adaptCloseOutcome(raw: unknown): CloseOutcome {
-  const o = raw as Record<string, unknown>;
-  return {
-    multiplier: Number(o["multiplier"] ?? 0),
-    ops: asArray<Op>(o["ops"]),
-    type: String(o["type"] ?? "close"),
-    carry: o["carry"] === undefined ? undefined : String(o["carry"]),
-    nextMode: o["next_mode"] === undefined ? undefined : String(o["next_mode"]),
-  };
-}
-
-function adaptAwaiting(raw: unknown) {
-  if (!raw || typeof raw !== "object") return undefined;
-  const o = raw as Record<string, unknown>;
-  if (!o["type"]) return undefined;
-  return {
-    type: String(o["type"]),
-    options: o["options"] === undefined ? undefined : asArray(o["options"]),
-    deadline: o["deadline"] === undefined ? undefined : Number(o["deadline"]),
-    prompt: o["prompt"] === undefined ? undefined : String(o["prompt"]),
-  };
 }
