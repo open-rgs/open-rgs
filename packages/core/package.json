@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/core",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Open-RGS core: orchestrator, session, promo free-rounds, Lua/WASM math loader, binary-msgpack transport, admin endpoints. Bun-native.",
   "license": "MIT",
   "engines": {
