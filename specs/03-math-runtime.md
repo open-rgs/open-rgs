@@ -102,12 +102,17 @@ The loader:
   default 1000ms; `0` disables for trusted bulk simulation). wasmoon runs
   Lua synchronously on the event loop, so a runaway math (`while true do
   end`) would block the whole server for every player with no JS timer able
-  to interrupt it. A Lua instruction hook  - armed on the executing thread by
-  invoking each entry point (and module construction) from inside a
-  `doString` chunk, so it actually applies  - aborts the call with
-  `MATH_TIMEOUT` once it passes the deadline. The hook, its `sethook`
-  handle, and the deadline check are captured as upvalues then hidden, and
-  the hook survives `debug = nil`, so sandboxed math cannot disable it.
+  to interrupt it. A Lua instruction (count) hook aborts the call with
+  `MATH_TIMEOUT` once it passes the deadline. The hook applies to the thread
+  it is armed ON, and wasmoon runs each JS->Lua bridge call on its own
+  thread, so a guarded dispatcher arms the hook INSIDE the call (its first
+  act) before `pcall`-ing the math. That lets each entry point be invoked
+  through the JS function bridge - synchronous, no per-call work - rather than
+  recompiling a fresh `doString` chunk every call; module construction still
+  runs once inside a `doString`, guarded the same way. The hook, its
+  `sethook` handle, and the deadline check are captured as upvalues then
+  hidden, and the hook survives `debug = nil`, so sandboxed math cannot
+  disable it.
 
 ## WASM runtime details (planned)
 

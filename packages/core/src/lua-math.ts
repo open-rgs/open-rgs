@@ -125,16 +125,22 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   // --- Execution watchdog (see timeoutMs) --------------------------------
   // wasmoon runs Lua synchronously on the event loop, so a runaway math
   // (`while true do end`) would block the whole server and no JS timer could
-  // interrupt it. The only lever is a Lua instruction hook that aborts once
-  // we pass a wall-clock deadline. Crucially the hook only applies when the
-  // math is CALLED FROM a doString chunk (the JS function bridge runs on a
-  // context where the hook does not carry), so when the watchdog is on we
-  // invoke math through `__open_rgs_invoke` inside a doString and read the
-  // result back as that chunk's return value  - race-free because wasmoon
-  // executes the chunk synchronously (no await between arg-set and the call).
+  // interrupt it. The only lever is a Lua instruction (count) hook that aborts
+  // once we pass a wall-clock deadline. The hook applies to the thread it is
+  // armed ON, and wasmoon runs each JS->Lua bridge call on its own thread - so
+  // we arm the hook INSIDE the call: the guarded dispatcher does `sethook(...)`
+  // as its first act, then pcall's the math. That makes the watchdog apply on a
+  // plain bridge call, so the math can be invoked through the JS function bridge
+  // (synchronous, no per-call work) instead of recompiling a fresh `doString`
+  // chunk every call. (Arming the hook beforehand, on a different thread, does
+  // NOT carry to the call's thread - verified - which is why it's armed inside.)
   const timeoutMs = opts?.timeoutMs ?? 1000;
   const watchdog = timeoutMs > 0;
   let deadline = Infinity;
+  // Bridge handle to the guarded dispatcher, captured once after it's defined
+  // (watchdog on). Calling it runs the math under the abort hook without
+  // recompiling a chunk per call. Stays undefined when the watchdog is off.
+  let invokeNamed: ((name: string, ...args: unknown[]) => unknown) | undefined;
   const asTimeout = (e: unknown): RGSError | null =>
     e instanceof Error && e.message.includes("MATH_TIMEOUT")
       ? new RGSError("MATH_TIMEOUT", `math exceeded its ${timeoutMs}ms execution budget`)
@@ -142,19 +148,23 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
 
   /** Invoke a math entry point. With the watchdog off, call it directly
    *  (synchronous, zero overhead  - for trusted bulk simulation). With it on,
-   *  route through the guarded doString so the abort hook applies. */
+   *  call the guarded dispatcher through the JS bridge: it arms the count hook
+   *  on the call's own thread before pcall-ing the math, so the abort hook
+   *  applies WITHOUT recompiling a fresh chunk per call (the old per-call
+   *  `doString` did, which dominated the cost of a small math). The bridge call
+   *  is synchronous for synchronous Lua, so no Promise / microtask is created. */
   function invoke(fnName: string, args: unknown[]): unknown | Promise<unknown> {
     if (!watchdog) {
       return (api as Record<string, (...a: unknown[]) => unknown>)[fnName]!(...args);
     }
     deadline = performance.now() + timeoutMs;
-    for (let i = 0; i < args.length; i++) lua.global.set(`__open_rgs_arg${i + 1}`, args[i]);
-    const refs = args.map((_, i) => `__open_rgs_arg${i + 1}`).join(", ");
-    const code = `return __open_rgs_invoke(__open_rgs_math.${fnName}${refs ? ", " + refs : ""})`;
-    return lua.doString(code).then(
-      (raw) => { deadline = Infinity; return raw; },
-      (e) => { deadline = Infinity; throw asTimeout(e) ?? e; },
-    );
+    try {
+      return invokeNamed!(fnName, ...args);
+    } catch (e) {
+      throw asTimeout(e) ?? e;
+    } finally {
+      deadline = Infinity;
+    }
   }
 
   /** Apply a Lua->TS adapter to an invoke() result, awaiting if guarded. */
@@ -274,6 +284,8 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
         local function hook()
           if check() then error("MATH_TIMEOUT: math exceeded its time budget", 0) end
         end
+        -- Used at LOAD time only: module construction runs inside a doString
+        -- (below), and this guards that one evaluation.
         function __open_rgs_invoke(fn, a, b)
           sethook(hook, "", 100000)
           local ok, res = pcall(fn, a, b)
@@ -281,9 +293,21 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
           if not ok then error(res, 0) end
           return res
         end
+        -- Used PER CALL: looked up by name and invoked through the JS bridge
+        -- (see invoke()), so no chunk is recompiled per call. sethook is armed
+        -- HERE, inside the bridged call, which is what makes the hook apply on
+        -- wasmoon's call thread - arming it beforehand does not carry.
+        function __open_rgs_invoke_named(name, ...)
+          sethook(hook, "", 100000)
+          local ok, res = pcall(__open_rgs_math[name], ...)
+          sethook()
+          if not ok then error(res, 0) end
+          return res
+        end
       end
       __open_rgs_deadline_check = nil
     `);
+    invokeNamed = lua.global.get("__open_rgs_invoke_named") as (name: string, ...args: unknown[]) => unknown;
   }
 
   // Lock down the global environment before the (untrusted) math file runs.
