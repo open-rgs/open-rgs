@@ -1,5 +1,13 @@
 # @open-rgs/simulator
 
+## 1.1.0
+
+### Minor Changes
+
+- [#19](https://github.com/open-rgs/open-rgs/pull/19) [`52e39ec`](https://github.com/open-rgs/open-rgs/commit/52e39ec80803c9c5110071c8dcbd8a86c667869b) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(simulator): shard big runs across cores with `--shards N`
+
+  `open-rgs-sim --shards N` splits a run across N independently-seeded worker processes (one per core) and merges the per-shard reports — near-linear speedup for large certification runs. The merge (new exported `mergeReports`) is **exact** for the cert-critical numbers: measured RTP, standard error, 95% CI, verdict, hit rate, outcome-type/next-mode counts, RTP contributions, deviations, and the multiplier mean / stdDev (pooled population variance) / min / max. Only the distribution percentiles (multiplier + observation p50..p99) are count-weighted across shards and flagged via a new optional `SimulationReport.sharded` field. Sharding requires the manifest module to export a factory `({ seed }) => GameManifest` so each shard draws an independent RNG substream; a static manifest is refused (it would replay the identical stream — a fail-closed safeguard against an over-confident result).
+
 ## 1.0.1
 
 ### Patch Changes
