@@ -44,6 +44,17 @@ one of three source forms - same contract, swappable by a manifest entry:
 
 ### Compiled (WASM / Zig) math
 
+Author a kernel (exports `play` / `alloc` / `free`, imports `host.rng_next`;
+see `examples/hold-and-win/maths/play.zig` for a worked one) and build it to
+WASM with zig:
+
+```bash
+zig build-exe play.zig -target wasm32-freestanding -fno-entry -rdynamic \
+  -OReleaseSmall -femit-bin=play.wasm
+```
+
+Then load it:
+
 ```ts
 import { loadWasmMath, cryptoRng } from "@open-rgs/core";
 
