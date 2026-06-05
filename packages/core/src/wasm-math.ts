@@ -27,10 +27,12 @@
 // LIMITATION  - NO EXECUTION WATCHDOG (security/availability). Unlike the Lua
 // loader, a running WASM call cannot be interrupted from JS, so a kernel that
 // loops forever blocks the event loop (a DoS). loadWasmMath has no per-call
-// timeout: treat these kernels as TRUSTED and bounded. Untrusted/unbounded
-// SIMPLE kernels can run through `createMathPool`, which terminates a worker
-// that overruns (the fail-closed path). The pool is simple-only today, so a
-// COMPLEX kernel has no fail-closed timeout yet  - keep complex kernels trusted.
+// timeout: treat these kernels as TRUSTED and bounded. createMathPool runs them
+// on worker threads and FAILS THE ROUND closed (MATH_TIMEOUT) on a budget
+// overrun, but it does NOT kill a tight-loop runaway - Bun's worker.terminate()
+// can't preempt a sync loop, so that thread leaks. The pool buys off-thread
+// concurrency + round-level failure, NOT no-DoS; true no-DoS needs process
+// isolation (SIGKILL). So treat ALL WASM kernels as trusted/bounded regardless.
 // loadWasmMath logs a warning at load to keep this visible.
 
 import { readFile } from "node:fs/promises";
@@ -89,8 +91,9 @@ export async function loadWasmMath(path: string, opts?: LoadWasmMathOptions): Pr
   // Visibility for the no-watchdog limitation (see file header): a runaway WASM
   // call cannot be interrupted from JS, so the kernel must be trusted/bounded.
   log.warn("loadWasmMath: WASM math runs without an execution watchdog  - a " +
-    "runaway kernel blocks the event loop. Use only trusted, bounded kernels, " +
-    "or run untrusted simple kernels through createMathPool (terminate-on-timeout).", {
+    "runaway kernel blocks the event loop. Use only trusted, bounded kernels. " +
+    "(createMathPool moves math off the I/O thread and fails the round on " +
+    "timeout, but does not kill a tight-loop runaway - it is not a no-DoS box.)", {
     "event.category": "process",
     "event.action": "wasm_math_no_watchdog",
     "math.path": path,

@@ -1,8 +1,9 @@
 // Worker entry for the math pool (see math-pool.ts). Runs inside a Worker
 // thread: loads a WASM math kernel and answers one play() at a time. The
-// kernel uses a worker-local secure RNG (cryptoRng). If a kernel runs away, the
-// pool `terminate()`s this whole worker - that's the fail-closed timeout the
-// WASM tier otherwise lacks.
+// kernel uses a worker-local secure RNG (cryptoRng). If a kernel overruns its
+// budget the pool fails the round (MATH_TIMEOUT) and replaces this worker - but
+// note a tight-loop runaway thread can't be preempted and leaks (see
+// math-pool.ts header); the pool is off-thread + round-fail, not a no-DoS box.
 
 import { loadWasmMath } from "./wasm-math.js";
 import { cryptoRng } from "./lua-math.js";

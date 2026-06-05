@@ -1,13 +1,24 @@
 // Math worker pool: runs WASM math kernels in a pool of Worker threads, off the
-// orchestrator's I/O thread, with a per-call wall-clock timeout enforced by
-// `worker.terminate()`.
+// orchestrator's I/O thread, with a per-call wall-clock budget.
 //
-// Two wins:
+// What it gives you:
 //  - Performance: math runs on worker threads -> concurrency under load (the
 //    I/O thread is never blocked by a spin).
-//  - Security (Guarantee 5, fail-closed / no-DoS): a runaway kernel can't be
-//    interrupted from JS, so we KILL its worker on timeout and replace it. This
-//    is the watchdog the bare `loadWasmMath` path lacks.
+//  - Round-level fail-closed: a call that overruns its budget REJECTS with
+//    MATH_TIMEOUT (the round refuses to pay a hung/overrunning value, and the
+//    connection isn't left waiting) and the worker is dropped + replaced, so the
+//    pool stays usable.
+//
+// IMPORTANT - this is NOT a no-DoS sandbox for untrusted kernels. A tight
+// synchronous runaway (`while (true) {}`) CANNOT be interrupted: Bun's
+// `worker.terminate()` does not preempt a sync loop (it only lands at a yield
+// point, which a tight loop never reaches - see worker-terminate.test.ts). We
+// call terminate() best-effort, but a tight-loop runaway THREAD leaks (keeps a
+// core busy) even though the round already failed closed. So treat WASM kernels
+// as TRUSTED and bounded (same posture as bare loadWasmMath); the pool buys
+// off-thread concurrency + round-level failure, not runaway-killing. True no-DoS
+// needs process isolation (SIGKILL); not implemented here. (The Lua loader's
+// in-VM debug.sethook watchdog DOES preempt a tight loop - that path is bounded.)
 //
 // Returns a `SimpleMath`-shaped, async math you can drop into a manifest mode;
 // call `shutdown()` to tear the pool down. v1: simple (single `play`) WASM math.
@@ -116,9 +127,12 @@ export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
   function timeoutWorker(w: W): void {
     const task = w.task;
     w.timer = null; w.task = null; w.busy = false;
-    log.warn("math worker exceeded its budget  - terminating", {
+    log.warn("math worker exceeded its budget  - failing the round and replacing the worker", {
       "event.category": "process", "event.action": "math_worker_timeout", "timeout.ms": timeoutMs,
     });
+    // Best-effort: terminate() reclaims a worker that's idle or yielding, but it
+    // does NOT preempt a tight synchronous loop (that thread leaks - keeps a core
+    // busy). The round still fails closed below regardless. See file header.
     try { w.worker.terminate(); } catch { /* already gone */ }
     remove(w);
     if (task) task.reject(new RGSError("MATH_TIMEOUT", `math exceeded its ${timeoutMs}ms execution budget`));

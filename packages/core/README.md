@@ -40,7 +40,7 @@ one of three source forms - same contract, swappable by a manifest entry:
 |--------|--------|----------|
 | `loadLuaMath(path, opts?)` | `.lua` via wasmoon (Lua 5.4 -> WASM) | Default. Cheap to write, hot-reloadable. Per-call watchdog (`debug.sethook`). |
 | `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~15x faster than Lua. Simple or complex. |
-| `createMathPool(opts)` | the same `.wasm` kernel, in a Worker pool | The **fail-closed** way to run WASM math: per-call timeout enforced by `terminate()`. |
+| `createMathPool(opts)` | the same `.wasm` kernel, in a Worker pool | Off the I/O thread; **fails the round** closed on a per-call timeout. Not a runaway-kill (see below). |
 
 ### Compiled (WASM / Zig) math
 
@@ -67,7 +67,8 @@ execution watchdog** - a runaway kernel would block the event loop. It logs
 a warning at load to keep that visible. Use it only for trusted, bounded
 kernels.
 
-For unbounded or untrusted WASM math, run it through the worker pool:
+To run WASM math off the I/O thread (concurrency) with a per-call budget, use
+the worker pool:
 
 ```ts
 import { createMathPool } from "@open-rgs/core";
@@ -75,22 +76,29 @@ import { createMathPool } from "@open-rgs/core";
 const math = await createMathPool({
   wasmPath:  "./maths/play.wasm",
   size:      4,      // worker threads (default 4)
-  timeoutMs: 1000,   // per-call budget; an overrun is killed via terminate()
+  timeoutMs: 1000,   // per-call budget; an overrun fails the ROUND (MATH_TIMEOUT)
 });
 // ...later: math.shutdown();
 ```
 
-The pool runs the kernel on Worker threads (off the I/O thread) and **kills**
-any worker that overruns the budget, failing the round with `MATH_TIMEOUT` and
-replacing the worker. This is the WASM tier's enforcement of Guarantee 5
-(Fail Closed / no-DoS). v1 is simple (single `play`) math.
+On a budget overrun the pool **fails the round** closed (rejects with
+`MATH_TIMEOUT` - no bad payout, the connection isn't left hung) and replaces the
+worker. That preserves the *outcome-integrity* half of Guarantee 5. It is **not
+a no-DoS sandbox**, though: a tight synchronous runaway can't be preempted -
+Bun's `worker.terminate()` doesn't interrupt a sync loop, so that thread leaks
+(keeps a core busy) even after the round fails. So treat WASM kernels as
+**trusted and bounded** regardless; a true no-DoS kill needs process isolation
+(SIGKILL), not implemented. The pool's win over bare `loadWasmMath` is off-thread
+concurrency + round-level failure, not runaway-killing. v1 is simple (single
+`play`) math. (Only the Lua loader's in-VM watchdog preempts a tight loop.)
 
 **Complex rounds.** A kernel with `kind=1` and `open` / `step` / `is_terminal` /
 `close` (+ optional `autoclose`) exports loads as complex math. Core threads the
 kernel's serialized `state` (base64) back into each call; the kernel keeps
 nothing between calls. See `examples/cash-ladder` for a worked Zig kernel and
-`specs/03-math-runtime.md` for the ABI. (The pool is simple-only today, so a
-complex kernel has no fail-closed timeout yet — keep it trusted.)
+`specs/03-math-runtime.md` for the ABI. (The pool is simple-only today; and even
+for simple math it fails the *round* on timeout but can't kill a tight-loop
+runaway — so keep all WASM kernels trusted.)
 
 Why Zig for kernels: comptime RTP invariants, no GC pauses, no JIT warmup,
 tiny hashable output, and one source that compiles to **both** WASM (server)
