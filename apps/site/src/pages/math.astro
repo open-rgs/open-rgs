@@ -68,7 +68,7 @@ return {
     <table>
       <thead><tr><th>Helper</th><th>Behaviour</th></tr></thead>
       <tbody>
-        <tr><td><code>host.rng_next()</code></td><td>returns a float in <code>[0, 1)</code> from the orchestrator's RNG</td></tr>
+        <tr><td><code>host.rng_next()</code></td><td>returns a float in <code>[0, 1)</code> from the orchestrator's RNG (a secure CSPRNG by default; <code>Math.random</code> is never used)</td></tr>
         <tr><td><code>host.log_debug(msg)</code></td><td>writes a debug line tagged with the math file path</td></tr>
         <tr><td><code>host.mark.count(name)</code></td><td>increments a named counter  - inert in production, recorded by the simulator</td></tr>
         <tr><td><code>host.mark.observe(name, v)</code></td><td>appends a value to a named histogram</td></tr>
@@ -101,6 +101,47 @@ const math = await loadLuaMath("./maths/spin.lua", {
       round (visible in <code>/healthz</code>). Math version mismatch
       against stored session carry triggers the
       <code>manifest.recovery</code> policy.
+    </p>
+
+    <h2 data-section="§ 7">Compiled math (WASM / Zig)</h2>
+
+    <p>
+      For production-grade or certification-bound math, compile a kernel to
+      WebAssembly - typically in <strong>Zig</strong> (Rust, TinyGo, C also
+      work) - and load it instead of Lua. Same <code>MathModule</code>
+      contract; the orchestrator can't tell the difference. A WASM kernel runs
+      ~15x faster than the equivalent Lua and ships as one hashable artifact.
+    </p>
+
+    <pre><code>{`import { loadWasmMath, createMathPool, cryptoRng } from "@open-rgs/core";
+
+// Direct, synchronous calls - the fast path (trusted, bounded kernels).
+const math = await loadWasmMath("./maths/play.wasm", { rng: cryptoRng });
+
+// Fail-closed: run the kernel in a Worker pool with a per-call timeout.
+// A runaway kernel is killed via terminate() and the worker replaced.
+const pooled = await createMathPool({
+  wasmPath: "./maths/play.wasm", size: 4, timeoutMs: 1000,
+});`}</code></pre>
+
+    <p class="mute">
+      A running WASM call can't be interrupted from JS, so bare
+      <code>loadWasmMath</code> has <strong>no execution watchdog</strong> (it
+      warns at load). <code>createMathPool</code> is the fail-closed path - it
+      enforces the per-call budget by terminating the worker
+      (<code>MATH_TIMEOUT</code>). See <code>examples/hold-and-win</code> for a
+      worked Zig kernel and <a href="/build">build</a> for the toolchain.
+    </p>
+
+    <h2 data-section="§ 8">RNG (secure by default)</h2>
+
+    <p>
+      The host injects randomness; the math never owns its PRNG. The default is
+      a secure CSPRNG (<code>cryptoRng</code>, WebCrypto -> BoringSSL) -
+      <code>Math.random</code> is never used for outcomes. In production the
+      loader <strong>fails closed</strong>: you choose the source explicitly
+      (<code>&#123; rng: cryptoRng &#125;</code> or a certified source), even
+      though a secure default exists.
     </p>
 
     <nav class="related" aria-label="Related">

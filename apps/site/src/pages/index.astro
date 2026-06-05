@@ -26,7 +26,7 @@ await createServer({
     id: "hello", declaredRtp: 0.95, defaultMode: "default",
     modes: { default: { math: await loadLuaMath("./maths/spin.lua"), stakeMultiplier: 1 } },
   }),
-  platform:  new MockPlatform({ startingBalance: 100_00 }),
+  platform:  new MockPlatform({ startingBalance: 100_000 }),
   transport: binaryTransport({ port: 80 }),
 });`}</code></pre>
 

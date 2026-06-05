@@ -17,6 +17,19 @@ A living document. Updated when work lands or reprioritises.
 - Spec corpus 00-10 (overview through design philosophy).
 - ADR seed (001-006).
 - `CLAUDE.md` handoff doc for AI session continuity.
+- `@open-rgs/simulator` - per-mode RTP / hit-rate simulator + reports, with
+  multi-process `--shards`, plus fast batch tiers: `simulateWasmBatch`
+  (in-kernel `sim_batch`, ~216M spins/s single-threaded) and
+  `simulateNativeBatch` (native Zig + `std.Thread`, ~1.65B spins/s,
+  byte-parity with the WASM kernel).
+- WASM math loader (`loadWasmMath`) - load a Zig/Rust-authored `.wasm` kernel
+  directly (simple math).
+- Math worker pool (`createMathPool`) - runs WASM math in Worker threads with
+  a per-call `terminate()` timeout (the fail-closed watchdog for the WASM tier).
+- Secure-by-default outcome RNG (`cryptoRng` via WebCrypto -> BoringSSL) with
+  production fail-closed (the operator must choose an RNG explicitly) and an
+  opt-in deterministic `seed-expand` replay mode (xoshiro256++).
+- Worked examples on Zig kernels (e.g. `examples/hold-and-win`).
 
 ## Architectural decisions captured (A1-A10)
 
@@ -78,7 +91,6 @@ J  - public-surface freeze v0.5: pending
 |------|------|-------|
 | Prometheus metrics + W3C tracing | 06 | Operating blind today |
 | Graceful shutdown + drain mode | 02, 07 | K8s rolling restarts drop sessions |
-| WASM math loader | 03 | Open the door for Zig-authored maths |
 | Public/private state split (`view(state)`) | 01, 03, 08 | Required for honest exploit testing |
 | Bonus engine abstraction (promo -> BonusCampaign) | 02 | Jackpots, tournaments, gamification points |
 | `@open-rgs/cli fuzz` & `optimize` | 08 | Round out the math-author DX |

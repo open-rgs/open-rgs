@@ -38,7 +38,8 @@ No "auth helper #1 vs #2 vs #3  - pick your favourite."
 - One canonical JWT
 - One canonical mTLS
 - One canonical session store (in-memory)
-- One canonical math loader (Lua via wasmoon)
+- One canonical math loader per source form (Lua via wasmoon; WASM via
+  `loadWasmMath` for compiled/Zig kernels, optionally pooled by `createMathPool`)
 
 If someone needs exotic, they bring their own. Optionality compounds;
 pick one.

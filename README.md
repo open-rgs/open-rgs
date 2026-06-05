@@ -1,8 +1,9 @@
 # open-rgs
 
 A small, MIT-licensed Remote Game Server. Bun-native orchestrator,
-snap-in Lua maths, pluggable wallet adapters, binary-msgpack on the
-wire. One Bun file boots a working server.
+snap-in maths (Lua, or compiled WASM kernels in Zig/Rust), pluggable
+wallet adapters, binary-msgpack on the wire. One Bun file boots a
+working server.
 
 Built for slots, instant games, Mines, Chicken-Road, crash, and any
 other casino round shape.
@@ -66,7 +67,7 @@ return {
             +-------------------------------+
             |         ORCHESTRATOR          | ◀---- admin http
             |   +-----------------------+   |       /livez /healthz
-            |   |   Lua math (wasmoon)  |   |       /admin/*
+            |   |  Lua / WASM kernel    |   |       /admin/*
             |   +-----------------------+   |
             +----------------+--------------+
                              |  PlatformAdapter (one interface)
@@ -110,13 +111,13 @@ not break it  - in **[specs/00-guarantees.md](specs/00-guarantees.md)**.
 | Package | Purpose |
 |---|---|
 | `@open-rgs/contract` | types only, zero deps |
-| `@open-rgs/core` | orchestrator, Lua runtime, binary-msgpack transport, admin, metrics |
+| `@open-rgs/core` | orchestrator, Lua + WASM math runtimes, math worker pool, secure RNG, binary-msgpack transport, admin, metrics |
 | `@open-rgs/log` | structured logger (JSON / Server-core / Console formats) |
 | `@open-rgs/platform-mock` | in-memory dev wallet with promo + autoclose helpers |
 | `@open-rgs/adapter-kit` | WS / HTTP RPC helpers + currency conversion for adapter authors |
 | `@open-rgs/adapter-test-kit` | conformance suite for any PlatformAdapter implementation |
 | `@open-rgs/client` | tiny TS WebSocket client (Bun / Node / browser) |
-| `@open-rgs/simulator` | per-mode RTP / hit-rate / mark simulator + reports |
+| `@open-rgs/simulator` | per-mode RTP / hit-rate / mark simulator + reports; fast WASM & native-Zig batch tiers |
 
 ## Build a game
 
@@ -137,6 +138,7 @@ Plug points (each is one interface):
 - **Wallet adapter** -> implement `PlatformAdapter` (talks to your operator's wallet)
 - **Transport** -> implement `ClientTransport` (the default `binaryTransport` is binary-msgpack + WS)
 - **Lua VM extensions** -> `LuaExtension` for helpers (reels, paylines, distributions)
+- **Compiled math** -> ship a WASM kernel (`loadWasmMath`) authored in Zig/Rust; run it fail-closed under a worker pool (`createMathPool`)
 - **Metrics / logs** -> bring your own registry / formatter
 - **Idempotency** -> configurable per RPC
 
@@ -157,8 +159,7 @@ is a round calculator + wallet driver.
 
 ## Status
 
-`v1.0.0`  - the first stable release, following a full
-production-readiness audit. The public contract (`@open-rgs/contract`
+`v1.x`  - stable, following a full production-readiness audit. The public contract (`@open-rgs/contract`
 + `@open-rgs/core`) follows semver from 1.0: a breaking change means a
 major bump, not a surprise. Releases and per-package changelogs are
 managed with [Changesets](https://github.com/changesets/changesets)  -
