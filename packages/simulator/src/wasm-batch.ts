@@ -98,21 +98,39 @@ export async function simulateWasmBatch(wasmPath: string, opts: WasmBatchOptions
     done += n;
   }
   const elapsedMs = performance.now() - t0;
+  return reportFromAggregate(name, version, { count, sum, sumsq, min, max, hits }, declared, elapsedMs);
+}
 
+/** A kernel batch aggregate: enough to recover RTP, hit-rate, mean, stdDev,
+ *  min, max. Produced by the WASM `sim_batch` and by the native simulator. */
+export interface BatchAggregate {
+  count: number; sum: number; sumsq: number; min: number; max: number; hits: number;
+}
+
+/** Turn a (possibly merged) batch aggregate into a focused RTP report. RTP =
+ *  mean multiplier (the bet cancels); variance is population (sumsq/n - mean^2);
+ *  verdict compares declared vs measured against the standard error. Shared by
+ *  the WASM and native batch simulators. */
+export function reportFromAggregate(
+  name: string,
+  version: string,
+  agg: BatchAggregate,
+  declaredRtp: number,
+  elapsedMs: number,
+): WasmBatchReport {
+  const { count, sum, sumsq, min, max, hits } = agg;
   const mean = count > 0 ? sum / count : 0;
   const variance = count > 0 ? Math.max(0, sumsq / count - mean * mean) : 0;
   const stdDev = Math.sqrt(variance);
-  const measured = mean; // RTP = mean multiplier (the bet cancels)
   const standardError = count > 0 ? stdDev / Math.sqrt(count) : 0;
-  const a = Math.abs(measured - declared);
+  const a = Math.abs(mean - declaredRtp);
   const verdict: "pass" | "warn" | "fail" =
     standardError === 0 ? (a < 1e-9 ? "pass" : "fail")
     : a <= 1.96 * standardError ? "pass"
     : a <= 2.576 * standardError ? "warn" : "fail";
-
   return {
     name, version, spins: count,
-    rtp: { measured, declared, delta: measured - declared, standardError, ci95: [measured - 1.96 * standardError, measured + 1.96 * standardError], verdict },
+    rtp: { measured: mean, declared: declaredRtp, delta: mean - declaredRtp, standardError, ci95: [mean - 1.96 * standardError, mean + 1.96 * standardError], verdict },
     hitRate: count > 0 ? hits / count : 0,
     multiplier: { min: count > 0 ? min : 0, max, mean, stdDev },
     elapsedMs,
