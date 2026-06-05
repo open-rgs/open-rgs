@@ -5,7 +5,7 @@
 import { describe, expect, test, afterEach } from "bun:test";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadLuaMath } from "../src/lua-math.js";
+import { loadLuaMath, cryptoRng } from "../src/lua-math.js";
 import type { SimpleMath } from "@open-rgs/contract";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -19,9 +19,11 @@ afterEach(() => {
 });
 
 describe("loadLuaMath RNG fail-closed (C5)", () => {
-  test("production + no rng -> throws (refuses Math.random)", async () => {
+  test("production + no rng -> throws (must choose a source explicitly)", async () => {
     process.env["NODE_ENV"] = "production";
-    await expect(loadLuaMath(SIMPLE)).rejects.toThrow(/certified CSPRNG/);
+    // Fails closed even though a secure default (cryptoRng) exists: prod must
+    // choose its outcome RNG consciously.
+    await expect(loadLuaMath(SIMPLE)).rejects.toThrow(/choose its outcome RNG|cryptoRng/);
   });
 
   test("production + allowInsecureRng -> loads (explicit opt-out)", async () => {
@@ -71,6 +73,29 @@ describe("loadLuaMath rejects a simulator-only PRNG in production (H8)", () => {
     process.env["NODE_ENV"] = "development";
     const m = await loadLuaMath(SIMPLE, { rng: simRng });
     expect(m.kind).toBe("simple");
+  });
+});
+
+describe("secure default RNG (system CSPRNG, never Math.random)", () => {
+  test("cryptoRng returns uniform [0,1) and varies", () => {
+    const xs = Array.from({ length: 2000 }, () => cryptoRng());
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...xs)).toBeLessThan(1);
+    expect(new Set(xs).size).toBeGreaterThan(1990); // essentially all distinct
+  });
+
+  test("default path (no rng) does NOT call Math.random", async () => {
+    process.env["NODE_ENV"] = "development";
+    const orig = Math.random;
+    let called = false;
+    Math.random = () => { called = true; return orig(); };
+    try {
+      const m = await loadLuaMath(SIMPLE) as SimpleMath;          // no rng injected
+      await m.play(undefined, { mode: "default" });               // draws host.rng_next
+    } finally {
+      Math.random = orig;
+    }
+    expect(called).toBe(false); // outcomes came from the system CSPRNG, not Math.random
   });
 });
 
