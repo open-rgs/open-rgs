@@ -1,5 +1,13 @@
 # @open-rgs/core
 
+## 1.3.2
+
+### Patch Changes
+
+- [#16](https://github.com/open-rgs/open-rgs/pull/16) [`61d746a`](https://github.com/open-rgs/open-rgs/commit/61d746ac3f8d1df20b806c1db3f368797847c5c9) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - perf(core): run Lua math through the JS bridge instead of recompiling a chunk per call
+
+  With the execution watchdog on (the default), every math entry-point call previously built a Lua source string and ran it through `lua.doString`, which lexes + compiles a fresh chunk each call — and accumulates one per call, so a sustained loop (simulation, a busy server) degrades badly. The watchdog now arms its instruction-count abort hook _inside_ a guarded dispatcher that is invoked through wasmoon's JS function bridge, so the math runs with no per-call recompilation and returns synchronously (no forced Promise/microtask). The watchdog still aborts a runaway math with `MATH_TIMEOUT`, the sandbox lockdown is unchanged, and outcomes are byte-identical. With the example math, watchdog-on now runs within ~6% of watchdog-off (200k spins in ~4.2s); the previous path could not complete the same run.
+
 ## 1.3.1
 
 ### Patch Changes
