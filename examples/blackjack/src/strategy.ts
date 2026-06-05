@@ -3,7 +3,7 @@
 // never the opaque state - exactly what a real player sees. `basicStrategy` is
 // the optimal-ish policy (basic strategy for S17, double any two, no split).
 
-import type { StrategyFn } from "../../../packages/simulator/src/index.js";
+import type { StrategyFn, FlowLabel } from "../../../packages/simulator/src/index.js";
 
 interface HandCtx { total: number; soft: boolean; dealerUp: number }
 
@@ -40,4 +40,15 @@ export const alwaysHit: StrategyFn = ({ awaiting }) =>
 export const randomPlay: StrategyFn = ({ awaiting, rng }) => {
   const opts = awaiting.options as string[];
   return { type: awaiting.type, value: opts[Math.floor(rng() * opts.length)] };
+};
+
+/** Coarse player-state buckets for the play-flow chart (a legible Markov chain
+ *  instead of one node per total). */
+export const bucketLabel: FlowLabel = ({ ops }) => {
+  const o = ops[ops.length - 1] as { total: number; soft: boolean } | undefined;
+  if (!o) return "?";
+  if (o.soft) return `soft ${o.total}`;
+  if (o.total <= 11) return "hard <=11";
+  if (o.total <= 16) return "hard 12-16 (stiff)";
+  return "hard 17+";
 };

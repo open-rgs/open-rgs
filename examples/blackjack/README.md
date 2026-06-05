@@ -59,7 +59,36 @@ for the [examples gallery](https://github.com/open-rgs/open-rgs-examples).
 
 ```bash
 bun examples/blackjack/src/study.ts   # the policy comparison above
+bun examples/blackjack/src/flow.ts    # the play-flow Markov chain (below)
 ```
+
+## See how it was played (play-flow)
+
+A single RTP number tells you *how much*, not *how*. Pass `flow` to `simulate()`
+and the report gains a **Markov chain** of how rounds were actually played —
+decision buckets, the action taken, and the transition probability:
+
+```ts
+const [r] = await simulate(manifest, { complexStrategy: basicStrategy, flow: { label: bucketLabel } });
+// r.flow -> rendered by mdReport as a Mermaid chart + a transition table
+```
+
+```mermaid
+flowchart LR
+  start["▶ start"] -->|"37%"| stiff["hard 12-16 (stiff)"]
+  start -->|"24%"| h17["hard 17+"]
+  start -->|"4.5%"| bj["■ blackjack"]
+  stiff -->|"hit 30%"| lose["■ lose"]
+  stiff -->|"hit 25%"| h17
+  stiff -->|"stand 13%"| win["■ win"]
+  h17 -->|"stand 56%"| win
+  h17 -->|"stand 29%"| lose
+```
+
+You can *see* the strategy: stand on 17+, hit the stiff hands and either improve
+or bust. That's what makes interactive math easy to eyeball and test — run it,
+look at the chart, check the transitions match intent. The node labels come from
+the **public** context (`ops`), so the view never depends on hidden state.
 
 ## Two tiers (recap)
 

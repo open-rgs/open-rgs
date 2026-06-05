@@ -8,3 +8,7 @@ export { mdReport, mdReportSet, type SimulationReport, type DistributionStats } 
 export { htmlReportSet, type HtmlReportOptions } from "./html.js";
 export { computeDeviations, narrate, type TargetDeviation, type DeviationStatus } from "./deviation.js";
 export { mulberry32 } from "./rng.js";
+export {
+  createFlowRecorder, flowToMermaid, flowToMarkovTable,
+  type FlowGraph, type FlowEdge, type FlowContext, type FlowLabel,
+} from "./flow.js";
