@@ -50,9 +50,19 @@ is exact for RTP / CI / verdict / hit-rate / contributions / deviations
 and the multiplier mean / stdDev / min / max; only the distribution
 percentiles are count-weighted across shards (flagged in the report).
 Sharding requires a seedable factory manifest so each shard draws an
-independent substream  - a static manifest is refused. This is the
-in-stack way to use all cores today; a standalone Zig simulator binary
-(below) is the future path for billion-spin runs.
+independent substream  - a static manifest is refused.
+
+For a WASM math kernel, `simulateWasmBatch(wasmPath, opts)` runs the whole
+spin loop INSIDE the kernel (its `sim_batch` export: a seeded in-VM
+xoshiro256++ + the same `decide` logic as `play`), so there is no per-spin
+JS<->WASM boundary  - only one crossing per chunk. Measured **~216M
+spins/sec single-threaded (100M spins in ~0.46s)**, ~250x the per-spin WASM
+path, and it's the SAME sandboxed artifact you serve (nothing to re-certify).
+It returns a focused RTP report (measured RTP + CI + verdict, hit-rate,
+multiplier mean/stdDev/min/max  - exact from the kernel's count/sum/sumsq/
+min/max/hits aggregate). Combine with `--shards` for multicore. A standalone
+native (Zig + threads) simulator binary is the future "extreme" tier, gated
+by a byte-parity test against the shipped WASM.
 
 ## Bun usage  - what makes the orchestrator fast
 
