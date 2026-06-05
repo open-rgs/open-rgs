@@ -31,12 +31,13 @@ runaway kernel blocks the event loop (a DoS). Treat WASM kernels as trusted and
 bounded; `loadWasmMath` logs a warning at load to keep this visible.
 **`createMathPool`** runs the kernel on Worker threads instead: it moves math
 off the I/O thread and FAILS THE ROUND closed (`MATH_TIMEOUT`) on a budget
-overrun, then replaces the worker. But it is **not a no-DoS sandbox**: a tight
-synchronous runaway can't be preempted - Bun's `worker.terminate()` doesn't
-interrupt a sync loop, so the round fails closed while that thread leaks (keeps
-a core busy). Treat **all** WASM kernels as trusted/bounded; true no-DoS needs
-process isolation (SIGKILL), not implemented. (Only the Lua loader's in-VM
-`debug.sethook` watchdog actually preempts a tight loop.)
+overrun, then replaces the worker - the portable guarantee. It is **not a
+portable no-DoS sandbox**, though: whether `worker.terminate()` can kill a tight
+synchronous runaway is platform-dependent (it did on Linux, did not on Bun+macOS
+in our testing), so a runaway thread may leak. Treat **all** WASM kernels as
+trusted/bounded; a hard cross-platform no-DoS kill needs process isolation
+(SIGKILL), not implemented. (Only the Lua loader's in-VM `debug.sethook` watchdog
+preempts a tight loop on any platform.)
 
 ## RNG seam
 
@@ -212,12 +213,11 @@ kernel for direct, synchronous `play()` calls - the fast path, but with no
 execution watchdog (a runaway kernel blocks the event loop).
 `createMathPool({ wasmPath, size, timeoutMs })` runs the same kernel across
 Worker threads: it moves math off the I/O thread and fails the round closed
-(`MATH_TIMEOUT`) on a budget overrun, then replaces the worker. It is **not**
-no-DoS, though - a tight-loop runaway can't be preempted (`worker.terminate()`
-doesn't interrupt a sync loop), so the thread leaks even after the round fails.
-Both default to the secure `cryptoRng` and honor the same RNG seam above. Treat
-WASM kernels as trusted/bounded; the pool is also simple-only today (complex
-WASM has neither a timeout nor a kill).
+(`MATH_TIMEOUT`) on a budget overrun, then replaces the worker. It is **not** a
+portable no-DoS sandbox, though - killing a tight-loop runaway via
+`worker.terminate()` is platform-dependent, so the thread may leak. Both default
+to the secure `cryptoRng` and honor the same RNG seam above. Treat WASM kernels
+as trusted/bounded; the pool is also simple-only today.
 
 ## TS runtime details
 

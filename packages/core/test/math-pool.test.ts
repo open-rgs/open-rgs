@@ -34,9 +34,9 @@ describe("createMathPool (worker pool: off-thread + round-level fail-closed)", (
     // loop.wasm's play() never returns, so the ONLY way this call can settle is
     // the timeout firing - i.e. this asserts the fail-closed path runs at ~the
     // budget (not early, not hung). NOTE: this verifies the ROUND fails closed +
-    // the pool stays usable; it does NOT verify the runaway THREAD is killed (it
-    // isn't - worker.terminate() can't preempt a sync loop; see
-    // worker-terminate.test.ts). That is the pool's honest scope.
+    // the pool stays usable; it does NOT verify the runaway THREAD is killed
+    // (whether terminate() kills a tight loop is platform-dependent - see the
+    // math-pool.ts header). That is the pool's honest scope.
     const pool = await createMathPool({ wasmPath: LOOP, size: 1, timeoutMs: 200 });
     try {
       const t0 = performance.now();

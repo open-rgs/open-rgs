@@ -29,11 +29,11 @@
 // loops forever blocks the event loop (a DoS). loadWasmMath has no per-call
 // timeout: treat these kernels as TRUSTED and bounded. createMathPool runs them
 // on worker threads and FAILS THE ROUND closed (MATH_TIMEOUT) on a budget
-// overrun, but it does NOT kill a tight-loop runaway - Bun's worker.terminate()
-// can't preempt a sync loop, so that thread leaks. The pool buys off-thread
-// concurrency + round-level failure, NOT no-DoS; true no-DoS needs process
-// isolation (SIGKILL). So treat ALL WASM kernels as trusted/bounded regardless.
-// loadWasmMath logs a warning at load to keep this visible.
+// overrun - the portable guarantee - but it is not a portable no-DoS sandbox:
+// whether worker.terminate() kills a tight-loop runaway is platform-dependent
+// (yes on Linux, no on Bun+macOS in our testing), so a runaway thread may leak.
+// A hard cross-platform kill needs process isolation (SIGKILL). Treat ALL WASM
+// kernels as trusted/bounded regardless. loadWasmMath warns at load.
 
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -93,7 +93,7 @@ export async function loadWasmMath(path: string, opts?: LoadWasmMathOptions): Pr
   log.warn("loadWasmMath: WASM math runs without an execution watchdog  - a " +
     "runaway kernel blocks the event loop. Use only trusted, bounded kernels. " +
     "(createMathPool moves math off the I/O thread and fails the round on " +
-    "timeout, but does not kill a tight-loop runaway - it is not a no-DoS box.)", {
+    "timeout, but is not a portable no-DoS sandbox - keep kernels trusted.)", {
     "event.category": "process",
     "event.action": "wasm_math_no_watchdog",
     "math.path": path,

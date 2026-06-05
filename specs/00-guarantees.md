@@ -118,12 +118,12 @@ moving money on a bad value.
   RNG fail-closed under `NODE_ENV=production`
   (`specs/02-orchestrator.md`, `specs/03-math-runtime.md`). The watchdog is
   per math runtime: only the Lua loader has a true execution watchdog (an in-VM
-  `debug.sethook` count hook that preempts even a tight loop). WASM has none -
-  `createMathPool` fails the *round* closed on a budget overrun (no bad payout,
-  no hung connection) but cannot kill a tight-loop runaway thread
-  (`worker.terminate()` can't preempt a sync loop), and bare `loadWasmMath` has
-  no timeout at all - so WASM kernels must be trusted/bounded (a hard no-DoS
-  kill needs process isolation).
+  `debug.sethook` count hook that preempts even a tight loop on any platform).
+  WASM has none - `createMathPool` fails the *round* closed on a budget overrun
+  (no bad payout, no hung connection), but killing a tight-loop runaway thread
+  via `worker.terminate()` is platform-dependent (not portable), and bare
+  `loadWasmMath` has no timeout at all - so WASM kernels must be trusted/bounded
+  (a hard cross-platform no-DoS kill needs process isolation).
 - **Prevents:** a math bug becoming a *maximum* payout (the canonical
   `NaN <= cap` trap), negative settlements, and unauditable randomness in
   real-money play.
