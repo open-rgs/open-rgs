@@ -27,6 +27,39 @@ import { createMarkCollector, noopMarkCollector } from "./marks.js";
 
 const factory = new LuaFactory();
 
+// In-VM PRNG for rngMode "seed-expand": xoshiro256++ (Lua 5.4 64-bit ints,
+// which wrap mod 2^64) seeded by splitmix64 from a per-call seed. Bit-identical
+// to the canonical algorithm (verified against a BigInt reference over multiple
+// seeds), uniform, and ~8x cheaper per draw than a JS<->WASM crossing. The "++"
+// output (rotl(s0+s3,23)+s0) is MULTIPLY-FREE  - critical, since 64-bit
+// multiplies are slow in interpreted Lua (the "**" variant was ~30x slower and
+// made seed-expand a net loss). State (s0..s3) + rotl are chunk-locals captured
+// as upvalues, unreachable by the sandboxed math; the global names are nil'd
+// after wiring (host.rng_next keeps the function value). DO NOT change the
+// arithmetic without re-verifying against the reference  - a biased PRNG biases
+// RTP.
+const SEED_EXPAND_LUA = `
+  local s0, s1, s2, s3 = 0, 0, 0, 0
+  local function rotl(x, k) return (x << k) | (x >> (64 - k)) end
+  function __open_rgs_xoshiro_reseed(hi, lo)
+    local st = (math.floor(hi) << 32) | math.floor(lo)
+    local function sm()
+      st = st + 0x9e3779b97f4a7c15
+      local z = st
+      z = (z ~ (z >> 30)) * 0xbf58476d1ce4e5b9
+      z = (z ~ (z >> 27)) * 0x94d049bb133111eb
+      return z ~ (z >> 31)
+    end
+    s0 = sm(); s1 = sm(); s2 = sm(); s3 = sm()
+  end
+  function __open_rgs_xoshiro_next()
+    local result = rotl((s0 + s3) & 0xFFFFFFFFFFFFFFFF, 23) + s0
+    local t = s1 << 17
+    s2 = s2 ~ s0; s3 = s3 ~ s1; s1 = s1 ~ s2; s0 = s0 ~ s3; s2 = s2 ~ t; s3 = rotl(s3, 45)
+    return (result >> 11) / 9007199254740992.0
+  end
+`;
+
 interface LuaApi {
   kind?: "simple" | "complex";
   name?: string;
@@ -78,6 +111,24 @@ export interface LoadLuaMathOptions {
    *  marks:false (default) the calls are no-ops with ~zero cost. The
    *  simulator passes true to drive deviation reports. */
   marks?: boolean;
+  /** How randomness reaches the math. Default `"per-draw"`: every
+   *  `host.rng_next()` calls the injected `rng` directly  - one JS<->WASM
+   *  crossing per draw (~630 ns each, measured).
+   *
+   *  `"seed-expand"`: draw ONE seed per math call from `rng` and expand it
+   *  IN-VM with xoshiro256++ (seeded by splitmix64), so the math draws with
+   *  zero per-draw crossings  - only the per-call reseed crosses. An in-VM
+   *  draw is ~8x cheaper than a crossing, so this is a big win for draw-heavy
+   *  math (dozens of draws/spin) on both the server and the simulator; no
+   *  benefit (slightly more `rng` use) for ~1-draw math. Each entry-point call
+   *  is reseeded independently and the generator is hidden from the math (it
+   *  cannot reseed or peek).
+   *
+   *  CERT NOTE: under `"seed-expand"` the xoshiro expansion enters the
+   *  outcome-determination path, so it must be evaluated as part of the RNG
+   *  (re-certify before real-money use). A call is fully reconstructable from
+   *  its seed. Default stays `"per-draw"`. */
+  rngMode?: "per-draw" | "seed-expand";
 }
 
 /** Cryptographically-secure default RNG, backed by the system CSPRNG (Bun /
@@ -166,6 +217,14 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   // (watchdog on). Calling it runs the math under the abort hook without
   // recompiling a chunk per call. Stays undefined when the watchdog is off.
   let invokeNamed: ((name: string, ...args: unknown[]) => unknown) | undefined;
+
+  // Seed-expand RNG mode (opt-in, see LoadLuaMathOptions.rngMode). Per math
+  // call we draw one 64-bit seed from the resolved `rng` (two u32 halves) and
+  // reseed the in-VM PRNG; the math then draws with no per-draw crossing.
+  // `reseed` is the bridge handle, captured once the generator is installed.
+  const seedExpand = opts?.rngMode === "seed-expand";
+  const rngU32 = (): number => Math.floor(rng() * 0x1_0000_0000);
+  let reseed: ((hi: number, lo: number) => void) | undefined;
   const asTimeout = (e: unknown): RGSError | null =>
     e instanceof Error && e.message.includes("MATH_TIMEOUT")
       ? new RGSError("MATH_TIMEOUT", `math exceeded its ${timeoutMs}ms execution budget`)
@@ -179,6 +238,9 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
    *  `doString` did, which dominated the cost of a small math). The bridge call
    *  is synchronous for synchronous Lua, so no Promise / microtask is created. */
   function invoke(fnName: string, args: unknown[]): unknown | Promise<unknown> {
+    // Reseed the in-VM PRNG from `rng` once per call (one crossing), regardless
+    // of how many draws the math makes. Covers both paths below.
+    if (seedExpand) reseed!(rngU32(), rngU32());
     if (!watchdog) {
       return (api as Record<string, (...a: unknown[]) => unknown>)[fnName]!(...args);
     }
@@ -221,16 +283,50 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   // Host imports exposed to the math. NB: no balance / bet / currency
   // helpers  - by design. Math sees ONLY randomness, a logger, and
   // (optionally) annotation marks.
-  lua.global.set("host", {
-    rng_next: () => rng(),
-    log_debug: (msg: string) => log.debug(`[lua:${path}] ${msg}`),
-    mark: {
-      count:      (name: string)               => marks.count(name),
-      observe:    (name: string, value: number) => marks.observe(name, Number(value)),
-      tag:        (name: string)               => marks.tag(name),
-      contribute: (name: string, multiplier: number) => marks.contribute(name, Number(multiplier)),
-    },
-  });
+  //
+  // `host` is built as a PURE LUA TABLE, not a JS object handed to
+  // global.set. A JS-backed table is a proxy whose every field access goes
+  // through a `__index` metamethod that crosses into JS  - and `host.rng_next`
+  // is read once per draw, so that crossing (~4.3 us per access, measured)
+  // dominates draw-heavy math. Referencing the JS hooks from a plain Lua table
+  // makes `host.rng_next` a cheap Lua index (~6.5x faster on the RNG hot path);
+  // only the underlying hook *call* still crosses. We set the raw hooks under
+  // private globals, copy them into the Lua `host`, then drop the globals so
+  // the sandboxed math reaches them only through `host.*`.
+  lua.global.set("__rgs_rng",             () => rng());
+  lua.global.set("__rgs_log",             (msg: string) => log.debug(`[lua:${path}] ${msg}`));
+  lua.global.set("__rgs_mark_count",      (name: string) => marks.count(name));
+  lua.global.set("__rgs_mark_observe",    (name: string, value: number) => marks.observe(name, Number(value)));
+  lua.global.set("__rgs_mark_tag",        (name: string) => marks.tag(name));
+  lua.global.set("__rgs_mark_contribute", (name: string, multiplier: number) => marks.contribute(name, Number(multiplier)));
+  await lua.doString(`
+    host = {
+      rng_next  = __rgs_rng,
+      log_debug = __rgs_log,
+      mark = {
+        count = __rgs_mark_count, observe = __rgs_mark_observe,
+        tag   = __rgs_mark_tag,   contribute = __rgs_mark_contribute,
+      },
+    }
+    __rgs_rng = nil; __rgs_log = nil
+    __rgs_mark_count = nil; __rgs_mark_observe = nil
+    __rgs_mark_tag = nil; __rgs_mark_contribute = nil
+  `);
+
+  // Seed-expand mode: install the in-VM PRNG and repoint host.rng_next at it,
+  // so the math draws without crossing into JS per draw (invoke() reseeds it
+  // from `rng` once per call). The generator is then hidden from the (untrusted)
+  // math  - it cannot reseed or peek  - while host.rng_next keeps working
+  // because the table holds the function value, not the global name. Repointed
+  // BEFORE the math.random override + sandbox lockdown below, which read
+  // host.rng_next dynamically, so they pick it up.
+  if (seedExpand) {
+    await lua.doString(SEED_EXPAND_LUA);
+    await lua.doString(`host.rng_next = __open_rgs_xoshiro_next`);
+    reseed = lua.global.get("__open_rgs_xoshiro_reseed") as (hi: number, lo: number) => void;
+    await lua.doString(`__open_rgs_xoshiro_reseed = nil; __open_rgs_xoshiro_next = nil`);
+    reseed(rngU32(), rngU32()); // seed before any load-time draw (all-zero state -> all zeros)
+  }
 
   // The minimal VM handle extensions get for VM-level operations.
   const vm: LuaVm = {
