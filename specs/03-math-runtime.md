@@ -17,9 +17,13 @@ the same contract is enforced regardless.
 | `.wasm` | `WebAssembly.instantiate` | Production-grade math, certification-friendly artifact. Source typically Zig or Rust. |
 | (subprocess) | spawn + length-prefixed msgpack stdio | Escape hatch for languages that don't WASM well. Slowest, most flexible. |
 
-`@open-rgs/core` ships a Lua loader. WASM and TS loaders are planned
-peers (`loadWasmMath`, `loadTsMath`). All loaders return a
-`Promise<MathModule>` that the manifest's `math:` field accepts.
+`@open-rgs/core` ships a Lua loader (`loadLuaMath`) and a WASM loader
+(`loadWasmMath`, simple math; complex is planned). A TS loader
+(`loadTsMath`) is a planned peer. All loaders return a
+`Promise<MathModule>` that the manifest's `math:` field accepts. A WASM
+kernel runs ~15x faster than the equivalent Lua math (measured, 1-draw
+distribution) with no per-draw boundary tax, stays sandboxed by
+construction, and ships as a hashable artifact for certification.
 
 ## RNG seam
 
