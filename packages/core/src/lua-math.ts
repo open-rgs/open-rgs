@@ -395,13 +395,19 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
     end
   `);
 
-  // Define the guarded invoker BEFORE the sandbox nils `debug`. It arms a
-  // Lua count hook on the current thread, runs the math fn, disarms  - the
-  // hook fires every N instructions and aborts once we pass the per-call
-  // deadline. It must be CALLED FROM a doString chunk (see invoke()), not
-  // via the JS function bridge, for the hook to apply. `sethook`, the hook,
-  // and the deadline check are captured as upvalues then hidden, so the
-  // (sandboxed) math cannot reach or disable the watchdog.
+  // Define the guarded invokers BEFORE the sandbox nils `debug`. Each arms a
+  // Lua count hook (fires every N instructions; aborts once we pass the
+  // per-call deadline) as its FIRST act, runs the math under pcall, then
+  // disarms. The hook applies to the thread it is armed ON:
+  //   - `__open_rgs_invoke` guards load-time module construction (run from a
+  //     doString, below);
+  //   - `__open_rgs_invoke_named` guards each per-call entry point, which
+  //     invoke() reaches through the JS function bridge - arming the hook
+  //     INSIDE the bridged call is what makes it carry to wasmoon's per-call
+  //     thread (verified empirically; this is why no per-call doString is
+  //     needed).
+  // `sethook`, the hook, and the deadline check are captured as upvalues then
+  // hidden, so the (sandboxed) math cannot reach or disable the watchdog.
   if (watchdog) {
     lua.global.set("__open_rgs_deadline_check", () => performance.now() > deadline);
     await lua.doString(`
