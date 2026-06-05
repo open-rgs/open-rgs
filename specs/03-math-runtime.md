@@ -53,6 +53,16 @@ The host implementation can be **injected at boot** via
 Math produces byte-identical outputs for byte-identical RNG sequences,
 because no other source of nondeterminism is exposed.
 
+**Delivery (`rngMode`).** By default (`"per-draw"`) each `host.rng_next()`
+calls the injected `rng` directly. The opt-in `"seed-expand"` mode draws one
+seed per math call from `rng` and expands it in-VM with xoshiro256++ (seeded
+by splitmix64), so the math draws with no per-draw JS<->WASM crossing  - a
+large speedup for draw-heavy math. It is reseeded independently per call and
+the generator is hidden from the math. Under `"seed-expand"` the expansion
+joins the outcome-determination path and must be evaluated as part of the RNG
+(re-certify before real-money use); the consumed sequence stays deterministic
+and reconstructable from each call's seed.
+
 ## Lua runtime details
 
 Loader: `wasmoon` v1.x. Lua 5.4 compiled to WASM, runs in Bun via the
