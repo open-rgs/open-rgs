@@ -11,3 +11,5 @@ dist
 # Native sim binary (built from sim.zig with your own zig; platform-specific)
 packages/core/test/fixtures/wasm/sim
 packages/core/test/fixtures/wasm/*.o
+examples/hold-and-win/maths/sim
+examples/hold-and-win/maths/*.o
