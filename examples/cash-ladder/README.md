@@ -82,7 +82,7 @@ the optimal policy is to not climb at all. That is the point of a sweep — the
 "RTP" you certify depends entirely on the player's strategy.
 
 **Host-driven policy (flexible).** When the choice is among *step options*
-(e.g. blackjack hit / stand / double), pass a strategy function to the per-spin
+(e.g. gamble vs collect — see `examples/gamble-slot`), pass a strategy function to the per-spin
 simulator instead — it sees the public context (`awaiting` + the latest `ops`)
 at each decision, never the opaque state:
 

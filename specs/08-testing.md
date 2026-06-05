@@ -59,18 +59,18 @@ strategies (action pickers). Math files ship a `simulate.pickAction`
 function or the game ships separate strategy files in `strategies/`:
 
 ```lua
--- strategies/blackjack/basic.lua
+-- strategies/gamble-slot/to-target.lua
 return function(public_state, awaiting, history)
-  if awaiting.type == "hit_or_stand" then
-    local total = hand_total(public_state.player_hand)
-    return total < 17 and { type = "hit" } or { type = "stand" }
+  if awaiting.type == "gamble" then
+    -- keep gambling until we've doubled 3x, then collect
+    return public_state.gambles < 3 and { type = "gamble" } or { type = "collect" }
   end
 end
 ```
 
 ```bash
-@open-rgs/cli simulate ./blackjack/manifest.ts \
-    --strategy ./strategies/blackjack/basic.lua \
+@open-rgs/cli simulate ./gamble-slot/manifest.ts \
+    --strategy ./strategies/gamble-slot/to-target.lua \
     --spins 1M
 ```
 
@@ -80,7 +80,7 @@ end
 and surfaces any strategy that beats declared RTP by more than eps.
 
 ```bash
-@open-rgs/cli compare ./examples/blackjack/manifest.ts \
+@open-rgs/cli compare ./examples/gamble-slot/manifest.ts \
     --strategies basic,greedy,always-hit,random \
     --spins 1M
 
@@ -98,7 +98,7 @@ and surfaces any strategy that beats declared RTP by more than eps.
 for unexpected winners:
 
 ```bash
-@open-rgs/cli fuzz ./examples/blackjack/manifest.ts \
+@open-rgs/cli fuzz ./examples/gamble-slot/manifest.ts \
     --target-rtp 0.995 --tolerance 0.005 --budget 1000
 
 # Generated 1000 random strategies, 1M spins each.
@@ -229,7 +229,7 @@ encode/decode roundtrips. Example assertions:
 - `@open-rgs/cli simulate ./examples/lucky-digits/manifest.ts --mode default --spins 1M`
   completes in under 60 seconds on a single core and reports RTP within
   0.005 of the declared value.
-- `@open-rgs/cli fuzz ./examples/blackjack/manifest.ts --budget 100`
+- `@open-rgs/cli fuzz ./examples/gamble-slot/manifest.ts --budget 100`
   completes and finds zero exploits (assuming the math is clean).
 - The orchestrator unit-test suite covers >= 80% of branches in
   `orchestrator.ts` (planned, not yet measured).

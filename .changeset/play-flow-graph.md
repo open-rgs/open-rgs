@@ -18,5 +18,5 @@ state, so the view can't depend on hidden info. Off by default (zero overhead).
 New exports: `createFlowRecorder`, `flowToMermaid`, `flowToMarkovTable`,
 `FlowGraph`, `FlowEdge`, `FlowContext`, `FlowLabel`. The goal: make interactive
 (complex / options) game math easy to eyeball and test - run it, look at the
-chart, check the transitions match intent. See `examples/blackjack` (basic
-strategy: stand on 17+, hit stiff hands, bust or improve).
+chart, check the transitions match intent. See `examples/gamble-slot` (the
+gamble-or-collect ladder visualized as a Markov chain).
