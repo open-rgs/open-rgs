@@ -25,6 +25,13 @@ kernel runs ~15x faster than the equivalent Lua math (measured, 1-draw
 distribution) with no per-draw boundary tax, stays sandboxed by
 construction, and ships as a hashable artifact for certification.
 
+**WASM watchdog caveat:** unlike the Lua loader, a running WASM call cannot be
+interrupted from JS, so `loadWasmMath` currently has **no per-call timeout** - a
+runaway kernel blocks the event loop (a DoS). Treat WASM kernels as trusted and
+bounded; `loadWasmMath` logs a warning at load to keep this visible. A timeout
+needs the kernel to run in a worker that can be `terminate()`-ed (planned: the
+shared math worker pool, which also moves math off the I/O thread).
+
 ## RNG seam
 
 Math NEVER ships its own PRNG. The host provides one:

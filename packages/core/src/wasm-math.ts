@@ -13,6 +13,13 @@
 // an output buffer, and msgpack-decodes the returned bytes. RNG resolution is
 // shared with loadLuaMath (secure system CSPRNG by default; fail-closed in
 // production).
+//
+// LIMITATION - NO EXECUTION WATCHDOG (security/availability). Unlike the Lua
+// loader, a running WASM call cannot be interrupted from JS, so a kernel that
+// loops forever blocks the event loop (a DoS). There is no per-call timeout
+// here yet: treat WASM kernels as TRUSTED and bounded. A timeout requires
+// running the kernel in a worker and `terminate()`-ing it (planned: the shared
+// math worker pool). loadWasmMath logs a warning at load to keep this visible.
 
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -57,6 +64,16 @@ export async function loadWasmMath(path: string, opts?: LoadWasmMathOptions): Pr
   const bytes = await readFile(path);
   // Hash the artifact  - proves which kernel produced an outcome (audit log).
   const contentHash = createHash("sha256").update(bytes).digest("hex");
+
+  // Visibility for the no-watchdog limitation (see file header): a runaway WASM
+  // call cannot be interrupted from JS, so the kernel must be trusted/bounded.
+  log.warn("loadWasmMath: WASM math runs without an execution watchdog  - a " +
+    "runaway kernel blocks the event loop. Use only trusted, bounded kernels " +
+    "until the math worker pool (with terminate-on-timeout) lands.", {
+    "event.category": "process",
+    "event.action": "wasm_math_no_watchdog",
+    "math.path": path,
+  });
 
   let ex!: WasmExports;
   const readStr = (ptr: number, len: number): string =>
