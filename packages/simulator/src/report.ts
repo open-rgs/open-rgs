@@ -101,6 +101,12 @@ export interface SimulationReport {
   };
   /** Wall-clock time spent simulating this mode. */
   elapsedMs: number;
+  /** Present only on a merged report from a sharded run (`--shards N>1`).
+   *  Everything is an exact merge EXCEPT the distribution percentiles
+   *  (multiplier + observation p50..p99), which are count-weighted
+   *  approximations across shards. RTP / CI / verdict, hit rate, mean,
+   *  stdDev, min, max, contributions, and deviations are all exact. */
+  sharded?: { shards: number; percentilesApproximate: true };
 }
 
 /** Render one SimulationReport as a tidy markdown block. */
@@ -138,6 +144,10 @@ export function mdReport(r: SimulationReport): string {
 
   lines.push("## Multiplier distribution");
   lines.push("");
+  if (r.sharded) {
+    lines.push(`> ⚠ percentiles are approximate (merged from ${r.sharded.shards} shards); min / mean / stddev / max are exact.`);
+    lines.push("");
+  }
   lines.push("| stat   | value   |");
   lines.push("|--------|---------|");
   lines.push(`| min    | ${num(r.multiplier.min)} |`);
