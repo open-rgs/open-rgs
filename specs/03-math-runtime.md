@@ -18,7 +18,7 @@ the same contract is enforced regardless.
 | (subprocess) | spawn + length-prefixed msgpack stdio | Escape hatch for languages that don't WASM well. Slowest, most flexible. |
 
 `@open-rgs/core` ships a Lua loader (`loadLuaMath`) and a WASM loader
-(`loadWasmMath`, simple math only; complex is not yet supported). A TS loader
+(`loadWasmMath`, both simple and complex math). A TS loader
 (`loadTsMath`) is a planned peer. All loaders return a
 `Promise<MathModule>` that the manifest's `math:` field accepts. A WASM
 kernel runs ~15x faster than the equivalent Lua math (measured, 1-draw
@@ -164,12 +164,19 @@ A WASM math module exposes these exports:
   (func (param i32 i32 i32 i32 i32 i32) (result i32)))
 ;;          prev_p prev_l ctx_p ctx_l out_p out_max -> out_len
 
-;; complex
-(export "open"        (func ...))
-(export "step"        (func ...))
-(export "close"       (func ...))
-(export "is_terminal" (func ...))
-(export "autoclose"   (func ...))
+;; complex  - open/step/close/autoclose return out_len; is_terminal returns 0|1
+(export "open"
+  (func (param i32 i32 i32 i32 i32 i32) (result i32)))
+;;          prev_p prev_l ctx_p ctx_l out_p out_max -> out_len
+(export "step"
+  (func (param i32 i32 i32 i32 i32 i32) (result i32)))
+;;          state_p state_l act_p act_l out_p out_max -> out_len
+(export "is_terminal"
+  (func (param i32 i32) (result i32)))               ;; state_p state_l -> 0|1
+(export "close"
+  (func (param i32 i32 i32 i32) (result i32)))       ;; state_p state_l out_p out_max -> out_len
+(export "autoclose"
+  (func (param i32 i32 i32 i32) (result i32)))       ;; optional; same shape as close
 ```
 
 Imports it consumes:
@@ -183,6 +190,16 @@ Buffers carry MessagePack-encoded payloads. The host writes input into
 the module's linear memory at a returned `alloc()` pointer, calls the
 function, reads the output, then frees both.
 
+**Complex state (the bytes <-> string boundary).** A complex round's `state`
+(`RoundState`) is an opaque *string* core stores and threads back into `step` /
+`is_terminal` / `close` - the kernel keeps nothing between calls. A kernel's
+state is bytes, so it emits `state` as a MessagePack `bin` and the loader
+base64-encodes it into the string (and base64-decodes it back before the next
+call): the kernel sees bytes, core sees an opaque string. `open` / `step`
+return `{ state, ops, awaiting? }` (omit `awaiting` once the round is terminal);
+`close` / `autoclose` return `{ multiplier, ops, type, carry?, next_mode? }`.
+See `examples/cash-ladder` for a worked Zig kernel.
+
 Source language: **Zig is the recommended default** for new WASM math.
 See **Spec 06** for performance rationale. Rust, AssemblyScript,
 TinyGo, and C all work.
@@ -194,6 +211,8 @@ untrusted math, `createMathPool({ wasmPath, size, timeoutMs })` runs the same
 kernel across Worker threads and enforces the per-call budget by terminating a
 worker that overruns - the fail-closed production path (see Guarantee 5). Both
 default to the secure `cryptoRng` and honor the same RNG seam described above.
+The pool is **simple-only** today, so a *complex* WASM kernel has no fail-closed
+timeout yet - keep complex kernels trusted and bounded.
 
 ## TS runtime details
 
