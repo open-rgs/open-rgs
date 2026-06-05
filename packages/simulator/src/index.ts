@@ -1,6 +1,6 @@
 // @open-rgs/simulator public surface.
 
-export { simulate, type SimulateOptions } from "./simulate.js";
+export { simulate, type SimulateOptions, type ComplexStrategy, type StrategyFn, type StrategyContext } from "./simulate.js";
 export { mergeReports } from "./merge.js";
 export { simulateWasmBatch, reportFromAggregate, type WasmBatchReport, type WasmBatchOptions, type BatchAggregate } from "./wasm-batch.js";
 export { simulateNativeBatch, type NativeBatchOptions } from "./native-batch.js";
