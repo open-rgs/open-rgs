@@ -169,9 +169,9 @@ In rough order of likelihood:
 ### Zig math kernel: minimum shape
 
 ```zig
-// build with: zig build-lib play.zig -target wasm32-freestanding \
-//   -dynamic --export=play --export=alloc --export=free \
-//   -O ReleaseFast
+// build with: zig build-exe play.zig -target wasm32-freestanding \
+//   -fno-entry -rdynamic -OReleaseSmall -femit-bin=play.wasm
+// (the native simulator binary: zig build-exe sim.zig -OReleaseFast -femit-bin=sim)
 
 const std = @import("std");
 

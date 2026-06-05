@@ -113,6 +113,10 @@ const math = await loadLuaMath("./maths/spin.lua", {
       ~15x faster than the equivalent Lua and ships as one hashable artifact.
     </p>
 
+    <p>Build the kernel to WASM with zig, then point a manifest mode at the <code>.wasm</code>:</p>
+
+    <pre><code>{`zig build-exe play.zig -target wasm32-freestanding -fno-entry -rdynamic -OReleaseSmall -femit-bin=play.wasm`}</code></pre>
+
     <pre><code>{`import { loadWasmMath, createMathPool, cryptoRng } from "@open-rgs/core";
 
 // Direct, synchronous calls - the fast path (trusted, bounded kernels).
@@ -130,7 +134,8 @@ const pooled = await createMathPool({
       warns at load). <code>createMathPool</code> is the fail-closed path - it
       enforces the per-call budget by terminating the worker
       (<code>MATH_TIMEOUT</code>). See <code>examples/hold-and-win</code> for a
-      worked Zig kernel and <a href="/build">build</a> for the toolchain.
+      worked Zig kernel (with its <code>zig build-exe</code> commands and a
+      native multithreaded sim).
     </p>
 
     <h2 data-section="§ 8">RNG (secure by default)</h2>
