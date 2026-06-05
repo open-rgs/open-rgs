@@ -122,8 +122,8 @@ const math = await loadLuaMath("./maths/spin.lua", {
 // Direct, synchronous calls - the fast path (trusted, bounded kernels).
 const math = await loadWasmMath("./maths/play.wasm", { rng: cryptoRng });
 
-// Fail-closed: run the kernel in a Worker pool with a per-call timeout.
-// A runaway kernel is killed via terminate() and the worker replaced.
+// Off-thread + per-call timeout: an overrun FAILS THE ROUND (MATH_TIMEOUT).
+// Worker-kill is best-effort/platform-dependent - keep kernels trusted.
 const pooled = await createMathPool({
   wasmPath: "./maths/play.wasm", size: 4, timeoutMs: 1000,
 });`}</code></pre>
@@ -131,9 +131,10 @@ const pooled = await createMathPool({
     <p class="mute">
       A running WASM call can't be interrupted from JS, so bare
       <code>loadWasmMath</code> has <strong>no execution watchdog</strong> (it
-      warns at load). <code>createMathPool</code> is the fail-closed path - it
-      enforces the per-call budget by terminating the worker
-      (<code>MATH_TIMEOUT</code>). See <code>examples/hold-and-win</code> for a
+      warns at load). <code>createMathPool</code> runs it off the I/O thread and
+      fails the <em>round</em> on a per-call timeout (<code>MATH_TIMEOUT</code>),
+      but killing a tight-loop runaway via <code>terminate()</code> is
+      platform-dependent - keep WASM kernels trusted. See <code>examples/hold-and-win</code> for a
       worked Zig kernel (with its <code>zig build-exe</code> commands and a
       native multithreaded sim).
     </p>

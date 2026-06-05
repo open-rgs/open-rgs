@@ -28,12 +28,16 @@ construction, and ships as a hashable artifact for certification.
 **WASM watchdog caveat:** unlike the Lua loader, a running WASM call cannot be
 interrupted from JS, so `loadWasmMath` currently has **no per-call timeout** - a
 runaway kernel blocks the event loop (a DoS). Treat WASM kernels as trusted and
-bounded; `loadWasmMath` logs a warning at load to keep this visible. For
-unbounded or untrusted WASM math, run it through **`createMathPool`** instead:
-it executes the kernel in a pool of Worker threads and enforces a per-call
-budget by `terminate()`-ing any worker that overruns (failing the round with
-`MATH_TIMEOUT`), which also moves math off the I/O thread. `loadWasmMath` is
-the fast trusted-kernel path; the pool is the fail-closed one.
+bounded; `loadWasmMath` logs a warning at load to keep this visible.
+**`createMathPool`** runs the kernel on Worker threads instead: it moves math
+off the I/O thread and FAILS THE ROUND closed (`MATH_TIMEOUT`) on a budget
+overrun, then replaces the worker - the portable guarantee. It is **not a
+portable no-DoS sandbox**, though: whether `worker.terminate()` can kill a tight
+synchronous runaway is platform-dependent (it did on Linux, did not on Bun+macOS
+in our testing), so a runaway thread may leak. Treat **all** WASM kernels as
+trusted/bounded; a hard cross-platform no-DoS kill needs process isolation
+(SIGKILL), not implemented. (Only the Lua loader's in-VM `debug.sethook` watchdog
+preempts a tight loop on any platform.)
 
 ## RNG seam
 
@@ -206,13 +210,14 @@ TinyGo, and C all work.
 
 **Running a WASM kernel.** `loadWasmMath(path, { rng })` instantiates the
 kernel for direct, synchronous `play()` calls - the fast path, but with no
-execution watchdog (a runaway kernel blocks the event loop). For unbounded or
-untrusted math, `createMathPool({ wasmPath, size, timeoutMs })` runs the same
-kernel across Worker threads and enforces the per-call budget by terminating a
-worker that overruns - the fail-closed production path (see Guarantee 5). Both
-default to the secure `cryptoRng` and honor the same RNG seam described above.
-The pool is **simple-only** today, so a *complex* WASM kernel has no fail-closed
-timeout yet - keep complex kernels trusted and bounded.
+execution watchdog (a runaway kernel blocks the event loop).
+`createMathPool({ wasmPath, size, timeoutMs })` runs the same kernel across
+Worker threads: it moves math off the I/O thread and fails the round closed
+(`MATH_TIMEOUT`) on a budget overrun, then replaces the worker. It is **not** a
+portable no-DoS sandbox, though - killing a tight-loop runaway via
+`worker.terminate()` is platform-dependent, so the thread may leak. Both default
+to the secure `cryptoRng` and honor the same RNG seam above. Treat WASM kernels
+as trusted/bounded; the pool is also simple-only today.
 
 ## TS runtime details
 

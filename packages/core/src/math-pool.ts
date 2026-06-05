@@ -1,13 +1,25 @@
 // Math worker pool: runs WASM math kernels in a pool of Worker threads, off the
-// orchestrator's I/O thread, with a per-call wall-clock timeout enforced by
-// `worker.terminate()`.
+// orchestrator's I/O thread, with a per-call wall-clock budget.
 //
-// Two wins:
+// What it gives you:
 //  - Performance: math runs on worker threads -> concurrency under load (the
 //    I/O thread is never blocked by a spin).
-//  - Security (Guarantee 5, fail-closed / no-DoS): a runaway kernel can't be
-//    interrupted from JS, so we KILL its worker on timeout and replace it. This
-//    is the watchdog the bare `loadWasmMath` path lacks.
+//  - Round-level fail-closed: a call that overruns its budget REJECTS with
+//    MATH_TIMEOUT (the round refuses to pay a hung/overrunning value, and the
+//    connection isn't left waiting) and the worker is dropped + replaced, so the
+//    pool stays usable.
+//
+// IMPORTANT - this is NOT a portable no-DoS sandbox. On a budget overrun the
+// pool also calls `worker.terminate()`, but whether terminate() can kill a tight
+// SYNCHRONOUS runaway (`while (true) {}`) is platform/version-dependent: in our
+// testing it did on Linux but did NOT on Bun+macOS (the loop kept running). So
+// don't rely on it for the guarantee - the portable promise is only that the
+// ROUND fails closed; a tight-loop thread MAY leak (keep a core busy) on some
+// platforms. Treat WASM kernels as TRUSTED and bounded (same posture as bare
+// loadWasmMath); the pool buys off-thread concurrency + round-level failure. A
+// hard, cross-platform kill needs process isolation (SIGKILL); not implemented
+// here. (The Lua loader's in-VM debug.sethook watchdog preempts a tight loop on
+// any platform - that path is genuinely bounded.)
 //
 // Returns a `SimpleMath`-shaped, async math you can drop into a manifest mode;
 // call `shutdown()` to tear the pool down. v1: simple (single `play`) WASM math.
@@ -116,9 +128,12 @@ export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
   function timeoutWorker(w: W): void {
     const task = w.task;
     w.timer = null; w.task = null; w.busy = false;
-    log.warn("math worker exceeded its budget  - terminating", {
+    log.warn("math worker exceeded its budget  - failing the round and replacing the worker", {
       "event.category": "process", "event.action": "math_worker_timeout", "timeout.ms": timeoutMs,
     });
+    // Best-effort: terminate() reclaims the worker; whether it also kills a tight
+    // synchronous runaway is platform-dependent (see file header). The round
+    // fails closed below regardless - that's the portable guarantee.
     try { w.worker.terminate(); } catch { /* already gone */ }
     remove(w);
     if (task) task.reject(new RGSError("MATH_TIMEOUT", `math exceeded its ${timeoutMs}ms execution budget`));
