@@ -60,9 +60,16 @@ spins/sec single-threaded (100M spins in ~0.46s)**, ~250x the per-spin WASM
 path, and it's the SAME sandboxed artifact you serve (nothing to re-certify).
 It returns a focused RTP report (measured RTP + CI + verdict, hit-rate,
 multiplier mean/stdDev/min/max  - exact from the kernel's count/sum/sumsq/
-min/max/hits aggregate). Combine with `--shards` for multicore. A standalone
-native (Zig + threads) simulator binary is the future "extreme" tier, gated
-by a byte-parity test against the shipped WASM.
+min/max/hits aggregate). Combine with `--shards` for multicore.
+
+The **native "extreme" tier** (`sim.zig` + `simulateNativeBatch`) compiles the
+SAME `kernel.zig` to a native, `std.Thread`-parallel binary. Measured **~1.65B
+spins/sec (100M spins in ~60ms on 10 threads)** - the fastest path. It is
+unsandboxed and a *separate* build from the served WASM, so its soundness rests
+on a **byte-parity test**: a native single slice is byte-identical to WASM
+`sim_batch` for the same seed (same kernel source, both IEEE-754). Run the
+parity test (skipped where zig is absent) whenever the kernel changes; use the
+native tier for offline certification of your own math only.
 
 ## Bun usage  - what makes the orchestrator fast
 
