@@ -18,7 +18,7 @@ the same contract is enforced regardless.
 | (subprocess) | spawn + length-prefixed msgpack stdio | Escape hatch for languages that don't WASM well. Slowest, most flexible. |
 
 `@open-rgs/core` ships a Lua loader (`loadLuaMath`) and a WASM loader
-(`loadWasmMath`, simple math; complex is planned). A TS loader
+(`loadWasmMath`, simple math only; complex is not yet supported). A TS loader
 (`loadTsMath`) is a planned peer. All loaders return a
 `Promise<MathModule>` that the manifest's `math:` field accepts. A WASM
 kernel runs ~15x faster than the equivalent Lua math (measured, 1-draw
@@ -28,9 +28,12 @@ construction, and ships as a hashable artifact for certification.
 **WASM watchdog caveat:** unlike the Lua loader, a running WASM call cannot be
 interrupted from JS, so `loadWasmMath` currently has **no per-call timeout** - a
 runaway kernel blocks the event loop (a DoS). Treat WASM kernels as trusted and
-bounded; `loadWasmMath` logs a warning at load to keep this visible. A timeout
-needs the kernel to run in a worker that can be `terminate()`-ed (planned: the
-shared math worker pool, which also moves math off the I/O thread).
+bounded; `loadWasmMath` logs a warning at load to keep this visible. For
+unbounded or untrusted WASM math, run it through **`createMathPool`** instead:
+it executes the kernel in a pool of Worker threads and enforces a per-call
+budget by `terminate()`-ing any worker that overruns (failing the round with
+`MATH_TIMEOUT`), which also moves math off the I/O thread. `loadWasmMath` is
+the fast trusted-kernel path; the pool is the fail-closed one.
 
 ## RNG seam
 
@@ -141,7 +144,7 @@ The loader:
   hidden, and the hook survives `debug = nil`, so sandboxed math cannot
   disable it.
 
-## WASM runtime details (planned)
+## WASM runtime details
 
 A WASM math module exposes these exports:
 
@@ -183,6 +186,14 @@ function, reads the output, then frees both.
 Source language: **Zig is the recommended default** for new WASM math.
 See **Spec 06** for performance rationale. Rust, AssemblyScript,
 TinyGo, and C all work.
+
+**Running a WASM kernel.** `loadWasmMath(path, { rng })` instantiates the
+kernel for direct, synchronous `play()` calls - the fast path, but with no
+execution watchdog (a runaway kernel blocks the event loop). For unbounded or
+untrusted math, `createMathPool({ wasmPath, size, timeoutMs })` runs the same
+kernel across Worker threads and enforces the per-call budget by terminating a
+worker that overruns - the fail-closed production path (see Guarantee 5). Both
+default to the secure `cryptoRng` and honor the same RNG seam described above.
 
 ## TS runtime details
 
@@ -232,9 +243,8 @@ restart                math is reloaded fresh; carry rehydrates from session.car
   workload (see **Spec 06**).
 - The same Lua source produces identical outputs given identical RNG
   sequences across two independent loader invocations.
-- A WASM math module conforming to the exports/imports above (when the
-  WASM loader ships) is interchangeable with a Lua module via a
-  manifest entry change only.
+- A WASM math module conforming to the exports/imports above is
+  interchangeable with a Lua module via a manifest entry change only.
 
 ## Open questions
 

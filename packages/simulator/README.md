@@ -81,6 +81,62 @@ console.log(mdReportSet(reports));
 
 Run it: `bun src/simulate.ts > report.md`.
 
+## Fast batch simulation (WASM + native Zig)
+
+`simulate()` above runs the math one spin at a time (the Lua path). When the
+math is a **WASM kernel** that exports `sim_batch`, the whole spin loop runs
+*inside* the kernel - 100M+ spins incur no per-spin `JS<->WASM` boundary, just
+one crossing per chunk. It uses a seeded in-VM PRNG and the same `decide`
+logic as the kernel's production `play`, so the measured RTP is exactly the
+shipped math's, on the same sandboxed artifact you serve (nothing to
+re-certify).
+
+```ts
+import { simulateWasmBatch } from "@open-rgs/simulator";
+
+const report = await simulateWasmBatch("./maths/play.wasm", {
+  spins:       100_000_000,
+  seed:        42,          // each chunk derives an independent substream
+  declaredRtp: 0.95,        // optional; else taken from the kernel's rtp_x10000
+});
+console.log(report.rtp.measured, report.rtp.verdict, report.hitRate);
+```
+
+Measured **~216M spins/sec single-threaded** (~250x the per-spin WASM path).
+The returned `WasmBatchReport` carries exact RTP + standard error + 95% CI +
+verdict, hit rate, and multiplier min/max/mean/stdDev (from the kernel's
+`count/sum/sumsq/min/max/hits` aggregate). Distribution percentiles and
+outcome-type / mark breakdowns are *not* produced by the fast path - use the
+per-spin `simulate()` for those. Combine with `--shards` for multicore.
+
+### Native "extreme" tier
+
+`simulateNativeBatch(binPath, opts)` runs a native build of the **same**
+`kernel.zig` (with `std.Thread` parallelism, so one call uses every core) for
+offline certification at billion-spin scale - measured **~1.65B spins/sec**
+(100M spins in ~60ms on 10 threads). It is **synchronous**:
+
+```ts
+import { simulateNativeBatch } from "@open-rgs/simulator";
+
+const report = simulateNativeBatch("./maths/sim", {
+  spins:       100_000_000,
+  seed:        42,
+  declaredRtp: 0.95,        // required - the native binary carries no RTP
+});
+```
+
+> ⚠️ The native tier is **unsandboxed** and a *separate* build from the WASM
+> you serve, so its soundness rests on a **byte-parity test**: a native
+> single-thread slice must be byte-identical to WASM `sim_batch` for the same
+> seed (same Zig source, both IEEE-754). Run that test whenever the kernel
+> changes, and use the native tier only to certify *your own* math.
+
+`reportFromAggregate(name, version, aggregate, declaredRtp, elapsedMs)` is the
+shared helper both tiers use to turn a raw `{count,sum,sumsq,min,max,hits}`
+aggregate into a `WasmBatchReport`. See `examples/hold-and-win` for a worked
+Zig kernel exercised through both tiers.
+
 ## What you get back
 
 One [`SimulationReport`](src/report.ts) per mode:

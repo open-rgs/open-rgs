@@ -36,7 +36,7 @@ const manifest = defineGame({
 
 await createServer({
   manifest,
-  platform:  new MockPlatform({ startingBalance: 100_00 }),
+  platform:  new MockPlatform({ startingBalance: 100_000 }),
   transport: binaryTransport({ port: Number(process.env.PORT ?? 80) }),
   version:   pkg.version,
   shutdownDrainMs: 30_000,

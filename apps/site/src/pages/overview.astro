@@ -5,7 +5,7 @@ import Mermaid from "../components/Mermaid.astro";
 
 <BaseLayout
   title="How it works (mile-high)  - open-rgs"
-  description="Mile-high overview of open-rgs: client transport, orchestrator, Lua math, platform adapter. One Bun process, one port, four interchangeable parts."
+  description="Mile-high overview of open-rgs: client transport, orchestrator, Lua/WASM math, platform adapter. One Bun process, one port, four interchangeable parts."
 >
   <main>
     <h1>How it works</h1>
@@ -24,7 +24,7 @@ flowchart TD
   subgraph RGS["one Bun process . one port"]
     direction TB
     Transport["TRANSPORT"]
-    Orch["ORCHESTRATOR<br/>. Lua math via wasmoon"]
+    Orch["ORCHESTRATOR<br/>. math: Lua or WASM (Zig)"]
     Transport --> Orch
   end
   Admin["admin http<br/>/livez . /healthz<br/>/admin/manifest<br/>/admin/autoclose"]
@@ -55,7 +55,7 @@ flowchart TD
         <tr>
           <td><strong>Math</strong></td>
           <td>RTP, ops, awaiting hints. Currency-blind. RNG injected via <code>host</code></td>
-          <td>write one Lua file per game shape</td>
+          <td>write a Lua file - or compile a WASM kernel (Zig) for certification</td>
         </tr>
         <tr>
           <td><strong>Adapter</strong></td>

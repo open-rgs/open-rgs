@@ -116,7 +116,11 @@ moving money on a bad value.
 - **Enforced by:** multiplier sanitization (non-finite -> hard error, negative
   -> clamp to 0), `assertFundedWin`, the math watchdog (`MATH_TIMEOUT`), and
   RNG fail-closed under `NODE_ENV=production`
-  (`specs/02-orchestrator.md`, `specs/03-math-runtime.md`).
+  (`specs/02-orchestrator.md`, `specs/03-math-runtime.md`). The watchdog is
+  per math runtime: the Lua loader arms a `debug.sethook` count hook; a WASM
+  kernel run via `createMathPool` is bounded by terminating the worker on
+  overrun. (Bare `loadWasmMath` has **no** watchdog and logs a warning at
+  load - use the pool for unbounded or untrusted WASM math.)
 - **Prevents:** a math bug becoming a *maximum* payout (the canonical
   `NaN <= cap` trap), negative settlements, and unauditable randomness in
   real-money play.
