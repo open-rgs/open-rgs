@@ -34,3 +34,32 @@ jobs:
 
       - name: Build site
         run: bun run --filter @open-rgs/site build
+
+  # A PR that changes published package SOURCE must carry a changeset, so no
+  # user-visible change ever ships without a changelog + version bump. Escape
+  # hatch for genuinely no-release src edits (pure refactor, comment): add an
+  # empty changeset with `bunx changeset add --empty`. Scoped to packages/*/src
+  # so docs / tests / examples / apps changes don't trip it.
+  changeset-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Require a changeset for source changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          src="$(git diff --name-only "$BASE_SHA"...HEAD | grep -E '^packages/[^/]+/src/' || true)"
+          cs="$(git diff --name-only --diff-filter=A "$BASE_SHA"...HEAD | grep -E '^\.changeset/.+\.md$' | grep -viE 'README\.md$' || true)"
+          if [ -n "$src" ] && [ -z "$cs" ]; then
+            echo "::error::Published source changed but no changeset was added."
+            echo "Run 'bun run changeset' to describe the release, or 'bunx changeset add --empty' if this ships nothing user-visible."
+            echo "--- changed source files ---"
+            printf '%s\n' "$src"
+            exit 1
+          fi
+          echo "changeset check OK"

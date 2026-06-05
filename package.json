@@ -15,7 +15,10 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p packages/contract && tsc --noEmit -p packages/log && tsc --noEmit -p packages/core && tsc --noEmit -p packages/platform-mock && tsc --noEmit -p packages/simulator && tsc --noEmit -p packages/adapter-kit && tsc --noEmit -p packages/adapter-test-kit && tsc --noEmit -p packages/client",
-    "test": "bun --filter '@open-rgs/simulator' test",
+    "test": "bun test",
+    "test:core": "bun test packages/core",
+    "test:sim": "bun test packages/simulator",
+    "test:examples": "bun test examples",
     "site:dev": "npm --workspace apps/site run dev",
     "site:build": "npm --workspace apps/site run build",
     "site:preview": "npm --workspace apps/site run preview",
