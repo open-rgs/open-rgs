@@ -39,7 +39,7 @@ one of three source forms - same contract, swappable by a manifest entry:
 | Loader | Source | Use case |
 |--------|--------|----------|
 | `loadLuaMath(path, opts?)` | `.lua` via wasmoon (Lua 5.4 -> WASM) | Default. Cheap to write, hot-reloadable. Per-call watchdog (`debug.sethook`). |
-| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~15x faster than Lua. Simple math only. |
+| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~15x faster than Lua. Simple or complex. |
 | `createMathPool(opts)` | the same `.wasm` kernel, in a Worker pool | The **fail-closed** way to run WASM math: per-call timeout enforced by `terminate()`. |
 
 ### Compiled (WASM / Zig) math
@@ -84,6 +84,13 @@ The pool runs the kernel on Worker threads (off the I/O thread) and **kills**
 any worker that overruns the budget, failing the round with `MATH_TIMEOUT` and
 replacing the worker. This is the WASM tier's enforcement of Guarantee 5
 (Fail Closed / no-DoS). v1 is simple (single `play`) math.
+
+**Complex rounds.** A kernel with `kind=1` and `open` / `step` / `is_terminal` /
+`close` (+ optional `autoclose`) exports loads as complex math. Core threads the
+kernel's serialized `state` (base64) back into each call; the kernel keeps
+nothing between calls. See `examples/cash-ladder` for a worked Zig kernel and
+`specs/03-math-runtime.md` for the ABI. (The pool is simple-only today, so a
+complex kernel has no fail-closed timeout yet — keep it trusted.)
 
 Why Zig for kernels: comptime RTP invariants, no GC pauses, no JIT warmup,
 tiny hashable output, and one source that compiles to **both** WASM (server)
