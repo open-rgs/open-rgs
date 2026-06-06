@@ -136,7 +136,9 @@ const pooled = await createMathPool({
       but killing a tight-loop runaway via <code>terminate()</code> is
       platform-dependent - keep WASM kernels trusted. See <code>examples/hold-and-win</code> for a
       worked Zig kernel (with its <code>zig build-exe</code> commands and a
-      native multithreaded sim).
+      native multithreaded sim), and <code>examples/twin-slot</code> /
+      <code>examples/twin-gamble</code> for the same math written in both Lua and
+      Zig, with a test proving the two runtimes are 1:1.
     </p>
 
     <h2 data-section="§ 8">RNG (secure by default)</h2>

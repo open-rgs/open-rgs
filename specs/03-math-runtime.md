@@ -202,7 +202,9 @@ base64-encodes it into the string (and base64-decodes it back before the next
 call): the kernel sees bytes, core sees an opaque string. `open` / `step`
 return `{ state, ops, awaiting? }` (omit `awaiting` once the round is terminal);
 `close` / `autoclose` return `{ multiplier, ops, type, carry?, next_mode? }`.
-See `examples/cash-ladder` for a worked Zig kernel.
+See `examples/cash-ladder` for a worked Zig kernel, and `examples/twin-slot` /
+`examples/twin-gamble` for the **same** math written in *both* Lua and Zig with a
+test proving the two runtimes are 1:1 (a simple round and a complex round).
 
 Source language: **Zig is the recommended default** for new WASM math.
 See **Spec 06** for performance rationale. Rust, AssemblyScript,
