@@ -1,5 +1,58 @@
 # @open-rgs/simulator
 
+## 1.2.0
+
+### Minor Changes
+
+- [#27](https://github.com/open-rgs/open-rgs/pull/27) [`8b46c12`](https://github.com/open-rgs/open-rgs/commit/8b46c124cdde3c73d69423e28c59fe487cb88ee5) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(simulator): native multithreaded simulator (extreme tier), ~1.65B spins/sec
+
+  `simulateNativeBatch(binPath, opts)` drives a standalone native sim binary — built from the **same `kernel.zig`** as the WASM you ship, parallelised with `std.Thread` (rayon is Rust; this is the Zig equivalent) — and returns the same focused RTP report as `simulateWasmBatch`. **Measured ~1.65B spins/sec: 100M spins in ~60ms on 10 threads** — the fastest path.
+
+  Soundness rests on a **byte-parity test**: a native single slice is byte-identical to WASM `sim_batch` for the same seed (shared kernel source, both IEEE-754 f64). The test builds the binary with zig and is **skipped where zig is absent** (e.g. CI), so it never blocks the suite. The native binary is **not sandboxed** and is a **separate build** from the served WASM — use it for offline certification of your own math only, and re-run the parity test whenever the kernel changes.
+
+  Also exports `reportFromAggregate` (+ `BatchAggregate`), shared by both batch simulators. The reference kernel is split into `kernel.zig` (shared `decide` + PRNG + stats), `play.zig` (→ `play.wasm`: `play` + `sim_batch`), and `sim.zig` (→ native binary); the WASM `play`/`sim_batch` behaviour is unchanged.
+
+- [#37](https://github.com/open-rgs/open-rgs/pull/37) [`69b4328`](https://github.com/open-rgs/open-rgs/commit/69b43280e0bce4c4061fa53ffc2089b49a217f0e) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(simulator): play-flow graph - SEE how interactive rounds were played
+
+  A single RTP number says how much, not how. `simulate({ flow })` now records a
+  **play-flow graph**: a little Markov chain of how complex rounds were actually
+  played - decision nodes, the action taken, and the transition probability. It's
+  attached to `report.flow` and rendered by `mdReport` as a **Mermaid flowchart**
+  (reads like a Markov chain; renders inline on GitHub and the docs site) plus a
+  transition table.
+
+  Pass `flow: true` to label nodes by `awaiting.type`, or `flow: { label }` to
+  bucket nodes from the PUBLIC context (`awaiting` + `ops`) - never the opaque
+  state, so the view can't depend on hidden info. Off by default (zero overhead).
+
+  New exports: `createFlowRecorder`, `flowToMermaid`, `flowToMarkovTable`,
+  `FlowGraph`, `FlowEdge`, `FlowContext`, `FlowLabel`. The goal: make interactive
+  (complex / options) game math easy to eyeball and test - run it, look at the
+  chart, check the transitions match intent. See `examples/gamble-slot` (the
+  gamble-or-collect ladder visualized as a Markov chain).
+
+- [#35](https://github.com/open-rgs/open-rgs/pull/35) [`d5b57c4`](https://github.com/open-rgs/open-rgs/commit/d5b57c4e47ca07b7ac031a6575c2edbe654b13eb) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(simulator): pluggable complex-round strategy (policy function)
+
+  `simulate({ complexStrategy })` accepted only `"first"` / `"random"`. It now also
+  takes a **policy function** `(ctx) => PlayerAction`, where `ctx` is the public
+  context at each decision - `awaiting`, the latest public `ops`, the step index,
+  and the seeded rng. This is how you simulate games whose RTP depends on player
+  choices: "keep gambling N times", a gamble-to-target rule, an optimal solver.
+
+  The strategy deliberately sees only what a real client sees (`awaiting` + `ops`),
+  never the opaque round `state`, so simulated policies can't cheat on hidden info.
+
+  Exports: `StrategyFn`, `StrategyContext`, `ComplexStrategy`. The built-in
+  `"first"` / `"random"` names are unchanged. (A complementary in-kernel self-play
+  tier - a fixed policy baked into the WASM kernel for ~native-speed policy sweeps -
+  is shown in `examples/cash-ladder` via its `sim_ladder` export.)
+
+- [#26](https://github.com/open-rgs/open-rgs/pull/26) [`f5bc306`](https://github.com/open-rgs/open-rgs/commit/f5bc306b7e81347bab128795e586aabd81dda273) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(simulator): `simulateWasmBatch` — in-WASM batch simulation, ~216M spins/sec
+
+  `simulateWasmBatch(wasmPath, opts)` runs the entire spin loop **inside** a WASM math kernel — via a `sim_batch` export (a seeded in-VM xoshiro256++ plus the same `decide` logic the kernel's `play` uses) — so there is no per-spin JS↔WASM boundary, only one crossing per chunk. **Measured ~216M spins/sec single-threaded (100M spins in ~0.46s)**, roughly 250× the per-spin WASM path. It's the **same sandboxed artifact you serve** — the batch measures the production `play` logic by construction, so there's nothing to re-certify.
+
+  Returns a focused RTP-certification report: measured RTP + 95% CI + verdict, hit rate, and the multiplier mean / stdDev / min / max — all **exact** from the kernel's `(count, sum, sumsq, min, max, hits)` aggregate. Distribution percentiles and outcome-type / mark breakdowns are not produced by the fast path (use the per-spin simulator for those). Each chunk draws an independent substream; results are deterministic per seed. Pair with `--shards` for multicore. (The reference kernel in the core test fixtures gains the `decide` + `sim_batch` exports.)
+
 ## 1.1.0
 
 ### Minor Changes

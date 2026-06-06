@@ -1,5 +1,48 @@
 # @open-rgs/core
 
+## 1.5.0
+
+### Minor Changes
+
+- [#34](https://github.com/open-rgs/open-rgs/pull/34) [`586e4a1`](https://github.com/open-rgs/open-rgs/commit/586e4a16d1389db650d34039b8574a9cbe2ace24) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(core): complex WASM math (open/step/close) in loadWasmMath
+
+  `loadWasmMath` now supports **complex** kernels (`kind=1`) - `open` / `step` /
+  `is_terminal` / `close` plus optional `autoclose` - not just simple `play`.
+
+  The loader owns the state boundary: a complex round's `state` is an opaque
+  _string_ in the contract, but a kernel's state is bytes, so the kernel emits
+  `state` as a MessagePack `bin` and the loader base64-encodes it into the
+  `RoundState` string (and decodes it back before the next call). The kernel stays
+  binary-native; core sees an opaque string it threads across calls.
+
+  Worked Zig example in `examples/cash-ladder`; ABI pinned in
+  `specs/03-math-runtime.md`. Note: `createMathPool` is still simple-only, so a
+  complex WASM kernel has no fail-closed execution timeout yet - keep complex
+  kernels trusted and bounded.
+
+- [#23](https://github.com/open-rgs/open-rgs/pull/23) [`d08ee95`](https://github.com/open-rgs/open-rgs/commit/d08ee955c6f8668a6520536f012e5201586fb784) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - perf(core): Lua-native `host` table (~3–5× on RNG-heavy math) + opt-in `rngMode: "seed-expand"`
+
+  The math `host` was a JS-backed object, so every `host.rng_next()` — read once per draw — crossed the JS↔WASM boundary through the proxy's `__index` (~4.3 µs/access, measured), dominating draw-heavy math. `host` is now built as a pure Lua table that references the JS hooks, making `host.rng_next` a cheap Lua index. Measured **~3.1× (10 draws/spin) to ~5.3× (50 draws/spin)** faster on the RNG hot path — by default, with no behaviour or certification change (the same injected `rng` still determines outcomes).
+
+  New opt-in `loadLuaMath({ rngMode: "seed-expand" })`: draws one seed per math call from the injected `rng` and expands it in-VM with **xoshiro256++** (multiply-free; bit-verified against a reference; uniform), so the math draws with zero per-draw crossings — a further win for draw-heavy math (**~9.2× vs the old default at 50 draws/spin**). Each call is reseeded independently and the generator is hidden from the (untrusted) math. CERT NOTE: under `"seed-expand"` the expansion enters the outcome-determination path and must be evaluated as part of the RNG; the default stays `"per-draw"` (unchanged).
+
+- [#30](https://github.com/open-rgs/open-rgs/pull/30) [`6ad4e0e`](https://github.com/open-rgs/open-rgs/commit/6ad4e0efc3dd418f59d6f8197b6f419444804379) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(core): `createMathPool` — run WASM math in a worker pool, off the I/O thread
+
+  `createMathPool({ wasmPath, size, timeoutMs })` runs a WASM math kernel across a pool of Worker threads, off the orchestrator's I/O thread, and returns a `SimpleMath`-shaped async math (plus `shutdown()`).
+
+  - **Performance:** math executes on worker threads → concurrency under load; a single spin never blocks the event loop.
+  - **Round-level fail-closed:** a call that overruns its `timeoutMs` budget rejects with `MATH_TIMEOUT` (the round refuses to pay a hung/overrunning value, and the connection isn't left waiting) and the worker is replaced, so the pool stays usable.
+
+  **Not a portable no-DoS sandbox.** Failing the round closed is the portable guarantee; the worker is also `terminate()`d, but whether terminate() kills a tight synchronous runaway (`while(true){}`) is platform-dependent — in our testing it did on Linux, did not on Bun+macOS — so on some platforms a runaway thread can leak (keep a core busy). Treat WASM kernels as **trusted and bounded** (same posture as bare `loadWasmMath`); the pool buys off-thread concurrency + round-level failure. A hard, cross-platform no-DoS kill needs process isolation (SIGKILL) — a follow-up. (Only the Lua loader's in-VM `debug.sethook` watchdog preempts a tight loop on any platform.)
+
+  Each worker loads the kernel with a worker-local secure RNG (`cryptoRng`). v1 covers simple (single `play`) WASM math; complex (`open`/`step`/`close`) and a process-isolated no-DoS pool are follow-ups.
+
+- [#25](https://github.com/open-rgs/open-rgs/pull/25) [`4bb55e1`](https://github.com/open-rgs/open-rgs/commit/4bb55e11aafdd07f49a69a937253ca5d7a2ac9d3) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - feat(core): `loadWasmMath` — WASM math kernels (simple), ~14× faster than Lua
+
+  New `loadWasmMath(path, opts)` loads a `.wasm` math kernel conforming to the spec ABI (specs/03-math-runtime.md) and adapts it to `MathModule` — the orchestrator can't tell it from a Lua math. A WASM kernel runs **~14× faster than the equivalent Lua math** (measured on identical math; reproduce with `examples/twin-slot/src/bench.ts`): it calls the `host.rng_next` import directly with no per-draw JS↔WASM proxy tax, stays **sandboxed by construction**, and ships as a **hashable artifact** for certification. I/O is MessagePack over linear memory; RNG resolution is shared with `loadLuaMath` (secure system CSPRNG by default, fail-closed in production). A reference Zig kernel and the built `.wasm` are in the core test fixtures.
+
+  Scope (this entry): **simple** math (single `play`); **complex** WASM math (`open`/`step`/`close`/`is_terminal`) ships in the same release as its own change. Internal: the Lua→TS outcome adapters were extracted to a shared `math-adapt` module so both loaders normalise outcomes identically, and `resolveRng` is shared so the WASM loader inherits the exact secure-default / fail-closed policy.
+
 ## 1.4.0
 
 ### Minor Changes
