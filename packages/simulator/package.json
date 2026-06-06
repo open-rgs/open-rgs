@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/simulator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Per-mode RTP + hit-rate simulator and report generator for open-rgs games. Library + `open-rgs-sim` CLI (run via bunx).",
   "license": "MIT",
   "engines": {
