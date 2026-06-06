@@ -39,7 +39,7 @@ one of three source forms - same contract, swappable by a manifest entry:
 | Loader | Source | Use case |
 |--------|--------|----------|
 | `loadLuaMath(path, opts?)` | `.lua` via wasmoon (Lua 5.4 -> WASM) | Default. Cheap to write, hot-reloadable. Per-call watchdog (`debug.sethook`). |
-| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~15x faster than Lua. Simple or complex. |
+| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~14x faster than Lua (measured - `examples/twin-slot/src/bench.ts`). Simple or complex. |
 | `createMathPool(opts)` | the same `.wasm` kernel, in a Worker pool | Off the I/O thread; **fails the round** closed on a per-call timeout. Worker-kill is best-effort/platform-dependent (see below). |
 
 ### Compiled (WASM / Zig) math

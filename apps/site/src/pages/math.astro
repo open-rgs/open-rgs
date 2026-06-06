@@ -110,7 +110,8 @@ const math = await loadLuaMath("./maths/spin.lua", {
       WebAssembly - typically in <strong>Zig</strong> (Rust, TinyGo, C also
       work) - and load it instead of Lua. Same <code>MathModule</code>
       contract; the orchestrator can't tell the difference. A WASM kernel runs
-      ~15x faster than the equivalent Lua and ships as one hashable artifact.
+      ~14x faster than the equivalent Lua (measured; reproduce with
+      <code>examples/twin-slot/src/bench.ts</code>) and ships as one hashable artifact.
     </p>
 
     <p>Build the kernel to WASM with zig, then point a manifest mode at the <code>.wasm</code>:</p>
