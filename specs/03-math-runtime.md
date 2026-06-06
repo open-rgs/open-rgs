@@ -21,8 +21,9 @@ the same contract is enforced regardless.
 (`loadWasmMath`, both simple and complex math). A TS loader
 (`loadTsMath`) is a planned peer. All loaders return a
 `Promise<MathModule>` that the manifest's `math:` field accepts. A WASM
-kernel runs ~15x faster than the equivalent Lua math (measured, 1-draw
-distribution) with no per-draw boundary tax, stays sandboxed by
+kernel runs ~14x faster than the equivalent Lua math (measured on
+*identical* math - see `examples/twin-slot` / `examples/twin-gamble` and their
+`src/bench.ts`) with no per-draw boundary tax, stays sandboxed by
 construction, and ships as a hashable artifact for certification.
 
 **WASM watchdog caveat:** unlike the Lua loader, a running WASM call cannot be
