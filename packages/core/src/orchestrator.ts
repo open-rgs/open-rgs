@@ -90,6 +90,9 @@ async function timedPlatformCall<T>(
   try {
     const out = await fn();
     metrics.platformDuration.observe((performance.now() - start) / 1000, { method });
+    // SLA freshness: the wallet answered. `time() - this` going large while
+    // rgs_platform_connected is still 1 = connected-but-silent wallet.
+    metrics.platformLastOk.set(Date.now() / 1000);
     return out;
   } catch (e) {
     metrics.platformDuration.observe((performance.now() - start) / 1000, { method });

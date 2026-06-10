@@ -15,12 +15,15 @@ let inner: Logger = createLogger({
 
 interface CoreLog extends Logger {
   /** Re-init the singleton with service identity. Called once from
-   *  createServer(). Safe to call before any log lines are emitted. */
-  init(name: string, version: string, isDev: boolean): void;
+   *  createServer(). Safe to call before any log lines are emitted.
+   *  `instanceId` (when given) is bound onto EVERY line as
+   *  `service.instance.id`, so logs correlate with the `instance_id`
+   *  metric label and /healthz. */
+  init(name: string, version: string, isDev: boolean, instanceId?: string): void;
 }
 
 export const log: CoreLog = {
-  init(name: string, version: string, isDev: boolean) {
+  init(name: string, version: string, isDev: boolean, instanceId?: string) {
     const env = process.env["LOG_LEVEL"];
     const minLevel: LogLevel | undefined =
       env === "debug" || env === "info" || env === "warn" || env === "error" || env === "fatal"
@@ -32,6 +35,9 @@ export const log: CoreLog = {
       environment: isDev ? "development" : "production",
       minLevel,
     });
+    // child() shares the ring buffer and level with its parent - swapping
+    // the singleton for a bound child keeps getRecent()/setLevel() intact.
+    if (instanceId) inner = inner.child({ "service.instance.id": instanceId });
   },
   debug: (m, f) => inner.debug(m, f),
   info:  (m, f) => inner.info(m, f),

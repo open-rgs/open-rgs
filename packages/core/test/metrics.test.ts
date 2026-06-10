@@ -84,3 +84,21 @@ describe("@open-rgs/core metrics", () => {
     expect(() => r.counter("dupe", "second")).toThrow();
   });
 });
+
+describe("instance identity + platform SLA series", () => {
+  test("createRgsMetrics registers build_info and platform SLA metrics", async () => {
+    const { createRgsMetrics } = await import("../src/metrics-rgs.js");
+    const m = createRgsMetrics();
+    m.buildInfo.set(1, {
+      instance_id: "rgs-test1234", game: "g", core_version: "x", game_version: "y",
+    });
+    m.platformConnected.set(1);
+    m.platformTransitions.inc(1, { direction: "down" });
+    m.platformLastOk.set(1234567890);
+    const text = m.registry.expose();
+    expect(text).toContain('rgs_build_info{instance_id="rgs-test1234",game="g",core_version="x",game_version="y"} 1');
+    expect(text).toContain("rgs_platform_connected 1");
+    expect(text).toContain('rgs_platform_connection_transitions_total{direction="down"} 1');
+    expect(text).toContain("rgs_platform_last_ok_timestamp_seconds 1234567890");
+  });
+});
