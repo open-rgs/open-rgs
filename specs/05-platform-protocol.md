@@ -114,11 +114,25 @@ When implemented, it MUST honour Guarantee 2 (`specs/00-guarantees.md`):
 - **No-op, not error, when nothing to reverse.** An unknown or already-reversed
   round returns `{ reversed: false, reason }` and moves no money  - reversing
   twice must not credit twice. Idempotency-key dedupe applies as elsewhere.
+- **Safe under concurrency.** Because reversal is wallet-initiated, it arrives
+  *outside* the orchestrator's per-session lock  - that lock serializes only
+  client-driven traffic, so nothing upstream of the adapter orders a reversal
+  against an in-flight `settleSimple`/`openComplex`/`closeComplex` on the same
+  session. An adapter MUST implement `reverseRound` to be safe under concurrent
+  invocation with those calls (its own per-session mutex, an upstream
+  transaction  - the mechanism is the adapter's choice).
+- **Durable tracking.** A real adapter MUST persist its reversed-round
+  tracking  - the reversal receipts it replays on a repeat, the set of
+  already-reversed rounds, and the ordering basis behind latest-first  -
+  durably, so it survives a process restart. An adapter that forgets prior
+  reversals on restart turns a retried reversal into a second credit.
 
-The reference `@open-rgs/platform-mock` implements this correctly (a per-session
-LIFO stack of `(roundId, balanceBefore, carryBefore)` snapshots); the
-conformance suite asserts the whole-record, latest-first, and no-double-credit
-properties.
+The reference `@open-rgs/platform-mock` implements these semantics correctly (a
+per-session LIFO stack of `(roundId, balanceBefore, carryBefore)` snapshots,
+plus a receipt map for idempotent replay). It keeps all of that **in memory**  -
+by design, it is a dev mock  - so it is deliberately not a model for the
+durable-tracking rule above. The conformance suite asserts the whole-record,
+latest-first, and no-double-credit properties.
 
 ### Health
 

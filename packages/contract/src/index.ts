@@ -532,7 +532,22 @@ export interface RoundReceipt {
  *  a session may be reversed; an adapter MUST reject an attempt to reverse an
  *  older round while newer rounds sit on top of it (restoring an old round's
  *  pre-state would silently discard the newer rounds and over-refund). A wallet
- *  reversing a span of rounds reverses them newest-to-oldest. */
+ *  reversing a span of rounds reverses them newest-to-oldest.
+ *
+ *  CONCURRENCY  - because reversal is wallet-initiated, it arrives OUTSIDE the
+ *  orchestrator's per-session lock; that lock serializes only client-driven
+ *  traffic, so nothing upstream of the adapter orders a reversal against an
+ *  in-flight settle/open/close on the same session. An adapter MUST implement
+ *  reverseRound to be safe under concurrent invocation with those calls (its
+ *  own per-session mutex, an upstream transaction  - the mechanism is the
+ *  adapter's choice).
+ *
+ *  DURABILITY  - a real adapter MUST persist its reversed-round tracking (the
+ *  reversal receipts it replays, the set of already-reversed rounds, and the
+ *  ordering basis behind latest-first) durably, so it survives a process
+ *  restart. An adapter that forgets prior reversals on restart turns a retried
+ *  reversal into a second credit. The reference mock's in-memory stack is a
+ *  mock-only convenience, not a model for production. */
 export interface ReverseRound {
   sessionId: string;
   /** The round to reverse. MUST be the latest un-reversed round on the session. */
@@ -544,6 +559,11 @@ export interface ReverseRound {
   idempotencyKey?: string;
 }
 
+/** Result of a reversal. Receipts are part of the adapter's durable
+ *  reversed-round record: a repeated reversal of the same round (or a repeated
+ *  idempotency key) MUST replay the stored receipt rather than credit again,
+ *  which only holds if the receipts survive a process restart  - see
+ *  DURABILITY on {@link ReverseRound}. */
 export interface ReverseReceipt {
   roundId: string;
   /** Balance after the reversal  - restored to the round's pre-settle value. */
@@ -598,8 +618,13 @@ export interface PlatformAdapter {
   /** Reverse an already-settled round (chargeback / reconciliation). Optional  -
    *  implement only if your upstream supports reversal. MUST undo money AND
    *  carry together, latest-first; see {@link ReverseRound} (Guarantee 2,
-   *  "One Round, One Record"). The reference @open-rgs/platform-mock implements
-   *  it correctly and the conformance suite checks it. */
+   *  "One Round, One Record"). Because it is wallet-initiated it is NOT
+   *  covered by the orchestrator's per-session lock  - it MUST be safe to
+   *  invoke concurrently with settleSimple/openComplex/closeComplex on the
+   *  same session  - and a real adapter MUST keep its reversed-round tracking
+   *  durable across restarts. The reference @open-rgs/platform-mock implements
+   *  the semantics correctly (in memory  - it's a mock) and the conformance
+   *  suite checks them. */
   reverseRound?(req: ReverseRound): Promise<ReverseReceipt>;
 
   onEvent(handler: (e: PlatformEvent) => void): void;
