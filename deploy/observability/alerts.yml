@@ -1,0 +1,126 @@
+# Prometheus alert rules for an open-rgs fleet. Load via rule_files in
+# prometheus.yml. Thresholds are sensible defaults - tune to your
+# traffic. All series are documented in specs/07-deployment.md
+# ("Instance identity & metrics scraping").
+
+groups:
+  - name: open-rgs
+    rules:
+      # The wallet is gone for at least one instance. Players on that
+      # instance cannot bet - page someone.
+      - alert: RgsPlatformDisconnected
+        expr: min(rgs_platform_connected) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Platform adapter disconnected"
+          description: >-
+            At least one RGS instance reports rgs_platform_connected == 0
+            for over a minute. The wallet is unreachable from that
+            instance; rounds there cannot settle.
+
+      # The connected-but-silent wallet: the socket is up but no RPC has
+      # succeeded fleet-wide in 30s. This catches a hung wallet that a
+      # connectivity gauge alone would miss.
+      - alert: RgsWalletSilent
+        expr: >-
+          (time() - max(rgs_platform_last_ok_timestamp_seconds)) > 30
+          and (min(rgs_platform_connected) == 1)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Wallet connected but not answering"
+          description: >-
+            No RGS instance has had a successful platform RPC in over 30s
+            even though every adapter still reports connected. The wallet
+            is up but silent - likely hung or deadlocked upstream.
+
+      # Connection flapping - the wallet link is unstable even if it is
+      # nominally "up" right now.
+      - alert: RgsPlatformFlapping
+        expr: sum(rate(rgs_platform_connection_transitions_total[10m])) * 60 > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Platform connection flapping"
+          description: >-
+            The fleet is averaging more than 2 platform connection
+            transitions per minute over the last 10 minutes. Check the
+            wallet endpoint and the network path.
+
+      # Live RTP drifting from the declared line. NOTE: short-window RTP
+      # is noisy BY NATURE - a single max-win hit moves a quiet fleet by
+      # whole percentage points. 6h / 5pp is a compromise; widen both
+      # for low-traffic deployments before trusting this alert.
+      - alert: RgsRtpDrift
+        expr: >-
+          abs(
+            sum(increase(rgs_wins_minor_total[6h]))
+              / sum(increase(rgs_bets_minor_total[6h]))
+            - avg(rgs_declared_rtp)
+          ) > 0.05
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Live RTP drifting from declared"
+          description: >-
+            Live RTP over the last 6h differs from the declared RTP by
+            more than 5 percentage points. Could be variance (big hits on
+            low volume), could be a math or config regression - check
+            round volume first, then the math version in rgs_build_info.
+
+      # Negative GGR for an hour: the house paid out more than it took
+      # in. EXPECTED occasionally - big hits happen, that is what max
+      # win caps are for. This is a look-at-it signal, not a page.
+      - alert: RgsNegativeGgrHour
+        expr: >-
+          sum(increase(rgs_bets_minor_total{funding="real"}[1h]))
+            - sum(increase(rgs_wins_minor_total[1h]))
+          < 0
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Negative GGR over the last hour"
+          description: >-
+            Wins paid exceeded real stakes over the last hour. This is
+            expected occasionally - a single big hit can flip an hour
+            negative. Glance at the win distribution; only investigate
+            if it repeats or correlates with an RTP drift alert.
+
+      # Instances appearing/disappearing rapidly - crash loops or an
+      # over-eager autoscaler. Each rgs_build_info series is one
+      # instance; the count moving a lot means churn.
+      - alert: RgsInstanceChurn
+        expr: changes(count(rgs_build_info)[30m:1m]) > 6
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RGS instance count churning"
+          description: >-
+            The number of live instances (rgs_build_info series) changed
+            more than 6 times in 30 minutes. Normal HPA scaling moves
+            this too - tune the threshold to your autoscaler's cadence,
+            but sustained churn usually means crash-looping pods.
+
+      # Platform RPC error budget: more than 5% of wallet calls failing.
+      - alert: RgsErrorBudget
+        expr: >-
+          sum(rate(rgs_platform_call_errors_total[5m]))
+            / sum(rate(rgs_platform_call_duration_seconds_count[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Platform RPC error rate above 5%"
+          description: >-
+            More than 5% of platform adapter RPCs failed over the last
+            5 minutes. Break down rgs_platform_call_errors_total by
+            method and reason (timeout / disconnected / ...) to locate
+            the failing call.

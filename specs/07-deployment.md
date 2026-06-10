@@ -309,6 +309,8 @@ await createServer({ manifest: gambleCherry, platform, transport: binaryTranspor
 - Should we publish a Helm chart? **Probably eventually**; Spec 09
   tracks it.
 - Should the deploy template include a Prometheus ServiceMonitor?
-  Metrics ship today on `/admin/metrics` (see "Instance identity &
-  metrics scraping" above); a ServiceMonitor example lands with the
-  observability pack under `deploy/`. **Open: template only.**
+  **Resolved: plain scrape config instead.** The observability pack
+  (`deploy/observability/` - scrape config, alert rules, Grafana
+  dashboard) uses a raw `kubernetes_sd_configs` job, which works on
+  any Prometheus; prometheus-operator users can transcribe it into a
+  ServiceMonitor/PodMonitor trivially.

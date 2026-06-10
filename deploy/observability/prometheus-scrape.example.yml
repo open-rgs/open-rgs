@@ -1,0 +1,55 @@
+# Example Prometheus scrape config for open-rgs game servers.
+#
+# /admin/metrics is bearer-token protected (OPEN_RGS_ADMIN_TOKEN on the
+# server side). Metrics are pod-local: scrape EVERY instance and
+# aggregate in dashboards - never put a load balancer between
+# Prometheus and the pods.
+#
+# Two jobs below - static targets and Kubernetes pod discovery. Pick
+# the one that matches your environment; you don't need both. Keep the
+# job label "rgs" either way (the dashboard and alert rules default to
+# it).
+
+scrape_configs:
+  # --- Option A: static targets (bare metal / docker compose) --------
+  - job_name: rgs
+    metrics_path: /admin/metrics
+    authorization:
+      type: Bearer
+      credentials: <admin-token>          # = OPEN_RGS_ADMIN_TOKEN
+      # ...or keep it out of this file:
+      # credentials_file: /etc/prometheus/secrets/rgs-admin-token
+    static_configs:
+      - targets:
+          - rgs-1.internal:8080
+          - rgs-2.internal:8080
+
+  # --- Option B: Kubernetes pod discovery ----------------------------
+  # Discovers every pod of the Deployment, so scraping follows the HPA.
+  - job_name: rgs-k8s
+    metrics_path: /admin/metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/rgs-admin-token
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [<namespace>]
+    relabel_configs:
+      # Keep only the game-server pods (app: rgs-<game-id> in
+      # deploy/k8s/deployment.yml).
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: rgs-.*
+        action: keep
+      # Scrape the named "ws" container port (admin shares it).
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        regex: ws
+        action: keep
+      # Normalize the job label so dashboards/alerts see job="rgs".
+      - target_label: job
+        replacement: rgs
+      # Pod name as the instance label - matches OPEN_RGS_INSTANCE_ID
+      # when set via the downward API, so `instance` and `instance_id`
+      # line up one-to-one.
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: instance

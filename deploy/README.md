@@ -22,6 +22,8 @@ See `examples/` in this repo for fully-worked references.
 - `docker/compose.yml`  - local dev stack with the mock wallet.
 - `k8s/deployment.yml`  - minimal Deployment + Service manifests.
 - `k8s/hpa.yml`  - HorizontalPodAutoscaler for CPU-driven scaling.
+- `observability/`  - Prometheus scrape config + alert rules and a
+  Grafana dashboard for the standard `rgs_*` series.
 
 ## Quick start (local Docker)
 
