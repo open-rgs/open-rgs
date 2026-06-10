@@ -38,6 +38,21 @@ export interface RgsMetrics {
    *  `time() - rgs_platform_last_ok_timestamp_seconds` to catch a wallet
    *  that is "connected" but not answering. */
   platformLastOk: Gauge;
+  /** Stakes, in the currency's minor unit. funding="real" counts the actual
+   *  debit (the effective cost incl. price/stake multipliers - fractional
+   *  ante costs allowed); funding="promo" counts the NOTIONAL bet of a
+   *  platform-funded free round (no player debit). Monotonic in-process
+   *  counters: GGR and RTP are DERIVED at query time, which is the only way
+   *  ratios aggregate correctly across a fleet -
+   *    GGR  = sum(rgs_bets_minor_total{funding="real"}) - sum(rgs_wins_minor_total)
+   *    RTP  = sum(increase(rgs_wins_minor_total[w])) / sum(increase(rgs_bets_minor_total[w])) */
+  betsMinor: Counter;           // {currency, mode, funding}
+  /** Wins credited, in the currency's minor unit, labelled by the funding
+   *  of the round that produced them. */
+  winsMinor: Counter;           // {currency, mode, funding}
+  /** Declared/theoretical RTP per mode - the target line dashboards draw
+   *  against live RTP. */
+  declaredRtp: Gauge;           // {mode}
 }
 
 export function createRgsMetrics(): RgsMetrics {
@@ -97,6 +112,21 @@ export function createRgsMetrics(): RgsMetrics {
     platformLastOk: registry.gauge(
       "rgs_platform_last_ok_timestamp_seconds",
       "Unix time of the last successful platform RPC.",
+    ),
+    betsMinor: registry.counter(
+      "rgs_bets_minor_total",
+      "Stakes in minor units. funding=real is the actual debit; funding=promo the notional free-round bet.",
+      ["currency", "mode", "funding"],
+    ),
+    winsMinor: registry.counter(
+      "rgs_wins_minor_total",
+      "Wins credited in minor units, by the round's funding.",
+      ["currency", "mode", "funding"],
+    ),
+    declaredRtp: registry.gauge(
+      "rgs_declared_rtp",
+      "Declared/theoretical RTP per mode.",
+      ["mode"],
     ),
   };
 }

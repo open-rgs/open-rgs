@@ -7,6 +7,10 @@ export interface LabelMap { readonly [k: string]: string }
 
 export interface Counter {
   inc(value?: number, labels?: LabelMap): void;
+  /** Read back current values per label-set (key = `k=v,k=v` in label-name
+   *  order, "" for unlabelled). For in-process consumers - e.g. the
+   *  financial snapshot log - that want the totals without scraping. */
+  snapshot(): ReadonlyArray<{ labels: string; value: number }>;
 }
 export interface Gauge {
   set(value: number, labels?: LabelMap): void;
@@ -98,6 +102,10 @@ class CounterImpl implements Counter, Metric {
   inc(value = 1, labels?: LabelMap): void {
     const k = labelKey(labels, this.labelNames);
     this.values.set(k, (this.values.get(k) ?? 0) + value);
+  }
+
+  snapshot(): ReadonlyArray<{ labels: string; value: number }> {
+    return [...this.values].map(([labels, value]) => ({ labels, value }));
   }
 
   expose(): string {

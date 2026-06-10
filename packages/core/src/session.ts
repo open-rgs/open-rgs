@@ -45,6 +45,10 @@ export interface OpenRound {
   opsLog: Op[];
   /** Wall-clock ms epoch when the round opened. */
   openedAt: number;
+  /** Promo pool id when this round is platform-funded (no player debit).
+   *  Threaded to the close so financial metrics label wins by the funding
+   *  of the round that produced them. */
+  promoId?: string;
 }
 
 export interface LocalSession {

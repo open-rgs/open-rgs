@@ -102,6 +102,35 @@ async function timedPlatformCall<T>(
   }
 }
 
+/** Financial counters - in-process, monotonic, aggregated at query time.
+ *  funding="real" counts the actual debit (effectiveCost - may be fractional
+ *  for ante-style stakes); funding="promo" counts the NOTIONAL bet of a
+ *  platform-funded round (the player paid nothing). GGR/RTP are derived in
+ *  PromQL from these, never stored as ratios (ratios don't aggregate across
+ *  a fleet; counters do). */
+function incBets(
+  metrics: RgsMetrics | undefined,
+  s: { currency: string },
+  mode: string,
+  betInfo: { bet: number; effectiveCost: number; promoId?: string },
+): void {
+  if (!metrics) return;
+  const funding = betInfo.promoId ? "promo" : "real";
+  const amount = betInfo.promoId ? betInfo.bet : betInfo.effectiveCost;
+  metrics.betsMinor.inc(amount, { currency: s.currency, mode, funding });
+}
+
+function incWins(
+  metrics: RgsMetrics | undefined,
+  s: { currency: string },
+  mode: string,
+  win: number,
+  promoId: string | undefined,
+): void {
+  if (!metrics || win <= 0) return;
+  metrics.winsMinor.inc(win, { currency: s.currency, mode, funding: promoId ? "promo" : "real" });
+}
+
 function errorReason(msg: string): string {
   if (/InsufficientFunds/i.test(msg))         return "insufficient_funds";
   if (/SessionInvalid/i.test(msg))            return "session_invalid";
@@ -575,6 +604,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     metrics?.roundTotal.inc(1, { kind: "simple", mode: requestedMode, type: cappedOutcome.type });
     metrics?.roundDuration.observe((performance.now() - roundStart) / 1000, { kind: "simple", mode: requestedMode });
+    incBets(metrics, s, requestedMode, betInfo);
+    incWins(metrics, s, requestedMode, win, betInfo.promoId);
 
     sessions.setBalance(s.sessionId, receipt.balance);
     sessions.setCarry(s.sessionId, cappedOutcome.carry, cappedOutcome.nextMode);
@@ -657,6 +688,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     }
 
     sessions.setBalance(s.sessionId, receipt.balance);
+    incBets(metrics, s, requestedMode, betInfo);
     s.openRound = {
       roundId: receipt.roundId,
       modeId: requestedMode,
@@ -667,6 +699,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       actionLog: [],
       opsLog: [...open.ops],
       openedAt: Date.now(),
+      ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
     };
     recordAudit(mode, {
       sessionId: s.sessionId, roundId: receipt.roundId, kind: "open",
@@ -797,6 +830,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     metrics?.roundTotal.inc(1, { kind: "complex", mode: open.modeId, type: cappedClose.type });
     metrics?.roundDuration.observe((Date.now() - roundStart) / 1000, { kind: "complex", mode: open.modeId });
+    incWins(metrics, s, open.modeId, win, open.promoId);
 
     sessions.setBalance(s.sessionId, receipt.balance);
     sessions.setCarry(s.sessionId, cappedClose.carry, cappedClose.nextMode);
@@ -953,6 +987,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     metrics?.roundTotal.inc(1, { kind: "complex", mode: open.modeId, type: cappedClose.type });
     metrics?.roundDuration.observe((Date.now() - open.openedAt) / 1000, { kind: "complex", mode: open.modeId });
+    incWins(metrics, s, open.modeId, win, open.promoId);
 
     sessions.setBalance(s.sessionId, receipt.balance);
     sessions.setCarry(
