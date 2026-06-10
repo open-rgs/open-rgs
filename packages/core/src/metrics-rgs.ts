@@ -25,6 +25,19 @@ export interface RgsMetrics {
   wsConnections: Gauge;
   /** Lua math execution duration, per call (play / open / step / close). */
   mathDuration: Histogram;      // {kind, mode, phase}
+  /** Constant 1 carrying this instance's identity as labels  - the
+   *  node_exporter build_info pattern. Dashboards join on instance_id;
+   *  a fresh series appearing = an instance (re)started. */
+  buildInfo: Gauge;             // {instance_id, game, core_version, game_version}
+  /** 1 while the platform adapter reports healthy, else 0. The
+   *  "is the wallet there at all" SLA gauge. */
+  platformConnected: Gauge;
+  /** Connection state transitions  - flap visibility. */
+  platformTransitions: Counter; // {direction: up|down}
+  /** Unix seconds of the last SUCCESSFUL platform RPC. Alert on
+   *  `time() - rgs_platform_last_ok_timestamp_seconds` to catch a wallet
+   *  that is "connected" but not answering. */
+  platformLastOk: Gauge;
 }
 
 export function createRgsMetrics(): RgsMetrics {
@@ -66,6 +79,24 @@ export function createRgsMetrics(): RgsMetrics {
       "Lua math execution duration, per call phase.",
       undefined,
       ["kind", "mode", "phase"],
+    ),
+    buildInfo: registry.gauge(
+      "rgs_build_info",
+      "Constant 1; labels carry instance identity (instance_id, game, versions).",
+      ["instance_id", "game", "core_version", "game_version"],
+    ),
+    platformConnected: registry.gauge(
+      "rgs_platform_connected",
+      "1 while the platform adapter reports healthy, else 0.",
+    ),
+    platformTransitions: registry.counter(
+      "rgs_platform_connection_transitions_total",
+      "Platform connection state transitions, by direction.",
+      ["direction"],
+    ),
+    platformLastOk: registry.gauge(
+      "rgs_platform_last_ok_timestamp_seconds",
+      "Unix time of the last successful platform RPC.",
     ),
   };
 }

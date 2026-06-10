@@ -185,6 +185,38 @@ Notes:
 - Sticky sessions are nice-to-have (faster reconnect -> in-memory
   session cache hit) but NOT required for correctness.
 
+### Instance identity & metrics scraping
+
+Every server resolves a unique **instance id** at boot: explicit
+`createServer({ instanceId })` > `OPEN_RGS_INSTANCE_ID` env > a
+self-generated `rgs-<8 hex>`. In K8s, pass the pod name via the downward
+API so the id matches `kubectl` output:
+
+```yaml
+env:
+  - name: OPEN_RGS_INSTANCE_ID
+    valueFrom: { fieldRef: { fieldPath: metadata.name } }
+```
+
+The id is surfaced in three places that correlate one-to-one:
+`rgs_build_info{instance_id,...}` on `/admin/metrics` (the node_exporter
+build_info pattern  - a fresh series appearing = an instance (re)started),
+`instance_id` in `/healthz`, and `service.instance.id` on every log line.
+
+`/admin/metrics` serves Prometheus exposition behind the admin bearer
+token (`authorization.credentials` in the scrape config). Metrics are
+pod-local  - scrape every pod and aggregate in dashboards. Alongside the
+round/math/session series, the platform-adapter SLA series answer "is the
+wallet there, and is it answering":
+
+| Series | Meaning |
+|---|---|
+| `rgs_platform_connected` | 1 while the adapter reports healthy |
+| `rgs_platform_connection_transitions_total{direction}` | flap counter |
+| `rgs_platform_last_ok_timestamp_seconds` | last SUCCESSFUL RPC; alert on `time() - x > 30` to catch a connected-but-silent wallet |
+| `rgs_platform_call_duration_seconds{method}` | RPC latency histogram |
+| `rgs_platform_call_errors_total{method,reason}` | errors, reason includes `timeout` / `disconnected` |
+
 ## Platform adapter packaging
 
 Three patterns:

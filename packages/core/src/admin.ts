@@ -61,6 +61,11 @@ export interface AdminConfig {
    *  as game_version in /healthz. Default "unknown"  - callers should
    *  pass their package.json version through createServer({ version }). */
   gameVersion?: string;
+  /** Unique id of this running instance (createServer resolves it:
+   *  config > OPEN_RGS_INSTANCE_ID env > self-generated). Surfaced as
+   *  instance_id in /healthz so health checks, metrics (`rgs_build_info`)
+   *  and logs (`service.instance.id`) correlate on one key. */
+  instanceId?: string;
   /** Bearer token required on /admin/* and the detailed /healthz. When set,
    *  requests must send `Authorization: Bearer <authToken>` (constant-time
    *  compared). createServer reads it from `adminToken` or the
@@ -240,6 +245,7 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
     }
     return {
       status:               cfg.platform.isHealthy ? "healthy" : "reconnecting",
+      instance_id:          cfg.instanceId ?? "unknown",
       core_version:         CORE_VERSION,
       game_version:         cfg.gameVersion ?? "unknown",
       game:                 cfg.manifest.id,

@@ -29,6 +29,14 @@ export interface ServerConfig {
    *  /healthz as game_version. Pass your package.json version. Default
    *  "unknown"  - pass it so /healthz doesn't lie about what's deployed. */
   version?: string;
+  /** Unique id of THIS running instance. Every instance generates its own
+   *  at boot (`rgs-<8 hex>`); the `OPEN_RGS_INSTANCE_ID` env var overrides
+   *  the generation (e.g. the pod name via the k8s downward API), and an
+   *  explicit value here wins over both. Surfaced as the `instance_id`
+   *  label on `rgs_build_info`, as `instance_id` in /healthz, and as
+   *  `service.instance.id` on every log line  - so per-instance metrics,
+   *  logs, and health all correlate on one key. */
+  instanceId?: string;
   /** HTTP admin port. Default: same as transport port (single-port mode,
    *  routes mounted under /admin/* + /livez + /readyz + /healthz). Set
    *  to a distinct port to spin up a separate admin Bun.serve  - ideally on
@@ -88,6 +96,10 @@ export interface ServerHandle {
 export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const isDev       = cfg.isDev ?? process.env["NODE_ENV"] !== "production";
   const gameVersion = cfg.version ?? "unknown";
+  // Self-generated per-boot identity; env (k8s pod name) or config override.
+  const instanceId  = cfg.instanceId
+    ?? process.env["OPEN_RGS_INSTANCE_ID"]
+    ?? `rgs-${crypto.randomUUID().slice(0, 8)}`;
 
   // Forced-outcome cheats: fail closed. Require an explicit opt-in AND a
   // non-production NODE_ENV. The old gate keyed off `isDev`, which defaults
@@ -99,7 +111,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const cheatsEnabled = !isProduction
     && (cfg.enableCheats ?? process.env["OPEN_RGS_ENABLE_CHEATS"] === "1");
 
-  log.init(`open-rgs-${cfg.manifest.id}`, gameVersion, isDev);
+  log.init(`open-rgs-${cfg.manifest.id}`, gameVersion, isDev, instanceId);
   log.info("RGS starting", {
     "event.category": "process",
     "event.action":   "startup",
@@ -169,6 +181,33 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
 
   const metrics = cfg.metrics ?? createRgsMetrics();
 
+  // Identity series (constant 1) - dashboards join per-instance panels on
+  // instance_id; a new series appearing marks an instance (re)start.
+  metrics.buildInfo.set(1, {
+    instance_id:  instanceId,
+    game:         cfg.manifest.id,
+    core_version: CORE_VERSION,
+    game_version: gameVersion,
+  });
+
+  // Platform SLA watcher: connected gauge + flap counter, sampled every
+  // second off the adapter's own isHealthy. platformLastOk is stamped by
+  // the orchestrator on every successful RPC.
+  let platformWasHealthy = cfg.platform.isHealthy;
+  metrics.platformConnected.set(platformWasHealthy ? 1 : 0);
+  const platformWatch = setInterval(() => {
+    const healthy = cfg.platform.isHealthy;
+    if (healthy !== platformWasHealthy) {
+      metrics.platformTransitions.inc(1, { direction: healthy ? "up" : "down" });
+      log.info(`Platform connection ${healthy ? "restored" : "lost"}`, {
+        "event.category": "platform",
+        "event.action":   healthy ? "platform_up" : "platform_down",
+      });
+      platformWasHealthy = healthy;
+    }
+    metrics.platformConnected.set(healthy ? 1 : 0);
+  }, 1_000);
+
   if (cheatsEnabled) {
     log.warn("CHEATS ENABLED  - forced-outcome hints from params.cheat are active. " +
       "This must NEVER be on for real-money play.", {
@@ -225,6 +264,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       orchestrator,
       metrics,
       gameVersion,
+      instanceId,
       ...adminAuth,
     });
     if (typeof (cfg.transport as { setExtraFetch?: unknown }).setExtraFetch === "function") {
@@ -247,6 +287,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       orchestrator,
       metrics,
       gameVersion,
+      instanceId,
       ...adminAuth,
     });
   }
@@ -271,6 +312,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       "event.action":   "shutdown_start",
       "drain.ms":       drainMs,
     });
+    clearInterval(platformWatch);
     try {
       // 1. Stop accepting new connections + drain in-flight requests.
       const transportStop = cfg.transport.stop({ drainMs });
