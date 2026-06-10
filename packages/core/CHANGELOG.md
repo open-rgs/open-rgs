@@ -1,5 +1,41 @@
 # @open-rgs/core
 
+## 1.6.0
+
+### Minor Changes
+
+- [#50](https://github.com/open-rgs/open-rgs/pull/50) [`76d665e`](https://github.com/open-rgs/open-rgs/commit/76d665e9dc2e993ac1e5c0a7e453ea73c773777e) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Financial metrics, aggregated in-process. New counters in the currency's
+  minor unit - `rgs_bets_minor_total{currency,mode,funding}` (funding=real is
+  the actual debit, funding=promo the notional free-round bet) and
+  `rgs_wins_minor_total{currency,mode,funding}` - plus `rgs_declared_rtp{mode}`
+  as the theoretical target line. GGR and live RTP are derived at query time
+  from the counters (the only way ratios aggregate correctly across a fleet).
+  Each instance also emits a `financial_snapshot` log line on an interval
+  (`financialLogIntervalMs`, default 10 min, 0 disables) with lifetime
+  per-currency bets/wins/GGR/RTP read straight from the in-memory counters.
+  `Counter` gains a `snapshot()` read-back method; bring-your-own RgsMetrics
+  implementations gain three required members (`betsMinor`, `winsMinor`,
+  `declaredRtp`).
+
+- [#47](https://github.com/open-rgs/open-rgs/pull/47) [`6392421`](https://github.com/open-rgs/open-rgs/commit/63924212a973f5b7e4a602295879e5acb04cfcb6) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Instance identity + platform SLA metrics. Every server now resolves a unique
+  instance id at boot (config `instanceId` > `OPEN_RGS_INSTANCE_ID` env > a
+  self-generated `rgs-<8 hex>`), surfaced as `rgs_build_info{instance_id,...}`
+  on /admin/metrics, `instance_id` in /healthz, and `service.instance.id` on
+  every log line - per-instance metrics, logs, and health correlate on one key.
+  New platform-adapter SLA series: `rgs_platform_connected` (gauge),
+  `rgs_platform_connection_transitions_total{direction}` (flap counter), and
+  `rgs_platform_last_ok_timestamp_seconds` (last successful wallet RPC - alert
+  on its age to catch a connected-but-silent platform). Note for bring-your-own
+  `RgsMetrics` implementations: the interface gains four required members
+  (`buildInfo`, `platformConnected`, `platformTransitions`, `platformLastOk`).
+
+### Patch Changes
+
+- [#49](https://github.com/open-rgs/open-rgs/pull/49) [`fd4c9a7`](https://github.com/open-rgs/open-rgs/commit/fd4c9a749ab2bff56dfc48f6f1a69595d139603f) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Baseline `rgs_platform_last_ok_timestamp_seconds` to boot time so an
+  instance that has not yet served a round reads as "silent since boot"
+  rather than "silent since the Unix epoch" in `time() - x` alert
+  expressions.
+
 ## 1.5.0
 
 ### Minor Changes
