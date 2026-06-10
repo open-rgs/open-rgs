@@ -192,7 +192,10 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
 
   // Platform SLA watcher: connected gauge + flap counter, sampled every
   // second off the adapter's own isHealthy. platformLastOk is stamped by
-  // the orchestrator on every successful RPC.
+  // the orchestrator on every successful RPC - baseline it to boot time so
+  // an instance that hasn't served a round yet reads as "silent since
+  // boot", not "silent since the epoch".
+  metrics.platformLastOk.set(Date.now() / 1000);
   let platformWasHealthy = cfg.platform.isHealthy;
   metrics.platformConnected.set(platformWasHealthy ? 1 : 0);
   const platformWatch = setInterval(() => {
