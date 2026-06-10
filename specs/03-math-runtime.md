@@ -108,6 +108,24 @@ The loader:
   `MATH_TIMEOUT` once it passes the deadline. The hook, its `sethook`
   handle, and the deadline check are captured as upvalues then hidden, and
   the hook survives `debug = nil`, so sandboxed math cannot disable it.
+- Serializes guarded invocations per VM. One math = one VM, and the
+  orchestrator's per-session lock only serializes a single session  - two
+  different sessions spin concurrently against the same VM. The guarded
+  path is two steps (write call args as VM globals, run an async `doString`
+  chunk), so without a turnstile a second call's arg-writes land while a
+  first chunk is in flight and the interop state corrupts. Guarded calls
+  therefore queue per VM: arg-set + chunk execute as one unit. Calls are
+  micro/millisecond-scale and `MATH_TIMEOUT` aborts a runaway chunk, so the
+  queue cannot wedge. The watchdog-off direct path stays unqueued  - a
+  synchronous call runs to completion on the single JS thread and cannot
+  interleave.
+- Restores a global-stack watermark after every guarded chunk. wasmoon's
+  `callByteCode` moves a chunk's return value onto the global Lua stack to
+  read it but never pops it; left alone, each guarded call leaks one slot
+  and the VM faults once the unchecked headroom (~40 slots) runs out  - a
+  process would die after a few dozen spins. The loader records the stack
+  top before each guarded call and removes anything above it afterwards,
+  inside the same per-VM turn.
 
 ## WASM runtime details (planned)
 

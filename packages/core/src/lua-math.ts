@@ -130,8 +130,7 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
   // math is CALLED FROM a doString chunk (the JS function bridge runs on a
   // context where the hook does not carry), so when the watchdog is on we
   // invoke math through `__open_rgs_invoke` inside a doString and read the
-  // result back as that chunk's return value  - race-free because wasmoon
-  // executes the chunk synchronously (no await between arg-set and the call).
+  // result back as that chunk's return value.
   const timeoutMs = opts?.timeoutMs ?? 1000;
   const watchdog = timeoutMs > 0;
   let deadline = Infinity;
@@ -140,21 +139,57 @@ export async function loadLuaMath(path: string, opts?: LoadLuaMathOptions): Prom
       ? new RGSError("MATH_TIMEOUT", `math exceeded its ${timeoutMs}ms execution budget`)
       : null;
 
+  // One math = one VM, but a server runs MANY sessions against it, and the
+  // orchestrator's per-session lock only serializes operations of a SINGLE
+  // session. The guarded path below is two steps (write args as VM globals,
+  // then run an async doString chunk) - if a second call's arg-writes land
+  // while a first chunk is still in flight, wasmoon's interop state corrupts
+  // ("metatable not found: js_proxy"; under heavier overlap the WASM heap
+  // itself faults). So guarded invocations take a per-VM turnstile: each
+  // call's arg-set + chunk run as one unit, queued behind the previous one.
+  // Calls are micro/millisecond-scale and MATH_TIMEOUT aborts a runaway
+  // chunk, so the queue cannot wedge.
+  let vmTurn: Promise<unknown> = Promise.resolve();
+
+  /** wasmoon's callByteCode (the engine of every doString) moves the chunk's
+   *  return value onto the GLOBAL stack to read it but never pops it  - each
+   *  guarded call leaks one global-stack slot, and once Lua's unchecked
+   *  headroom (~40 slots) runs out the VM faults ("Out of bounds memory
+   *  access") and interop metatable lookups fail from then on ("metatable
+   *  not found: js_proxy"). Restore the stack to a pre-call watermark after
+   *  every guarded chunk; we hold the per-VM turnstile, so nothing else
+   *  owns the slots above it. */
+  function restoreStack(base: number): void {
+    for (let top = lua.global.getTop(); top > base; top = lua.global.getTop()) {
+      lua.global.remove(top);
+    }
+  }
+
   /** Invoke a math entry point. With the watchdog off, call it directly
-   *  (synchronous, zero overhead  - for trusted bulk simulation). With it on,
-   *  route through the guarded doString so the abort hook applies. */
+   *  (synchronous, zero overhead  - for trusted bulk simulation; a sync call
+   *  runs to completion on the single JS thread, so it cannot interleave).
+   *  With it on, route through the guarded doString so the abort hook
+   *  applies, serialized per VM with the stack watermark restored. */
   function invoke(fnName: string, args: unknown[]): unknown | Promise<unknown> {
     if (!watchdog) {
       return (api as Record<string, (...a: unknown[]) => unknown>)[fnName]!(...args);
     }
-    deadline = performance.now() + timeoutMs;
-    for (let i = 0; i < args.length; i++) lua.global.set(`__open_rgs_arg${i + 1}`, args[i]);
-    const refs = args.map((_, i) => `__open_rgs_arg${i + 1}`).join(", ");
-    const code = `return __open_rgs_invoke(__open_rgs_math.${fnName}${refs ? ", " + refs : ""})`;
-    return lua.doString(code).then(
-      (raw) => { deadline = Infinity; return raw; },
-      (e) => { deadline = Infinity; throw asTimeout(e) ?? e; },
-    );
+    const run = (): Promise<unknown> => {
+      deadline = performance.now() + timeoutMs;
+      for (let i = 0; i < args.length; i++) lua.global.set(`__open_rgs_arg${i + 1}`, args[i]);
+      const refs = args.map((_, i) => `__open_rgs_arg${i + 1}`).join(", ");
+      const code = `return __open_rgs_invoke(__open_rgs_math.${fnName}${refs ? ", " + refs : ""})`;
+      const base = lua.global.getTop();
+      return lua.doString(code).then(
+        (raw) => { restoreStack(base); deadline = Infinity; return raw; },
+        (e) => { restoreStack(base); deadline = Infinity; throw asTimeout(e) ?? e; },
+      );
+    };
+    const result = vmTurn.then(run, run);
+    // The chain must survive a rejected call (same idiom as the
+    // orchestrator's per-session lock): swallow, never reuse.
+    vmTurn = result.then(() => undefined, () => undefined);
+    return result;
   }
 
   /** Apply a Lua->TS adapter to an invoke() result, awaiting if guarded. */
