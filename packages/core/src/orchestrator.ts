@@ -40,7 +40,7 @@ import { deriveIdempotencyKey } from "./idempotency.js";
 import type { AuditLog, AuditInput } from "./audit-log.js";
 import { log } from "./log.js";
 import type { RgsMetrics } from "./metrics-rgs.js";
-import type { IdempotencyConfig } from "@open-rgs/contract";
+import type { IdempotencyConfig, ConcurrencyPolicy } from "@open-rgs/contract";
 
 export interface OrchestratorConfig {
   manifest: GameManifest;
@@ -68,6 +68,15 @@ export interface OrchestratorConfig {
   /** Idempotency-key generator + retention. Defaults to uuid-v4 +
    *  5-minute TTL (a hint for upstream caches). */
   idempotency?: IdempotencyConfig;
+  /** What INIT does when the session is already attached to another LIVE
+   *  connection. Default "kick-old". See ConcurrencyPolicy in the
+   *  contract. */
+  concurrencyPolicy?: ConcurrencyPolicy;
+  /** Transport capability to kick a specific connection (sends a
+   *  SESSION_IN_USE error frame, then closes). Wired by createServer from
+   *  ClientTransport.closeConnection. Without it, "kick-old" degrades to
+   *  "allow" (createServer warns at boot). */
+  kickConnection?: (connectionId: string, reason: string) => void;
 }
 
 /** Default idempotency-key generator: crypto.randomUUID (UUID v4). */
@@ -365,6 +374,36 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     if (!req.sid) throw new RGSError("MISSING_SESSION", "sid required");
     if (!platform.isHealthy) throw new RGSError("PLATFORM_UNAVAILABLE", "Platform not connected");
 
+    // Concurrency policy (Spec 02): arbitrate when this sid is already
+    // attached to ANOTHER live connection. A connection that dropped
+    // detaches (connectionId null), so a plain reconnect never trips this.
+    {
+      const prior = sessions.get(req.sid);
+      if (prior && prior.connectionId && prior.connectionId !== conn.connectionId) {
+        const policy = cfg.concurrencyPolicy ?? "kick-old";
+        if (policy === "reject-new") {
+          metrics?.sessionConcurrency.inc(1, { action: "reject-new" });
+          throw new RGSError("SESSION_IN_USE", "session is attached to another live connection");
+        }
+        if (policy === "kick-old") {
+          metrics?.sessionConcurrency.inc(1, { action: "kick-old" });
+          const kicked = prior.connectionId;
+          // Detach BEFORE kicking: the kick triggers the old socket's close
+          // handler -> onDisconnect, which must not unbind the NEW owner.
+          sessions.setConnection(req.sid, null);
+          cfg.kickConnection?.(kicked, "session opened on a newer connection");
+          log.info("Older connection superseded (concurrency policy kick-old)", {
+            "event.category": "orchestrator",
+            "event.action": "session_kick_old",
+            "session.id": req.sid,
+            "connection.kicked": kicked,
+            "connection.new": conn.connectionId,
+          });
+        }
+        // "allow": both connections coexist - the pre-enforcement behaviour.
+      }
+    }
+
     // Resume path: if a session for this sid is already in our cache (e.g.
     // the player disconnected mid-round and reconnected), reuse it. The
     // openRound's full opsLog + actionLog + awaiting tell the new
@@ -379,6 +418,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       // keeps it current). Connection metadata gets updated.
       conn.sessionId = s.sessionId;
       conn.demo = !s.currency;
+      sessions.setConnection(s.sessionId, conn.connectionId);
       info = {
         sessionId: s.sessionId,
         currency: s.currency,
@@ -1020,6 +1060,15 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     if (!conn.sessionId) return;
     const s = sessions.get(conn.sessionId);
     if (!s) return;
+
+    // Ownership guard: a connection that was superseded (kick-old) or
+    // otherwise replaced no longer owns the session - its late close event
+    // must not detach or evict the NEW owner's session.
+    if (s.connectionId !== null && s.connectionId !== conn.connectionId) return;
+
+    // This connection owns the binding - detach it. The session itself may
+    // be retained below (open round) for a resume by a future connection.
+    sessions.setConnection(conn.sessionId, null);
 
     // Keep the session in cache if a round is open  - the player may
     // reconnect within the platform's grace window and resume. Autoclose

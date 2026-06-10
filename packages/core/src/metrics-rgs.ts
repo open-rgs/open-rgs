@@ -53,6 +53,10 @@ export interface RgsMetrics {
   /** Declared/theoretical RTP per mode - the target line dashboards draw
    *  against live RTP. */
   declaredRtp: Gauge;           // {mode}
+  /** Concurrency-policy interventions at INIT: an older connection kicked
+   *  ("kick-old") or a newer one refused ("reject-new"). A spike means
+   *  players are multi-windowing - or something is replaying tokens. */
+  sessionConcurrency: Counter;  // {action: kick-old|reject-new}
 }
 
 export function createRgsMetrics(): RgsMetrics {
@@ -127,6 +131,11 @@ export function createRgsMetrics(): RgsMetrics {
       "rgs_declared_rtp",
       "Declared/theoretical RTP per mode.",
       ["mode"],
+    ),
+    sessionConcurrency: registry.counter(
+      "rgs_session_concurrency_actions_total",
+      "Concurrency-policy interventions at INIT (kick-old / reject-new).",
+      ["action"],
     ),
   };
 }

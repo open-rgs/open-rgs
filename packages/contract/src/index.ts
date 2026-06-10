@@ -804,6 +804,11 @@ export interface ClientTransport {
   /** Stop accepting new connections. With opts.drainMs > 0, also waits
    *  for in-flight requests to complete (or that ms to elapse). */
   stop(opts?: { drainMs?: number }): void | Promise<void>;
+  /** Push a structured error frame to a connection and close it. Used by
+   *  the orchestrator's concurrencyPolicy "kick-old" to supersede the
+   *  older connection. OPTIONAL  - a transport without it degrades
+   *  kick-old to "allow" (createServer warns at boot). */
+  closeConnection?(connectionId: string, code: RGSErrorCode, reason: string): void;
 }
 
 // --- Idempotency strategy --------------------------------------------------
@@ -834,12 +839,25 @@ export interface IdempotencyConfig {
 
 // --- Concurrency policy ----------------------------------------------------
 
-/** What to do when a second WS connection arrives for an existing session.
- *  NOTE: declared but NOT yet enforced  - second connections to a live
- *  session are currently unmanaged at the transport level (per-session
- *  *operation* serialization exists in the orchestrator; connection-level
- *  policy does not). Tracked in Spec 09 (roadmap). */
-export type ConcurrencyPolicy = "kick-old" | "reject-new";
+/** What to do when a second WS connection INITs a session that is already
+ *  attached to another live connection. Enforced by the orchestrator at
+ *  INIT (configured via `createServer({ concurrencyPolicy })`):
+ *
+ *  - "kick-old" (default): the older connection receives a SESSION_IN_USE
+ *    error frame and is closed; the new connection takes over the session.
+ *    The player's newest window always wins  - opening the game twice never
+ *    leaves a stale window silently diverging.
+ *  - "reject-new": the new connection's INIT fails with SESSION_IN_USE
+ *    while the older connection stays attached.
+ *  - "allow": both connections coexist (the pre-enforcement behaviour).
+ *    Money stays safe either way  - per-session operation serialization +
+ *    wallet idempotency hold regardless  - but coexisting windows see
+ *    diverging balance views; prefer kick-old.
+ *
+ *  A connection that disconnects detaches from its session, so a reconnect
+ *  after a drop is never kicked/rejected  - the policy only arbitrates two
+ *  LIVE connections. */
+export type ConcurrencyPolicy = "kick-old" | "reject-new" | "allow";
 
 // --- Numeric convention ----------------------------------------------------
 
@@ -861,6 +879,10 @@ export type RGSErrorCode =
   | "MISSING_SESSION"
   | "SESSION_NOT_FOUND"
   | "SESSION_INVALID"
+  /** The session is attached to another live connection. Sent to the NEW
+   *  connection under concurrencyPolicy "reject-new", or to the OLD
+   *  connection (followed by a close) when "kick-old" supersedes it. */
+  | "SESSION_IN_USE"
   | "INSUFFICIENT_BALANCE"
   | "INVALID_BET"
   | "INVALID_MODE"

@@ -254,9 +254,31 @@ for closes  - see Spec 05) are the wallet-level backstop. Operations on
 *different* sessions are unaffected and run concurrently.
 
 The lock guards in-process ordering only; it is not a substitute for the
-wallet being the source of truth across processes. Enforcing a
-`ConcurrencyPolicy` for a *second connection* to a live session (kick-old
-vs reject-new) is separate and still pending.
+wallet being the source of truth across processes.
+
+### Connection concurrency (`ConcurrencyPolicy`)
+
+INIT arbitrates when the session is already attached to ANOTHER live
+connection (`createServer({ concurrencyPolicy })`):
+
+- **kick-old** (default): the older connection receives a
+  `SESSION_IN_USE` error frame and is closed (app close code 4000); the
+  new connection takes over. The player's newest window always wins  - two
+  open windows never silently diverge.
+- **reject-new**: the newer INIT fails with `SESSION_IN_USE`; the older
+  connection stays attached.
+- **allow**: both coexist (the pre-enforcement behaviour). Money stays
+  safe under any policy  - the per-session lock and wallet idempotency
+  hold regardless  - but coexisting windows see diverging balance views.
+
+A connection that disconnects DETACHES from its session first, so a plain
+reconnect after a drop is never policed: the policy only ever arbitrates
+two live connections. A kicked connection's late close event is ignored
+(it no longer owns the binding), so it cannot evict the new owner's
+session. Enforcement needs the transport's optional `closeConnection`
+capability for the kick; a custom transport without it degrades kick-old
+to allow with a boot-time warning. Interventions are counted in
+`rgs_session_concurrency_actions_total{action}`.
 
 ## Acceptance criteria
 

@@ -53,7 +53,11 @@ export interface OpenRound {
 
 export interface LocalSession {
   readonly sessionId: string;
-  readonly connectionId: string;
+  /** Connection currently attached to this session; null once that
+   *  connection dropped (detached). The concurrency policy arbitrates on
+   *  this: a second INIT while non-null hits kick-old / reject-new; a
+   *  reconnect after a drop (null) attaches freely. */
+  connectionId: string | null;
   balance: number;
   readonly currency: string;
   readonly currencyDecimals: number;
@@ -144,6 +148,13 @@ export function openRoundStats(now: number): { open_rounds: number; oldest_open_
 export function setBalance(id: string, balance: number): void {
   const s = sessions.get(id);
   if (s) s.balance = balance;
+}
+
+/** (Re)bind the session to a connection, or detach with null when that
+ *  connection drops. The concurrency policy reads this binding. */
+export function setConnection(id: string, connectionId: string | null): void {
+  const s = sessions.get(id);
+  if (s) s.connectionId = connectionId;
 }
 
 export function setCarry(id: string, carry?: CarryState, nextMode?: string): void {

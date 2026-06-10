@@ -26,6 +26,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         <tr><td class="mono">MISSING_SESSION</td><td>request needs <code>sid</code> but none was supplied or attached</td></tr>
         <tr><td class="mono">SESSION_NOT_FOUND</td><td>platform <code>openSession</code> rejected the id</td></tr>
         <tr><td class="mono">SESSION_INVALID</td><td>session exists but is closed / blocked / expired</td></tr>
+        <tr><td class="mono">SESSION_IN_USE</td><td>session attached to another live connection (concurrency policy: rejected new window, or kicked old one before closing it)</td></tr>
         <tr><td class="mono">INSUFFICIENT_BALANCE</td><td>pre-flight check failed for the requested bet</td></tr>
         <tr><td class="mono">INVALID_BET</td><td><code>betIndex</code> out of range, or bet 0 or less</td></tr>
         <tr><td class="mono">INVALID_MODE</td><td>mode id unknown, internal, or wrong <code>kind</code></td></tr>
