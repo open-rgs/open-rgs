@@ -40,5 +40,8 @@
   },
   "dependencies": {
     "@open-rgs/contract": "1.1.0"
+  },
+  "devDependencies": {
+    "@open-rgs/platform-mock": "1.2.0"
   }
 }

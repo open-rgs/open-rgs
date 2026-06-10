@@ -10,6 +10,12 @@
 //     receipt  - the property the contract relies on (was advertised but
 //     never actually run; audit H13)
 //   - error paths: overspend, unknown session, and bad round id are rejected
+//   - concurrency (opt-in via { concurrency: true }): cross-session parallel
+//     settles conserve per-session balances; the SAME idempotencyKey fired
+//     twice CONCURRENTLY (in-flight duplicate, not the sequential retry
+//     above) settles exactly once; reverseRound stays latest-first under
+//     interleaved reversal fire; and a plain settle still reconciles after
+//     the storms
 //   - each check is bounded by perCheckTimeoutMs (enforced via Promise.race)
 //
 // The suite doesn't mutate real-money state because it expects a mock
@@ -30,6 +36,13 @@ export interface RunOptions {
   skipComplex?: boolean;
   /** Skip event checks (use for a wallet that doesn't push events). */
   skipEvents?: boolean;
+  /** Opt IN to concurrency certification: parallel cross-session settles,
+   *  in-flight duplicate idempotency keys, and reversal interleave. Off by
+   *  default (reported as skips, mirroring skipComplex) because it opens
+   *  extra derived sessions and assumes each maps to an independent balance
+   *  - true for a mock or sandboxed wallet, the only thing this suite
+   *  should ever point at. */
+  concurrency?: boolean;
 }
 
 export async function runConformance(
@@ -291,6 +304,160 @@ export async function runConformance(
         if (e.type !== "balanceChanged") continue;
         if (typeof e.balance !== "number") throw new Error("balanceChanged.balance not a number");
         if (typeof e.reason !== "string")  throw new Error("balanceChanged.reason not a string");
+      }
+    });
+  }
+
+  // --- concurrency (opt-in) ---------------------------------------
+  // The orchestrator serializes client traffic per session, so an adapter
+  // never sees two client-driven calls racing on ONE session  - but it DOES
+  // see parallel traffic across sessions, retried settles whose duplicate
+  // arrives while the original is still in flight, and wallet-initiated
+  // reversals that bypass the per-session lock entirely (the contract's
+  // CONCURRENCY rule on ReverseRound). These checks exercise exactly that
+  // surface. Opt-in: they open derived sessions ("<sessionId>-conc-*") and
+  // assume each has an independent balance, which holds for a mock or
+  // sandboxed wallet.
+  if (!opts.concurrency) {
+    const reason = "concurrency not enabled (opt in with { concurrency: true })";
+    skip("concurrency.parallel-distinct-settles", "concurrency", "parallel settles across distinct sessions conserve each session's balance", reason);
+    skip("concurrency.duplicate-key-parallel", "concurrency", "the same idempotencyKey fired twice concurrently settles exactly once", reason);
+    skip("concurrency.reverse-interleave", "concurrency", "concurrent reversals of two stacked rounds stay latest-first (no over-refund)", reason);
+    skip("concurrency.post-storm-settle", "concurrency", "a plain sequential settle still reconciles after the concurrent storms", reason);
+  } else {
+    const cost = fixture.bet * fixture.priceMultiplier;
+    const settle = (sessionId: string, idempotencyKey: string, win: number): Promise<RoundReceipt> =>
+      adapter.settleSimple({
+        sessionId,
+        bet: fixture.bet,
+        betIndex: fixture.betIndex,
+        priceMultiplier: fixture.priceMultiplier,
+        win,
+        multiplier: win === 0 ? 0 : Math.round(win / fixture.bet),
+        type: win === 0 ? "loss" : "win",
+        roundState: "",
+        idempotencyKey,
+      });
+
+    await run("concurrency.parallel-distinct-settles", "concurrency", "parallel settles across distinct sessions conserve each session's balance", async () => {
+      // N sessions in parallel, M settles sequential WITHIN each session
+      //  - the orchestrator serializes per session, so cross-session
+      // parallelism is the only interleaving a conformant adapter must
+      // survive. Per session: final == start - sum(costs) + sum(wins).
+      const N = 8, M = 5;
+      const problems: string[] = [];
+      await Promise.all(Array.from({ length: N }, async (_, i) => {
+        const sid = `${fixture.sessionId}-conc-p${i}`;
+        const start = (await adapter.openSession(sid, `${fixture.connectionId}-conc-p${i}`)).balance;
+        let wins = 0;
+        let last: RoundReceipt | undefined;
+        for (let j = 0; j < M; j++) {
+          const win = j % 2 === 0 ? 0 : fixture.bet * 2;   // mix losses and wins
+          last = await settle(sid, `conc-p${i}-${j}`, win);
+          wins += win;
+        }
+        const expected = start - M * cost + wins;
+        if (last!.balance !== expected) {
+          problems.push(`${sid}: final balance ${last!.balance} != expected ${expected} (start ${start}, ${M} settles)`);
+        }
+      }));
+      if (problems.length > 0) {
+        throw new Error(`cross-session interference  - per-session conservation broken: ${problems.join("; ")}`);
+      }
+    });
+
+    await run("concurrency.duplicate-key-parallel", "concurrency", "the same idempotencyKey fired twice concurrently settles exactly once", async () => {
+      // The in-flight duplicate race: the sequential dedupe check above
+      // sends the duplicate AFTER the original resolved; here both are in
+      // flight at once (a retry racing its own original). Both must resolve
+      // to the SAME receipt and money must move exactly once.
+      const sid = `${fixture.sessionId}-conc-dup`;
+      const start = (await adapter.openSession(sid, `${fixture.connectionId}-conc-dup`)).balance;
+      const win = fixture.bet * 2;
+      const req: SettleSimple = {
+        sessionId: sid,
+        bet: fixture.bet,
+        betIndex: fixture.betIndex,
+        priceMultiplier: fixture.priceMultiplier,
+        win,
+        multiplier: 2,
+        type: "win",
+        roundState: "",
+        idempotencyKey: "conc-dup-parallel-1",   // SAME key, both calls
+      };
+      const [a, b] = await Promise.all([adapter.settleSimple(req), adapter.settleSimple({ ...req })]);
+      if (a.roundId !== b.roundId) {
+        throw new Error(`concurrent duplicates produced two rounds (${a.roundId} vs ${b.roundId})  - the dedupe has a read-then-write race`);
+      }
+      if (a.balance !== b.balance) {
+        throw new Error(`concurrent duplicates disagree on balance (${a.balance} vs ${b.balance})`);
+      }
+      const after = (await adapter.openSession(sid, `${fixture.connectionId}-conc-dup-2`)).balance;
+      const expected = start - cost + win;
+      if (after !== expected) {
+        throw new Error(`money moved more than once under the in-flight duplicate: balance ${after} != expected ${expected} (start ${start})`);
+      }
+    });
+
+    if (typeof adapter.reverseRound !== "function") {
+      skip("concurrency.reverse-interleave", "concurrency", "concurrent reversals of two stacked rounds stay latest-first (no over-refund)", "adapter does not implement reverseRound (optional)");
+    } else {
+      await run("concurrency.reverse-interleave", "concurrency", "concurrent reversals of two stacked rounds stay latest-first (no over-refund)", async () => {
+        // Settle A then B, then fire reverseRound(A) and reverseRound(B)
+        // concurrently. Reversal is wallet-initiated and bypasses the
+        // per-session lock, so the adapter alone must order these. Two
+        // serializations are legal:
+        //   - A first: A is not latest -> no-op "not-latest-round"; B then
+        //     reverses -> final balance is post-A.
+        //   - B first: B reverses (A becomes latest); A then legally
+        //     reverses too -> final balance is pre-A.
+        // Anything else  - over-refund, double-credit, B refused  - fails.
+        // Both rounds are net LOSSES on purpose: with only debits in play,
+        // "final > pre-A balance" is a strict over-refund invariant (a
+        // reversal credited more than the rounds ever took).
+        const sid = `${fixture.sessionId}-conc-rev`;
+        const bal0 = (await adapter.openSession(sid, `${fixture.connectionId}-conc-rev`)).balance;
+        const rA = await settle(sid, "conc-rev-a", 0);
+        const balA = rA.balance;
+        const rB = await settle(sid, "conc-rev-b", 0);
+        const [revA, revB] = await Promise.all([
+          adapter.reverseRound!({ sessionId: sid, roundId: rA.roundId, reason: "conformance-interleave", idempotencyKey: "conc-rev-key-a" }),
+          adapter.reverseRound!({ sessionId: sid, roundId: rB.roundId, reason: "conformance-interleave", idempotencyKey: "conc-rev-key-b" }),
+        ]);
+        const after = (await adapter.openSession(sid, `${fixture.connectionId}-conc-rev-2`)).balance;
+        if (after > bal0) {
+          throw new Error(`over-refund: balance ${after} > pre-round ${bal0}  - reversals credited more than the rounds moved`);
+        }
+        if (!revB.reversed) {
+          throw new Error(`the latest round (B) must be reversible, got no-op "${revB.reason ?? "(no reason)"}"`);
+        }
+        if (revA.reversed) {
+          // Legal only as the B-first serialization: both undone, balance
+          // back to the pre-A snapshot.
+          if (after !== bal0) {
+            throw new Error(`both rounds reversed but balance ${after} != pre-A ${bal0}  - reversal restored the wrong snapshot`);
+          }
+        } else {
+          if (revA.reason !== "not-latest-round") {
+            throw new Error(`A was refused with "${revA.reason ?? "(no reason)"}"  - expected "not-latest-round" while B sat on top`);
+          }
+          if (after !== balA) {
+            throw new Error(`only B reversed but balance ${after} != post-A ${balA}  - B's reversal restored the wrong snapshot`);
+          }
+        }
+      });
+    }
+
+    await run("concurrency.post-storm-settle", "concurrency", "a plain sequential settle still reconciles after the concurrent storms", async () => {
+      // Re-read a stormed session and run one boring settle  - the adapter's
+      // bookkeeping must come out of the races consistent, not just lucky.
+      const sid = `${fixture.sessionId}-conc-dup`;
+      const before = (await adapter.openSession(sid, `${fixture.connectionId}-conc-after`)).balance;
+      const win = fixture.bet;
+      const r = await settle(sid, "conc-after-1", win);
+      const expected = before - cost + win;
+      if (r.balance !== expected) {
+        throw new Error(`post-storm settle does not reconcile: balance ${r.balance} != expected ${expected} (before ${before})`);
       }
     });
   }

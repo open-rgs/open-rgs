@@ -23,8 +23,8 @@ bunx open-rgs-adapter-conform \
 Required: `--adapter <module>` (npm package or path) and `--export <name>`
 (adapter class export, default `default`). Optional: `--opts <json>` (or
 env `ADAPTER_OPTS_JSON`), `--skip-complex`, `--skip-events`,
-`--timeout-ms <n>`, `--out-json <path>`. Exit code is 0 only if every
-non-skipped check is `ok`.
+`--concurrency`, `--timeout-ms <n>`, `--out-json <path>`. Exit code is 0
+only if every non-skipped check is `ok`.
 
 ## Use (as a library)
 
@@ -52,6 +52,7 @@ if (report.summary.fail > 0) process.exit(1);   // fail your CI
 | simple-round | settleSimple (zero-win + with-win), debits + credits balance     |
 | complex-round | openComplex -> updateComplex (optional) -> closeComplex            |
 | events      | adapter emits at least one event; balanceChanged shape is valid   |
+| concurrency | opt-in (`concurrency: true`): parallel cross-session settles conserve per-session balances; the same idempotencyKey fired twice concurrently settles exactly once; concurrent reversals stay latest-first (no over-refund); a plain settle still reconciles afterwards |
 
 Each check returns one of `ok | warn | fail | skip` with a one-line
 message on non-ok.
@@ -63,8 +64,16 @@ runConformance(adapter, {
   fixture: { bet: 250, betIndex: 3 },   // override the session shape
   skipComplex: true,                    // platform is simple-rounds-only
   skipEvents: true,                     // platform doesn't push events
+  concurrency: true,                    // opt IN to the concurrency checks
 });
 ```
+
+`concurrency: true` is opt-in (reported as skips otherwise) because the
+checks open derived sessions (`<sessionId>-conc-*`) and assume each maps
+to an independent balance  - true for a mock or sandboxed wallet, which is
+the only thing this suite should ever point at. The reversal-interleave
+check runs only when the adapter implements the optional `reverseRound`;
+it skips cleanly otherwise.
 
 ## What it doesn't do
 
@@ -80,5 +89,5 @@ runConformance(adapter, {
 
 ```bash
 bun install
-bun test    # 5 cases against a tiny in-test adapter
+bun test    # in-test adapters + the reference @open-rgs/platform-mock
 ```

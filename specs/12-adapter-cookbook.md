@@ -278,18 +278,43 @@ inside the same method. Idempotency keys cover the retry case.
 
 ## What the conformance suite does NOT check
 
-These are real concerns that fall outside `runConformance(adapter)`  -
-add adapter-specific tests for them:
+Since the concurrency certification landed, `runConformance(adapter,
+{ concurrency: true })` DOES now check (opt-in, against a mock or
+sandboxed wallet only):
+
+- Parallel settles across distinct sessions conserving each session's
+  balance (the cross-session parallelism the orchestrator's per-session
+  lock does NOT shield the adapter from)
+- The same idempotencyKey fired twice CONCURRENTLY settling exactly
+  once  - the in-flight duplicate race the sequential dedupe check never
+  exercised
+- Concurrent reversals of two stacked rounds staying latest-first:
+  the latest round reverses, an older round under a newer one is
+  refused `not-latest-round` (or legally reverses if the newer round's
+  reversal landed first), and no serialization over-refunds
+- A plain sequential settle still reconciling after the storms
+
+These are real concerns that still fall outside `runConformance(adapter)`
+ - add adapter-specific tests for them:
 
 - Idempotency dedupe on the upstream side (kit-only assertion is "the
   key field is passed; upstream behaviour with it is the upstream's
   problem")
+- Cross-PROCESS duplicate keys  - two RGS pods retrying the same settle
+  against one upstream; the kit races duplicates inside one process,
+  which says nothing about an adapter whose dedupe lives in per-process
+  memory (the contract's DURABILITY rule  - restarts and multi-pod need
+  an external store, and only an integration rig proves it)
+- Durability of reversed-round tracking across adapter restarts (same
+  rule  - the kit can't restart your process mid-run)
 - Currency precision edge cases (kit assumes integer minor units)
-- Concurrent open rounds for the same session (the kit's fixture is
-  single-session, single-round)
+- Concurrent open rounds for the same session (the orchestrator
+  serializes client traffic per session by design; the kit doesn't
+  simulate a misbehaving orchestrator)
 - Bet ladder boundary enforcement (orchestrator enforces; kit doesn't
   exercise)
-- Network resilience under specific failure modes (use chaos tests)
+- Network resilience under specific failure modes  - fault injection,
+  dropped responses mid-settle, reconnect storms (use chaos tests)
 
 ---
 
