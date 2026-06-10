@@ -146,6 +146,10 @@ DECODE_ERROR             msgpack payload couldn't be decoded
 MISSING_SESSION          sid required, not provided
 SESSION_NOT_FOUND        sid valid but no session in cache (INIT first)
 SESSION_INVALID          wallet rejected the session
+SESSION_IN_USE           session attached to another live connection
+                         (reject-new: sent to the NEW connection's INIT;
+                         kick-old: sent to the OLD connection, which is
+                         then closed with app close code 4000)
 INSUFFICIENT_BALANCE     pre-flight or wallet rejection on funds
 INVALID_BET              betIndex out of range, or invalid combination
 INVALID_MODE             requested mode not in manifest, or wrong kind

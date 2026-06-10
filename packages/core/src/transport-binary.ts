@@ -80,6 +80,9 @@ export interface BinaryClientTransport extends ClientTransport {
    *  transport's port. Idempotent; last write wins. Must be called
    *  BEFORE start(). */
   setExtraFetch(fn: (req: Request) => Promise<Response | undefined> | Response | undefined): void;
+  /** Push a structured ERROR frame to a live connection, then close it
+   *  (app close code 4000). Drives concurrencyPolicy "kick-old". */
+  closeConnection(connectionId: string, code: RGSErrorCode, reason: string): void;
 }
 
 export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTransport {
@@ -88,9 +91,27 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
   let accepting = true;
   let inflight = 0;
   let extraFetch = cfg.extraFetch;
+  // Live sockets by connectionId - lets the orchestrator kick one specific
+  // connection (concurrencyPolicy "kick-old") without the transport knowing
+  // anything about sessions.
+  const socks = new Map<string, Bun.ServerWebSocket<WsData>>();
 
   return {
     setExtraFetch(fn) { extraFetch = fn; },
+
+    closeConnection(connectionId, code, reason) {
+      const ws = socks.get(connectionId);
+      if (!ws) return;
+      socks.delete(connectionId);
+      try { sendError(ws, code, reason); } catch { /* socket already gone */ }
+      try { ws.close(4000, reason.slice(0, 120)); } catch { /* ditto */ }
+      log.info("Connection closed by policy", {
+        "event.category": "transport",
+        "event.action": "connection_kicked",
+        "connection.id": connectionId,
+        "error.code": code,
+      });
+    },
 
     async start(api: OrchestratorAPI): Promise<{ port: number }> {
       server = Bun.serve<WsData>({
@@ -128,6 +149,7 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
           open(ws) {
             ws.data.connectedAt = Date.now();
             ws.data.lastOpSeq = 0;
+            socks.set(ws.data.connectionId, ws);
             cfg.onConnect?.();
             log.info("Client connected", {
               "event.category": "transport",
@@ -180,6 +202,7 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
             }
           },
           close(ws) {
+            socks.delete(ws.data.connectionId);
             api.onDisconnect(ws.data);
             cfg.onDisconnect?.();
             log.info("Client disconnected", {

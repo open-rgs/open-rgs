@@ -12,7 +12,7 @@
 //     interface unreachable from public ingress.
 
 import type {
-  GameManifest, PlatformAdapter, ClientTransport, IdempotencyConfig,
+  GameManifest, PlatformAdapter, ClientTransport, IdempotencyConfig, ConcurrencyPolicy,
 } from "@open-rgs/contract";
 import { createOrchestrator } from "./orchestrator.js";
 import { createAdminHandler, startAdmin } from "./admin.js";
@@ -89,6 +89,15 @@ export interface ServerConfig {
   /** Install a SIGTERM handler that calls stop(). Default true; set
    *  false in test harnesses. */
   installSignalHandlers?: boolean;
+  /** What INIT does when a session is already attached to another LIVE
+   *  connection: "kick-old" (default - the newest window wins; the older
+   *  connection gets a SESSION_IN_USE error frame and is closed),
+   *  "reject-new" (the newer INIT fails with SESSION_IN_USE), or "allow"
+   *  (coexist - the pre-1.7 behaviour; money stays safe but the windows'
+   *  balance views diverge). Enforced via the transport's closeConnection;
+   *  a custom transport without it degrades kick-old to allow (warns at
+   *  boot). */
+  concurrencyPolicy?: ConcurrencyPolicy;
 }
 
 export interface ServerHandle {
@@ -269,11 +278,26 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     });
   }
 
+  // Concurrency policy: enforcement needs the transport's closeConnection
+  // capability for kick-old. Without it, degrade to "allow" loudly rather
+  // than half-enforce.
+  const concurrencyPolicy = cfg.concurrencyPolicy ?? "kick-old";
+  const canKick = typeof cfg.transport.closeConnection === "function";
+  if (concurrencyPolicy === "kick-old" && !canKick) {
+    log.warn("Transport lacks closeConnection - concurrencyPolicy kick-old degrades to allow", {
+      "event.category": "process",
+      "event.action":   "concurrency_policy_degraded",
+    });
+  }
+
   const orchestrator = createOrchestrator({
     manifest: cfg.manifest,
     platform: cfg.platform,
     cheatsEnabled,
     metrics,
+    concurrencyPolicy: concurrencyPolicy === "kick-old" && !canKick ? "allow" : concurrencyPolicy,
+    ...(canKick ? { kickConnection: (connectionId: string, reason: string) =>
+      cfg.transport.closeConnection!(connectionId, "SESSION_IN_USE", reason) } : {}),
     ...(cfg.idempotency ? { idempotency: cfg.idempotency } : {}),
     ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink) } : {}),
     ...(cfg.auditMode ? { auditMode: cfg.auditMode } : {}),
