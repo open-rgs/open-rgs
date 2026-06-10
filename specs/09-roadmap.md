@@ -1,6 +1,7 @@
 # Spec 09  - Roadmap
 
 A living document. Updated when work lands or reprioritises.
+Last reality-checked against the code: 2026-06-10.
 
 ## Done (shipped in repo)
 
@@ -30,6 +31,34 @@ A living document. Updated when work lands or reprioritises.
   production fail-closed (the operator must choose an RNG explicitly) and an
   opt-in deterministic `seed-expand` replay mode (xoshiro256++).
 - Worked examples on Zig kernels (e.g. `examples/hold-and-win`).
+- `open-rgs-sim` CLI (the `bin` of `@open-rgs/simulator`)  - covers the
+  planned `cli simulate` role: manifest in, spins/seed/`--shards`,
+  md/html/json reports (`packages/simulator/src/cli.ts`). The
+  `compare` / `certify` / `fuzz` commands remain open (below).
+- Prometheus metrics on `/admin/metrics` (2026-06-10; PRs #47, #49, #50)  -
+  round/math/session series plus instance identity (`rgs_build_info`),
+  platform SLA series (`rgs_platform_connected`,
+  `rgs_platform_connection_transitions_total`,
+  `rgs_platform_last_ok_timestamp_seconds`) and financial counters
+  (`rgs_bets_minor_total` / `rgs_wins_minor_total` / `rgs_declared_rtp`),
+  with a periodic `financial_snapshot` log line
+  (`packages/core/src/metrics-rgs.ts`, `packages/core/src/server.ts`;
+  specs 06/07).
+- Graceful shutdown + drain mode  - `createServer` installs a SIGTERM
+  handler; `stop()` stops accepting connections and drains in-flight
+  requests for `shutdownDrainMs` (default 30 s) before exit
+  (`packages/core/src/server.ts`).
+- Reference deployment template  - `deploy/docker/` (Dockerfile +
+  compose) and `deploy/k8s/` (Deployment + HPA), per spec 07.
+- Idempotency keys end-to-end (core side)  - the orchestrator derives or
+  generates a key for every money-moving platform call: spin/open via
+  `initiatingIdemKey`, close via `deriveIdempotencyKey`
+  (`packages/core/src/orchestrator.ts`). Forwarding the key onto the
+  provider wire is each adapter's job by design.
+- Adapter-owns-state restore  - on `openSession` the orchestrator
+  rebuilds the session from `SessionInfo.carry` / `nextMode` /
+  `mathVersion` and discards the carry on a math-version mismatch
+  (discard-and-fresh, ADR-004; `packages/core/src/orchestrator.ts`).
 
 ## Architectural decisions captured (A1-A10)
 
@@ -69,8 +98,8 @@ J  - public-surface freeze v0.5: pending
 | Item | Spec | Status |
 |------|------|--------|
 | Cross-process restart recovery | 02, 05 | platform adapter inquiry endpoint TBD |
-| Idempotency keys end-to-end | 04, 05 | contract done; orchestrator + adapter wiring pending |
-| Adapter-owns-state migration | 04, 05 | contract done; orchestrator reads from SessionInfo.carry pending |
+| ~~Idempotency keys end-to-end~~ (core side done) | 04, 05 | orchestrator derives/generates a key on every money-moving call; forwarding onto the provider wire is each adapter's job |
+| ~~Adapter-owns-state migration~~ (done) | 04, 05 | orchestrator rebuilds sessions from SessionInfo.carry/nextMode/mathVersion (ADR-004) |
 | External API surface (casino-facing) | NEW | sketched during an early provider analysis; not yet specced |
 | Game launcher | NEW | sketched during an early provider analysis; not yet specced |
 
@@ -78,10 +107,10 @@ J  - public-surface freeze v0.5: pending
 
 | Item | Spec | Why |
 |------|------|-----|
-| `@open-rgs/cli simulate` | 08 | Math designers blocked without it |
+| ~~`@open-rgs/cli simulate`~~ (covered) | 08 | `open-rgs-sim` (bin of `@open-rgs/simulator`) fills this role |
 | `@open-rgs/cli compare` | 08 | Exploit smoke test for CI |
 | `@open-rgs/cli certify` | 08 | Math labs need the report shape |
-| Reference deployment template | 07 | Ship Dockerfile + K8s manifests under `deploy/` |
+| ~~Reference deployment template~~ (done) | 07 | shipped under `deploy/docker` + `deploy/k8s` |
 | ~~Cheat fail-closed~~ (done) | 04 | Cheat removed from the wire contract; honored only via `params.cheat` with an explicit opt-in and never in production; loud warning when enabled |
 | Manifest validation: `nextMode` resolution | 01 | Catch typos at boot, not at runtime |
 
@@ -89,8 +118,7 @@ J  - public-surface freeze v0.5: pending
 
 | Item | Spec | Notes |
 |------|------|-------|
-| Prometheus metrics + W3C tracing | 06 | Operating blind today |
-| Graceful shutdown + drain mode | 02, 07 | K8s rolling restarts drop sessions |
+| W3C tracing | 06 | Prometheus metrics shipped 2026-06-10 (see Done); tracing remains open |
 | Public/private state split (`view(state)`) | 01, 03, 08 | Required for honest exploit testing |
 | Bonus engine abstraction (promo -> BonusCampaign) | 02 | Jackpots, tournaments, gamification points |
 | `@open-rgs/cli fuzz` & `optimize` | 08 | Round out the math-author DX |
