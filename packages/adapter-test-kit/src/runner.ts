@@ -210,14 +210,20 @@ export async function runConformance(
 
   // --- error paths ------------------------------------------------
   await run("errors.insufficient-funds", "errors", "a bet exceeding balance is rejected", async () => {
+    // Overspend is driven through priceMultiplier, NOT a giant `bet`:
+    // amount-blind wires (the platform recomputes cost from its own bet
+    // ladder and ignores the wire amount) never see a doctored `bet`, but
+    // EVERY wallet shape sees cost = ladder/bet x priceMultiplier explode
+    // past the balance. 1e6 x any conformance ladder entry is far above
+    // any conformance balance.
     await expectReject(() => adapter.settleSimple({
       sessionId: fixture.sessionId,
-      bet: 10_000_000_000,           // far above any conformance balance
+      bet: fixture.bet * 1_000_000,
       betIndex: fixture.betIndex,
-      priceMultiplier: fixture.priceMultiplier,
+      priceMultiplier: 1_000_000,
       win: 0, multiplier: 0, type: "loss", roundState: "",
       idempotencyKey: "conf-overspend-1",
-    }), "settle with bet > balance was accepted  - a wallet MUST reject overspend");
+    }), "settle with cost > balance was accepted  - a wallet MUST reject overspend");
   });
 
   await run("errors.unknown-session", "errors", "a settle on an unopened session is rejected", async () => {
