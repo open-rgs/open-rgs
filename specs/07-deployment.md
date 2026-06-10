@@ -309,4 +309,6 @@ await createServer({ manifest: gambleCherry, platform, transport: binaryTranspor
 - Should we publish a Helm chart? **Probably eventually**; Spec 09
   tracks it.
 - Should the deploy template include a Prometheus ServiceMonitor?
-  Once `/metrics` exists. **Pending Spec 06 follow-up.**
+  Metrics ship today on `/admin/metrics` (see "Instance identity &
+  metrics scraping" above); a ServiceMonitor example lands with the
+  observability pack under `deploy/`. **Open: template only.**
