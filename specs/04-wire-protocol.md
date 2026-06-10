@@ -48,6 +48,16 @@ by design. It's the standard monotonic-sequence dedup for an at-least-once
 message channel, applied at the socket so it backstops the wallet's own
 idempotency rather than relying on it.
 
+**Scope.** The guard is **per-connection by design**: the sequence space and
+the cached last-response bytes live and die with the socket. A reconnect  -
+to the same pod or a different one  - starts fresh at `$seq` 1 with an empty
+cache, so a retry that straddles a reconnect gets no transport-level replay
+protection. The cross-connection (and cross-pod) at-most-once guard is the
+wallet's idempotency-key dedupe (`specs/05-platform-protocol.md`)  - that is
+the end-to-end guarantee; the transport guard only tightens the single-socket
+case. Sticky sessions do NOT change this: routing a player back to the same
+pod does not extend the guard across sockets.
+
 ## Message types
 
 | Code | Direction | Logical message            | Payload type |

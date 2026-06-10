@@ -68,7 +68,10 @@ export interface BinaryTransportConfig {
    *  processes `last+1`, REPLAYS the cached response for a re-sent `last`
    *  (a dropped-response retry -> no re-run, no double settle), and REJECTS a
    *  gap or a frame missing the sequence. A client that opts in must stamp
-   *  every frame; mixing is rejected, by design. */
+   *  every frame; mixing is rejected, by design. Per-connection means per
+   *  socket: a reconnect (same or different pod) starts a fresh `$seq` space
+   *  with an empty cache  - the wallet's idempotency-key dedupe (Spec 05) is
+   *  the cross-connection at-most-once guard. */
   replayGuard?: boolean;
 }
 

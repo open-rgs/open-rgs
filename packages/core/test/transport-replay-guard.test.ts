@@ -120,6 +120,48 @@ describe("transport replay guard (Guarantee 6)", () => {
     ws.close();
   });
 
+  test("the guard is PER-CONNECTION: a reconnect starts a fresh $seq space", async () => {
+    // Scope check (see specs/04-wire-protocol.md, "Scope"): the sequence and the
+    // cached response die with the socket. A reconnect  - same pod or another
+    // one  - gets no carry-over; cross-connection at-most-once is the wallet's
+    // idempotency-key dedupe, not the transport's.
+    const { api, spins } = countingApi();
+    const port = nextPort++;
+    transport = binaryTransport({ port, replayGuard: true });
+    await transport.start(api);
+
+    // Connection 1: seq 1..2 processed.
+    const ws1 = await openWs(port);
+    await roundtrip(ws1, frame(MSG_SPIN_REQUEST, { betIndex: 0, [WIRE_OPSEQ_KEY]: 1 }));
+    const c1r2 = await roundtrip(ws1, frame(MSG_SPIN_REQUEST, { betIndex: 0, [WIRE_OPSEQ_KEY]: 2 }));
+    expect(c1r2.payload.roundId).toBe("r-2");
+    expect(spins()).toBe(2);
+    const closed = new Promise<void>((res) => ws1.addEventListener("close", () => res()));
+    ws1.close();
+    await closed;
+
+    // Connection 2, same server. Continuing at seq 3 is a GAP (fresh space
+    // expects 1)  - rejected, orchestrator untouched.
+    const ws2 = await openWs(port);
+    const gap = await roundtrip(ws2, frame(MSG_SPIN_REQUEST, { betIndex: 0, [WIRE_OPSEQ_KEY]: 3 }));
+    expect(gap.type).toBe(0xff); // MSG_ERROR
+    expect(gap.payload.code).toBe("INVALID_FORMAT");
+    expect(spins()).toBe(2);
+
+    // Seq 1 on the new connection is a NEW operation (a fresh spin, r-3), not a
+    // replay of connection 1's seq-1 response  - the old cache is gone.
+    const r = await roundtrip(ws2, frame(MSG_SPIN_REQUEST, { betIndex: 0, [WIRE_OPSEQ_KEY]: 1 }));
+    expect(r.payload.roundId).toBe("r-3");
+    expect(spins()).toBe(3);
+
+    // And a re-send of seq 1 replays CONNECTION 2's own cached response (r-3),
+    // proving the two sequence spaces are fully independent.
+    const dup = await roundtrip(ws2, frame(MSG_SPIN_REQUEST, { betIndex: 0, [WIRE_OPSEQ_KEY]: 1 }));
+    expect(dup.payload.roundId).toBe("r-3");
+    expect(spins()).toBe(3);
+    ws2.close();
+  });
+
   test("with the guard OFF (default), a frame without $seq is processed normally", async () => {
     const { api, spins } = countingApi();
     const port = nextPort++;
