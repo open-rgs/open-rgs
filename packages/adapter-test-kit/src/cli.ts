@@ -20,6 +20,9 @@
 //                           be read from env ADAPTER_OPTS_JSON.
 //   --skip-complex          skip complex-round checks
 //   --skip-events           skip event checks
+//   --concurrency           opt in to concurrency certification (parallel
+//                           settles, in-flight duplicate keys, reversal
+//                           interleave)  - mock/sandbox adapters only
 //   --timeout-ms <n>        per-check deadline, default 5000
 //   --out-md  <path>        write markdown report here
 //   --out-json <path>       write JSON report here
@@ -38,6 +41,7 @@ interface Args {
   opts?: string;
   skipComplex?: boolean;
   skipEvents?: boolean;
+  concurrency?: boolean;
   timeoutMs?: number;
   outMd?: string;
   outJson?: string;
@@ -58,6 +62,7 @@ function parseArgs(argv: string[]): Args {
       case "--opts":        out.opts       = next(); break;
       case "--skip-complex": out.skipComplex = true; break;
       case "--skip-events":  out.skipEvents  = true; break;
+      case "--concurrency":  out.concurrency = true; break;
       case "--timeout-ms":  out.timeoutMs  = Number(next()); break;
       case "--out-md":      out.outMd      = next(); break;
       case "--out-json":    out.outJson    = next(); break;
@@ -81,6 +86,7 @@ Optional:
   --opts    <json>        JSON constructor options. Or env ADAPTER_OPTS_JSON.
   --skip-complex          skip complex-round checks
   --skip-events           skip event checks
+  --concurrency           opt in to concurrency certification (mock/sandbox only)
   --timeout-ms <n>        per-check deadline (default 5000)
   --out-md  <path>        write markdown report
   --out-json <path>       write JSON report
@@ -125,6 +131,7 @@ const adapter = new (Ctor as new (opts: unknown) => PlatformAdapter)(ctorOpts);
 const runOpts: RunOptions = {};
 if (args.skipComplex) runOpts.skipComplex = true;
 if (args.skipEvents)  runOpts.skipEvents  = true;
+if (args.concurrency) runOpts.concurrency = true;
 if (typeof args.timeoutMs === "number") runOpts.perCheckTimeoutMs = args.timeoutMs;
 
 console.error(`-> Running conformance against ${modSpec} (export=${exportName})`);
