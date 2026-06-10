@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/client",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Tiny WebSocket client for open-rgs. Promise-based init/spin/openRound/stepRound/closeRound/promoAccept. Bun / Node / browser.",
   "license": "MIT",
   "engines": {
@@ -37,12 +37,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@open-rgs/contract": "1.1.0",
+    "@open-rgs/contract": "1.2.0",
     "@msgpack/msgpack": "^3.1.3"
   },
   "devDependencies": {
-    "@open-rgs/core": "1.6.0",
-    "@open-rgs/platform-mock": "1.2.0",
+    "@open-rgs/core": "1.7.0",
+    "@open-rgs/platform-mock": "1.2.1",
     "@open-rgs/log": "1.0.0"
   }
 }

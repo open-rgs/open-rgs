@@ -1,5 +1,31 @@
 # @open-rgs/adapter-test-kit
 
+## 1.1.0
+
+### Minor Changes
+
+- [#59](https://github.com/open-rgs/open-rgs/pull/59) [`9652a2c`](https://github.com/open-rgs/open-rgs/commit/9652a2c9baa7a807e607b4683848286e3582de09) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Opt-in concurrency certification: `runConformance(adapter, { concurrency:
+true })` (CLI `--concurrency`) adds four checks for the surface the
+  orchestrator's per-session lock does NOT shield an adapter from. Parallel
+  settles across distinct sessions must conserve each session's balance; the
+  same idempotencyKey fired twice CONCURRENTLY (an in-flight duplicate, not
+  the sequential retry the existing dedupe check covers) must settle exactly
+  once with one receipt; concurrent reversals of two stacked rounds must stay
+  latest-first per the contract's CONCURRENCY rule on `reverseRound` - both
+  legal serializations accepted, over-refund and double-credit failed - with
+  a clean skip when the adapter doesn't implement the optional `reverseRound`;
+  and a plain sequential settle must still reconcile after the storms. Off by
+  default (reported as skips, like skipComplex) because the checks open
+  derived sessions and assume independent balances - mock/sandbox wallets
+  only. Validated against the reference @open-rgs/platform-mock, plus a
+  deliberately racy adapter (read-then-write dedupe gap) the new duplicate
+  check flags where the sequential one passes it.
+
+### Patch Changes
+
+- Updated dependencies [[`0e82986`](https://github.com/open-rgs/open-rgs/commit/0e82986fa98e82bc6bf1df8904239f454c30ad56), [`c029ad3`](https://github.com/open-rgs/open-rgs/commit/c029ad37eb817e8b700d80c2691102e0c15a4a84)]:
+  - @open-rgs/contract@1.2.0
+
 ## 1.0.1
 
 ### Patch Changes

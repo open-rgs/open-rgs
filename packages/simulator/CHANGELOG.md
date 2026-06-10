@@ -1,5 +1,12 @@
 # @open-rgs/simulator
 
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`0e82986`](https://github.com/open-rgs/open-rgs/commit/0e82986fa98e82bc6bf1df8904239f454c30ad56), [`c029ad3`](https://github.com/open-rgs/open-rgs/commit/c029ad37eb817e8b700d80c2691102e0c15a4a84)]:
+  - @open-rgs/contract@1.2.0
+
 ## 1.2.0
 
 ### Minor Changes
