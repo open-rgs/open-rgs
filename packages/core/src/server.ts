@@ -79,6 +79,11 @@ export interface ServerConfig {
    *  block-and-fail a complex-round step if dropped (for jurisdictions that
    *  require a server-side action log). Default "best-effort". */
   auditMode?: "best-effort" | "mandatory";
+  /** Interval for the in-process financial snapshot log line (lifetime
+   *  bets/wins per currency + derived GGR and RTP, read straight from the
+   *  in-memory counters - no external aggregation involved). Default
+   *  600_000 (10 min). Set 0 to disable. */
+  financialLogIntervalMs?: number;
   /** Graceful-shutdown drain window in ms. Default 30_000. */
   shutdownDrainMs?: number;
   /** Install a SIGTERM handler that calls stop(). Default true; set
@@ -196,6 +201,51 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   // an instance that hasn't served a round yet reads as "silent since
   // boot", not "silent since the epoch".
   metrics.platformLastOk.set(Date.now() / 1000);
+  // Declared RTP per mode - the target line dashboards draw live RTP against.
+  for (const [modeId, mode] of Object.entries(cfg.manifest.modes)) {
+    metrics.declaredRtp.set(mode.math.rtp ?? cfg.manifest.declaredRtp, { mode: modeId });
+  }
+
+  // Financial snapshot log: lifetime totals straight from the in-memory
+  // counters - the server aggregates its own money picture, no database
+  // round-trip. Per currency: raw components + the two standard
+  // derivations (GGR = real bets - all wins paid; RTP = wins / stakes).
+  const finLogMs = cfg.financialLogIntervalMs ?? 600_000;
+  const finLog = finLogMs > 0 ? setInterval(() => {
+    const byCurrency = new Map<string, Record<string, number>>();
+    const fold = (rows: ReadonlyArray<{ labels: string; value: number }>, kind: "bets" | "wins") => {
+      for (const { labels, value } of rows) {
+        // label key format: `k="v",k="v"` in label-name order
+        const l = Object.fromEntries(labels.split(",").map((kv) => {
+          const eq = kv.indexOf("=");
+          return [kv.slice(0, eq), kv.slice(eq + 1).replace(/^"|"$/g, "")] as [string, string];
+        }));
+        const cur = l["currency"] ?? "?";
+        const slot = byCurrency.get(cur) ?? { bets_real: 0, bets_promo: 0, wins_real: 0, wins_promo: 0 };
+        slot[`${kind}_${l["funding"] ?? "real"}`] = (slot[`${kind}_${l["funding"] ?? "real"}`] ?? 0) + value;
+        byCurrency.set(cur, slot);
+      }
+    };
+    fold(metrics.betsMinor.snapshot(), "bets");
+    fold(metrics.winsMinor.snapshot(), "wins");
+    if (byCurrency.size === 0) return;
+    const fin: Record<string, unknown> = {};
+    for (const [cur, t] of byCurrency) {
+      const stakes = t["bets_real"]! + t["bets_promo"]!;
+      const wins = t["wins_real"]! + t["wins_promo"]!;
+      fin[cur] = {
+        ...t,
+        ggr_minor: t["bets_real"]! - wins,
+        rtp_lifetime: stakes > 0 ? Number((wins / stakes).toFixed(4)) : null,
+      };
+    }
+    log.info("Financial snapshot (lifetime, this instance)", {
+      "event.category": "financial",
+      "event.action":   "financial_snapshot",
+      "financial":      fin,
+    });
+  }, finLogMs) : undefined;
+
   let platformWasHealthy = cfg.platform.isHealthy;
   metrics.platformConnected.set(platformWasHealthy ? 1 : 0);
   const platformWatch = setInterval(() => {
@@ -316,6 +366,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       "drain.ms":       drainMs,
     });
     clearInterval(platformWatch);
+    if (finLog) clearInterval(finLog);
     try {
       // 1. Stop accepting new connections + drain in-flight requests.
       const transportStop = cfg.transport.stop({ drainMs });

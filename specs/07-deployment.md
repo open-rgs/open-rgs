@@ -217,6 +217,31 @@ wallet there, and is it answering":
 | `rgs_platform_call_duration_seconds{method}` | RPC latency histogram |
 | `rgs_platform_call_errors_total{method,reason}` | errors, reason includes `timeout` / `disconnected` |
 
+Financial series are in-process monotonic counters in the currency's minor
+unit; the server only increments, and GGR / RTP are DERIVED at query time
+(ratios don't aggregate across a fleet - counters do):
+
+| Series | Meaning |
+|---|---|
+| `rgs_bets_minor_total{currency,mode,funding}` | stakes; `funding=real` = actual debit (effective cost), `funding=promo` = notional free-round bet |
+| `rgs_wins_minor_total{currency,mode,funding}` | wins credited, by the round's funding |
+| `rgs_declared_rtp{mode}` | the theoretical target line |
+
+```promql
+# GGR per currency (house view: real stakes minus all wins paid)
+sum by (currency) (rgs_bets_minor_total{funding="real"})
+  - sum by (currency) (rgs_wins_minor_total)
+
+# Live RTP over a window, vs the declared line
+sum(increase(rgs_wins_minor_total[1h]))
+  / sum(increase(rgs_bets_minor_total[1h]))
+```
+
+Each instance also logs a `financial_snapshot` line on an interval
+(`financialLogIntervalMs`, default 10 min, 0 = off): lifetime per-currency
+bets/wins/GGR/RTP read straight from the in-memory counters - the money
+picture survives in plain logs even with no metrics stack attached.
+
 ## Platform adapter packaging
 
 Three patterns:
