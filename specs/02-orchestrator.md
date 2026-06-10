@@ -228,9 +228,12 @@ resume: {
 }
 ```
 
-Cross-process resume (after a server restart) requires a wallet
-inquiry endpoint not yet specified. Until then, restart-recovery
-operates per `manifest.recovery.onRestart` (planned).
+Cross-process resume (after a server restart or pod move) is
+wallet-driven: the fresh INIT's `wallet.openSession` returns
+`SessionInfo.openRound`, and the orchestrator re-hydrates
+`LocalSession.openRound` from it  - see **ADR-007** and Spec 05
+§"Open-round persistence & resume" (v1.7; until adapters populate it,
+restart-recovery operates per `manifest.recovery.onRestart`).
 
 ## Per-session serialization
 
@@ -305,5 +308,6 @@ to allow with a boot-time warning. Interventions are counted in
   games, run several processes (spec 07, "Multi-game deployments").
 - Should we expose a "drain" mode (reject new INITs but let in-flight
   rounds finish) for graceful shutdown? **Pending.**
-- Cross-process resume needs a `wallet.getOpenRound(sessionId)` call.
-  Should that be optional on `PlatformAdapter`? **Pending.**
+- ~~Cross-process resume needs a `wallet.getOpenRound(sessionId)`
+  call.~~ **Decided  - no new call** (ADR-007): `openSession` is the
+  inquiry; the wallet returns `SessionInfo.openRound`.
