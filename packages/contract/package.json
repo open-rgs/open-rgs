@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/contract",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Public type contracts for open-rgs: MathModule, WalletProvider, ClientTransport, GameManifest. Zero runtime, zero deps.",
   "license": "MIT",
   "engines": {

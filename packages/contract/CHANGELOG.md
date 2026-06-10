@@ -1,5 +1,34 @@
 # @open-rgs/contract
 
+## 1.2.0
+
+### Minor Changes
+
+- [#55](https://github.com/open-rgs/open-rgs/pull/55) [`0e82986`](https://github.com/open-rgs/open-rgs/commit/0e82986fa98e82bc6bf1df8904239f454c30ad56) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Enforce `ConcurrencyPolicy` at INIT - BEHAVIOR CHANGE. When a second
+  connection INITs a session already attached to another live connection, the
+  orchestrator now arbitrates: **kick-old** (new default - the older
+  connection gets a `SESSION_IN_USE` error frame and is closed with app close
+  code 4000; the newest window always wins), **reject-new** (the newer INIT
+  fails with `SESSION_IN_USE`), or **allow** (the previous coexist behaviour;
+  set `createServer({ concurrencyPolicy: "allow" })` to keep it). Money was
+  safe under any policy; what changes is that two open windows no longer
+  silently diverge. A dropped connection detaches first, so reconnects are
+  never policed. Contract: `ConcurrencyPolicy` gains `"allow"`,
+  `RGSErrorCode` gains `SESSION_IN_USE`, and `ClientTransport` gains the
+  optional `closeConnection` capability (a transport without it degrades
+  kick-old to allow with a boot warning). New metric:
+  `rgs_session_concurrency_actions_total{action}`.
+
+### Patch Changes
+
+- [#52](https://github.com/open-rgs/open-rgs/pull/52) [`c029ad3`](https://github.com/open-rgs/open-rgs/commit/c029ad37eb817e8b700d80c2691102e0c15a4a84) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Harden the reversal contract docs with two normative rules. `reverseRound` is
+  wallet-initiated, so it arrives outside the orchestrator's per-session lock -
+  adapters MUST implement it to be safe under concurrent invocation with
+  settle/open/close on the same session. A real adapter MUST also persist its
+  reversed-round tracking (receipts, reversed set, latest-first ordering basis)
+  durably, since a restart that forgets prior reversals turns a retried reversal
+  into a second credit. Docs only - no runtime changes.
+
 ## 1.1.0
 
 ### Minor Changes

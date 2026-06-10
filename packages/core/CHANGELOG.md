@@ -1,5 +1,33 @@
 # @open-rgs/core
 
+## 1.7.0
+
+### Minor Changes
+
+- [#55](https://github.com/open-rgs/open-rgs/pull/55) [`0e82986`](https://github.com/open-rgs/open-rgs/commit/0e82986fa98e82bc6bf1df8904239f454c30ad56) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Enforce `ConcurrencyPolicy` at INIT - BEHAVIOR CHANGE. When a second
+  connection INITs a session already attached to another live connection, the
+  orchestrator now arbitrates: **kick-old** (new default - the older
+  connection gets a `SESSION_IN_USE` error frame and is closed with app close
+  code 4000; the newest window always wins), **reject-new** (the newer INIT
+  fails with `SESSION_IN_USE`), or **allow** (the previous coexist behaviour;
+  set `createServer({ concurrencyPolicy: "allow" })` to keep it). Money was
+  safe under any policy; what changes is that two open windows no longer
+  silently diverge. A dropped connection detaches first, so reconnects are
+  never policed. Contract: `ConcurrencyPolicy` gains `"allow"`,
+  `RGSErrorCode` gains `SESSION_IN_USE`, and `ClientTransport` gains the
+  optional `closeConnection` capability (a transport without it degrades
+  kick-old to allow with a boot warning). New metric:
+  `rgs_session_concurrency_actions_total{action}`.
+
+### Patch Changes
+
+- [#56](https://github.com/open-rgs/open-rgs/pull/56) [`0610a95`](https://github.com/open-rgs/open-rgs/commit/0610a952316e1acb14ace43a513e7f483e3ed087) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - Document the scope of the opt-in transport replay guard: it is per-connection
+  by design. A reconnect (same or different pod) starts a fresh `$seq` space with
+  an empty response cache; the wallet's idempotency-key dedupe (Spec 05) is the
+  cross-connection at-most-once guard. Docs/jsdoc only - no behavior change.
+- Updated dependencies [[`0e82986`](https://github.com/open-rgs/open-rgs/commit/0e82986fa98e82bc6bf1df8904239f454c30ad56), [`c029ad3`](https://github.com/open-rgs/open-rgs/commit/c029ad37eb817e8b700d80c2691102e0c15a4a84)]:
+  - @open-rgs/contract@1.2.0
+
 ## 1.6.0
 
 ### Minor Changes
