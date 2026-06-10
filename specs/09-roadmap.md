@@ -97,7 +97,7 @@ J  - public-surface freeze v0.5: pending
 
 | Item | Spec | Status |
 |------|------|--------|
-| Cross-process restart recovery | 02, 05 | platform adapter inquiry endpoint TBD |
+| Cross-process restart recovery | 02, 05, ADR-007 | designed  - ADR-007 (wallet returns `SessionInfo.openRound` on `openSession`); implementation v1.7 |
 | ~~Idempotency keys end-to-end~~ (core side done) | 04, 05 | orchestrator derives/generates a key on every money-moving call; forwarding onto the provider wire is each adapter's job |
 | ~~Adapter-owns-state migration~~ (done) | 04, 05 | orchestrator rebuilds sessions from SessionInfo.carry/nextMode/mathVersion (ADR-004) |
 | External API surface (casino-facing) | NEW | sketched during an early provider analysis; not yet specced |

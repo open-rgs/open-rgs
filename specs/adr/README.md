@@ -39,6 +39,7 @@ probably writing a spec instead.
 | 004 | [Adapter owns state, RGS is pass-through](./004-adapter-owns-state.md) | Accepted |
 | 005 | [RGS generates round IDs](./005-rgs-generated-round-id.md) | Accepted |
 | 006 | [RGS is stateless modulo session cache](./006-stateless-rgs.md) | Accepted |
+| 007 | [Cross-pod resume via wallet-returned open round](./007-cross-pod-resume.md) | Accepted |
 
 ## When to write an ADR
 

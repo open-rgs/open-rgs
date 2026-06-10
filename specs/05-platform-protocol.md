@@ -91,6 +91,40 @@ The wallet guarantees:
 - `BalanceChangedEvent` is emitted whenever the balance changes for any
   reason (round settle, deposit, withdrawal, manual adjustment).
 
+### Open-round persistence & resume (v1.7  - adapters MAY omit until then)
+
+Decided in **ADR-007**: cross-pod / post-restart resume is
+wallet-driven  - `openSession` is the inquiry, `SessionInfo.openRound`
+is the answer. No separate `getOpenRound` RPC.
+
+While a complex round is open, the wallet MUST persist, keyed by
+session:
+
+- the `roundId` (from its own `openComplex` receipt);
+- the `bet` (plus `betIndex` / `priceMultiplier` for its native audit
+  trail  - already on `OpenComplex`);
+- the mode the round was opened in;
+- the **initial state** (`OpenComplex.initialState`) and the **last
+  state checkpoint** (the most recent `UpdateComplex.state`; the
+  initial state when no checkpoint has arrived);
+- the open timestamp.
+
+This record is cleared (or marked closed) by `closeComplex`, including
+autoclose.
+
+On `openSession`, when such a record exists, the adapter SHOULD return
+it as `SessionInfo.openRound` so a fresh INIT on **any** pod can
+re-hydrate the round (Spec 02 §Resume on reconnect). Ops never cross
+to the wallet (see below), so a wallet-built `OpenRoundResume` MAY
+carry empty `ops` / `actionLog`  - resume is then state-correct but
+render-degraded; same-pod resume keeps full fidelity.
+
+Until v1.7, adapters MAY omit all of this; the orchestrator treats an
+absent `openRound` as "nothing to resume" and
+`manifest.recovery.onRestart` applies. The autoclose backstop above is
+**unchanged**  - resume rescues the player who returns; the backstop
+settles the round of the player who never does.
+
 ### Reversal (optional)  - Guarantee 2, "One Round, One Record"
 
 `reverseRound` is **optional** and **wallet-initiated**: it exists for
@@ -259,10 +293,10 @@ specific provider's brand, product id, or wire shape.
 
 ## Open questions
 
-- Should `PlatformAdapter` expose `getOpenRound(sessionId)` for
-  cross-process resume? Optional method, only providers that support it
-  populate it; orchestrator falls back to recovery policy otherwise.
-  **Pending decision** based on which wallets we integrate next.
+- ~~Should `PlatformAdapter` expose `getOpenRound(sessionId)` for
+  cross-process resume?~~ **Decided  - no** (ADR-007): `openSession` is
+  the inquiry; the wallet returns `SessionInfo.openRound` per
+  §"Open-round persistence & resume" above.
 - Should `PlatformAdapter` expose a `listOpenSessions()` for boot-time
   recovery? Same caveats. **Pending**.
 - Idempotency key forwarding is currently not in the contract. Adding
