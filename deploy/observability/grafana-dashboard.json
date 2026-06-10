@@ -1,0 +1,225 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Prometheus datasource scraping /admin/metrics on every RGS instance",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "uid": "open-rgs-fleet",
+  "title": "open-rgs fleet",
+  "tags": ["open-rgs"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "label": "job",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(rgs_build_info, job)",
+        "refresh": 2,
+        "current": { "text": "rgs", "value": "rgs" },
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Live instances",
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "refId": "A", "expr": "count(up{job=\"$job\"} == 1)" }],
+      "options": { "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "none" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Platform connected (fleet)",
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "refId": "A", "expr": "sum(rgs_platform_connected{job=\"$job\"}) / count(rgs_platform_connected{job=\"$job\"})" }],
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 0.5 },
+            { "color": "green", "value": 1 }
+          ] }
+        }, "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Wallet silence (s since last OK answer)",
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "refId": "A", "expr": "max(time() - rgs_platform_last_ok_timestamp_seconds{job=\"$job\"})" }],
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s", "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 10 },
+            { "color": "red", "value": 30 }
+          ] }
+        }, "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Instances",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "refId": "A", "expr": "rgs_build_info{job=\"$job\"}", "format": "table", "instant": true }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true }, "renameByName": { "instance_id": "instance id", "instance": "scrape target" } } }
+      ],
+      "options": {},
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Spin rate per instance (rounds/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "refId": "A",
+        "expr": "sum by (instance_id) (rate(rgs_round_total{job=\"$job\"}[$__rate_interval]) * on(instance) group_left(instance_id) rgs_build_info{job=\"$job\"})",
+        "legendFormat": "{{instance_id}}"
+      }],
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 12, "lineWidth": 2 }, "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Platform RPC latency (p50 / p95 / p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(rgs_platform_call_duration_seconds_bucket{job=\"$job\"}[$__rate_interval])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(rgs_platform_call_duration_seconds_bucket{job=\"$job\"}[$__rate_interval])))", "legendFormat": "p95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(rgs_platform_call_duration_seconds_bucket{job=\"$job\"}[$__rate_interval])))", "legendFormat": "p99" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 8, "lineWidth": 2 }, "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Instances over time (births & deaths)",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "count(up{job=\"$job\"} == 1)", "legendFormat": "scrape-up" },
+        { "refId": "B", "expr": "count(rgs_build_info{job=\"$job\"})", "legendFormat": "build_info series" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "lineWidth": 2, "stepAfter": true }, "min": 0, "unit": "none", "decimals": 0 }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Sessions & WS connections per instance",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (instance_id) (rgs_sessions_active{job=\"$job\"} * on(instance) group_left(instance_id) rgs_build_info{job=\"$job\"})", "legendFormat": "sessions {{instance_id}}" },
+        { "refId": "B", "expr": "sum by (instance_id) (rgs_ws_connections_active{job=\"$job\"} * on(instance) group_left(instance_id) rgs_build_info{job=\"$job\"})", "legendFormat": "ws {{instance_id}}" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 8, "lineWidth": 1 }, "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Platform SLA: connected / flaps / errors",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "min(rgs_platform_connected{job=\"$job\"})", "legendFormat": "all connected (min)" },
+        { "refId": "B", "expr": "sum(rate(rgs_platform_connection_transitions_total{job=\"$job\"}[$__rate_interval])) * 60", "legendFormat": "flaps/min" },
+        { "refId": "C", "expr": "sum(rate(rgs_platform_call_errors_total{job=\"$job\"}[$__rate_interval])) * 60", "legendFormat": "rpc errors/min" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 2 }, "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "GGR per currency (since deploy, minor units)",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{
+        "refId": "A",
+        "expr": "sum by (currency) (rgs_bets_minor_total{job=\"$job\",funding=\"real\"}) - sum by (currency) (rgs_wins_minor_total{job=\"$job\"})",
+        "legendFormat": "{{currency}}",
+        "instant": true
+      }],
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value_and_name" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none", "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "green", "value": 0 }
+          ] }
+        }, "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Live RTP (1h window) vs declared",
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(rgs_wins_minor_total{job=\"$job\"}[1h])) / sum(increase(rgs_bets_minor_total{job=\"$job\"}[1h]))", "legendFormat": "live RTP (1h)" },
+        { "refId": "B", "expr": "avg(rgs_declared_rtp{job=\"$job\"})", "legendFormat": "declared" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 8, "lineWidth": 2 }, "unit": "percentunit", "min": 0, "max": 1.5 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "declared" }, "properties": [
+            { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } },
+            { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
+          ] }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Stakes vs wins flow (minor units / s)",
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (currency) (rate(rgs_bets_minor_total{job=\"$job\"}[$__rate_interval]))", "legendFormat": "stakes {{currency}}" },
+        { "refId": "B", "expr": "sum by (currency) (rate(rgs_wins_minor_total{job=\"$job\"}[$__rate_interval]))", "legendFormat": "wins {{currency}}" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 2 }, "min": 0 }, "overrides": [] }
+    }
+  ]
+}
