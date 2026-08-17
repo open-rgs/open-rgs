@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/open-rgs/libs.git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
     "directory": "packages/big-symbols"
   },
   "type": "module",
@@ -36,5 +36,6 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test"
-  }
+  },
+  "homepage": "https://open-rgs.dev/extension/big-symbols"
 }

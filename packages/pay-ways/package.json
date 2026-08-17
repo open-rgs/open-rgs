@@ -3,12 +3,38 @@
   "version": "0.1.0",
   "description": "Ways / multiways evaluation: consecutive-column runs paid by the product of per-column counts.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/open-rgs/libs.git", "directory": "packages/pay-ways" },
-  "type": "module", "main": "src/index.ts", "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "publishConfig": { "access": "public", "provenance": true },
-  "files": ["src", "README.md"],
-  "keywords": ["open-rgs", "slot", "math", "paytable"],
-  "dependencies": { "@open-rgs/grid": "0.1.0", "@open-rgs/paytable": "0.1.0" },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/pay-ways"
+  },
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "slot",
+    "math",
+    "paytable"
+  ],
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0",
+    "@open-rgs/paytable": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "homepage": "https://open-rgs.dev/extension/pay-ways"
 }

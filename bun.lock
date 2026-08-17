@@ -18,6 +18,36 @@
         "astro": "^6.3.8",
       },
     },
+    "examples/demo-holdwin": {
+      "name": "@open-rgs/demo-holdwin",
+      "version": "0.0.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/holdwin": "0.1.0",
+        "@open-rgs/markov": "0.1.0",
+        "@open-rgs/pay-anywhere": "0.1.0",
+        "@open-rgs/pay-lines": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+        "@open-rgs/recipes": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "examples/demo-tumble": {
+      "name": "@open-rgs/demo-tumble",
+      "version": "0.0.0",
+      "dependencies": {
+        "@open-rgs/cascade": "0.1.0",
+        "@open-rgs/fill": "0.1.0",
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/pay-anywhere": "0.1.0",
+        "@open-rgs/pay-cluster": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+        "@open-rgs/recipes": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
     "examples/hello-spin": {
       "name": "hello-spin",
       "version": "0.1.0",
@@ -69,6 +99,21 @@
         "@open-rgs/platform-mock": "1.2.1",
       },
     },
+    "packages/big-symbols": {
+      "name": "@open-rgs/big-symbols",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/cascade": {
+      "name": "@open-rgs/cascade",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+      },
+    },
     "packages/client": {
       "name": "@open-rgs/client",
       "version": "1.0.2",
@@ -98,15 +143,116 @@
         "@open-rgs/platform-mock": "1.2.1",
       },
     },
+    "packages/fill": {
+      "name": "@open-rgs/fill",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/grid": {
+      "name": "@open-rgs/grid",
+      "version": "0.1.0",
+    },
+    "packages/holdwin": {
+      "name": "@open-rgs/holdwin",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
     "packages/log": {
       "name": "@open-rgs/log",
       "version": "1.0.0",
+    },
+    "packages/markov": {
+      "name": "@open-rgs/markov",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/multiways": {
+      "name": "@open-rgs/multiways",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+      "devDependencies": {
+        "@open-rgs/pay-ways": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-anywhere": {
+      "name": "@open-rgs/pay-anywhere",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-cluster": {
+      "name": "@open-rgs/pay-cluster",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-lines": {
+      "name": "@open-rgs/pay-lines",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-ways": {
+      "name": "@open-rgs/pay-ways",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/paytable": {
+      "name": "@open-rgs/paytable",
+      "version": "0.1.0",
     },
     "packages/platform-mock": {
       "name": "@open-rgs/platform-mock",
       "version": "1.2.1",
       "dependencies": {
         "@open-rgs/contract": "1.2.0",
+      },
+    },
+    "packages/recipes": {
+      "name": "@open-rgs/recipes",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/scatters": {
+      "name": "@open-rgs/scatters",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/selectors": {
+      "name": "@open-rgs/selectors",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
       },
     },
     "packages/simulator": {
@@ -119,6 +265,10 @@
         "@open-rgs/contract": "0.3.1",
         "handlebars": "^4.7.9",
       },
+    },
+    "packages/weights": {
+      "name": "@open-rgs/weights",
+      "version": "0.1.0",
     },
   },
   "packages": {
@@ -312,19 +462,55 @@
 
     "@open-rgs/adapter-test-kit": ["@open-rgs/adapter-test-kit@workspace:packages/adapter-test-kit"],
 
+    "@open-rgs/big-symbols": ["@open-rgs/big-symbols@workspace:packages/big-symbols"],
+
+    "@open-rgs/cascade": ["@open-rgs/cascade@workspace:packages/cascade"],
+
     "@open-rgs/client": ["@open-rgs/client@workspace:packages/client"],
 
     "@open-rgs/contract": ["@open-rgs/contract@workspace:packages/contract"],
 
     "@open-rgs/core": ["@open-rgs/core@workspace:packages/core"],
 
+    "@open-rgs/demo-holdwin": ["@open-rgs/demo-holdwin@workspace:examples/demo-holdwin"],
+
+    "@open-rgs/demo-tumble": ["@open-rgs/demo-tumble@workspace:examples/demo-tumble"],
+
+    "@open-rgs/fill": ["@open-rgs/fill@workspace:packages/fill"],
+
+    "@open-rgs/grid": ["@open-rgs/grid@workspace:packages/grid"],
+
+    "@open-rgs/holdwin": ["@open-rgs/holdwin@workspace:packages/holdwin"],
+
     "@open-rgs/log": ["@open-rgs/log@workspace:packages/log"],
 
+    "@open-rgs/markov": ["@open-rgs/markov@workspace:packages/markov"],
+
+    "@open-rgs/multiways": ["@open-rgs/multiways@workspace:packages/multiways"],
+
+    "@open-rgs/pay-anywhere": ["@open-rgs/pay-anywhere@workspace:packages/pay-anywhere"],
+
+    "@open-rgs/pay-cluster": ["@open-rgs/pay-cluster@workspace:packages/pay-cluster"],
+
+    "@open-rgs/pay-lines": ["@open-rgs/pay-lines@workspace:packages/pay-lines"],
+
+    "@open-rgs/pay-ways": ["@open-rgs/pay-ways@workspace:packages/pay-ways"],
+
+    "@open-rgs/paytable": ["@open-rgs/paytable@workspace:packages/paytable"],
+
     "@open-rgs/platform-mock": ["@open-rgs/platform-mock@workspace:packages/platform-mock"],
+
+    "@open-rgs/recipes": ["@open-rgs/recipes@workspace:packages/recipes"],
+
+    "@open-rgs/scatters": ["@open-rgs/scatters@workspace:packages/scatters"],
+
+    "@open-rgs/selectors": ["@open-rgs/selectors@workspace:packages/selectors"],
 
     "@open-rgs/simulator": ["@open-rgs/simulator@workspace:packages/simulator"],
 
     "@open-rgs/site": ["@open-rgs/site@workspace:apps/site"],
+
+    "@open-rgs/weights": ["@open-rgs/weights@workspace:packages/weights"],
 
     "@oslojs/encoding": ["@oslojs/encoding@1.1.0", "", {}, "sha512-70wQhgYmndg4GCPxPPxPGevRKqTIJ2Nh4OkiMWmDAVYsTQ+Ta7Sq+rPevXyXGdzr30/qZBnyOalCszoMxlyldQ=="],
 

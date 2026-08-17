@@ -3,12 +3,39 @@
   "version": "0.1.0",
   "description": "Spawn scatters as a declared event on top of a generated board - weighted count, reel exclusions, protected symbols, at most one per reel - so the trigger rate is a parameter rather than an emergent property.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/open-rgs/libs.git", "directory": "packages/scatters" },
-  "type": "module", "main": "src/index.ts", "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "publishConfig": { "access": "public", "provenance": true },
-  "files": ["src", "README.md"],
-  "keywords": ["open-rgs", "slot", "scatter", "trigger", "math"],
-  "dependencies": { "@open-rgs/grid": "0.1.0", "@open-rgs/weights": "0.1.0" },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/scatters"
+  },
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "slot",
+    "scatter",
+    "trigger",
+    "math"
+  ],
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0",
+    "@open-rgs/weights": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "homepage": "https://open-rgs.dev/extension/scatters"
 }

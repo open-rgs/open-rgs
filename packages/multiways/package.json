@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/open-rgs/libs.git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
     "directory": "packages/multiways"
   },
   "type": "module",
@@ -40,5 +40,6 @@
   "devDependencies": {
     "@open-rgs/paytable": "0.1.0",
     "@open-rgs/pay-ways": "0.1.0"
-  }
+  },
+  "homepage": "https://open-rgs.dev/extension/multiways"
 }
