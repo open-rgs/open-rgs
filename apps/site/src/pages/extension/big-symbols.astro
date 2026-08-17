@@ -2,15 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { placements, placeRandomBig, blocksOf } from "@open-rgs/big-symbols";
-
-placements(grid.shape, 2, 2);   // every legal top-left corner
-
-const g = placeRandomBig(grid, "WILD", 2, 2, host.rng_next);
-
-// For presentation only - the maths never needs it.
-blocksOf(g, "WILD", [[2, 2], [3, 3]]);`;
 ---
 
 <BaseLayout
@@ -23,14 +14,43 @@ blocksOf(g, "WILD", [[2, 2], [3, 3]]);`;
 
     <p class="lede">One symbol across a block of cells.</p>
 
-    <Anim kind="big-fit" caption="A block needs every column it covers to be tall enough." />
+    <h2 data-section="&sect; 1">Repeated cells, no overlay</h2>
+
+    <p>A big symbol is written as the same symbol across every cell it covers. No marker, no parallel geometry. That is what makes it work with every evaluator for free - and it matches what players are paid.</p>
+
     <Anim kind="big-counts" caption="A 2x2 wild really does act as four wilds." />
+
+    <Code code={`import { placeBig } from "@open-rgs/big-symbols";
+
+const g = placeBig(grid, { pos: { col: 1, row: 1 }, width: 2, height: 2 }, "WILD");
+
+// A ways evaluator sees 2 matches in each of 2 columns and multiplies
+// correctly. It does not know this package exists.`} />
+
+    <h2 data-section="&sect; 2">Fit is not obvious</h2>
+
+    <p>A 2x2 needs two adjacent columns that are both tall enough at those rows. On a multiways board where one reel drew a height of two, a block that fits everywhere else does not fit there.</p>
+
+    <Anim kind="big-fit" caption="A block needs every column it covers to be tall enough." />
+
+    <Code code={`import { fits, placements } from "@open-rgs/big-symbols";
+
+fits(RAGGED, { col: 1, row: 2 }, 2, 2);   // false - the neighbour is short
+placements(RAGGED, 2, 2);                 // only the legal corners`} />
+
+    <h2 data-section="&sect; 3">Refuse rather than clip</h2>
+
+    <p>A clipped 2x2 is a 2x1 pretending to be one: it pays less than the game promised, and by then it is just symbols, so nothing downstream can tell. Random placement returns the board unchanged when nothing fits, because a feature that cannot place is an outcome to price rather than a crash.</p>
+
     <Anim kind="grid-ragged" caption="On a ragged board a block that fits elsewhere may not fit here." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { placeRandomBig, blocksOf } from "@open-rgs/big-symbols";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>A big symbol is the same symbol repeated across every cell it covers. No overlay, no marker. That is what makes it work with every evaluator for free, and it matches what players are paid. placeBig refuses rather than clipping, because a clipped 2x2 is a 2x1 pretending to be one.</p>
+placeRandomBig(grid, "WILD", 3, 3, host.rng_next);   // unchanged if it cannot fit
+
+// Presentation only - the maths never needs it.
+blocksOf(g, "WILD", [[2, 2], [3, 3]]);`} />
+
+
   </main>
 </BaseLayout>

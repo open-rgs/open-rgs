@@ -2,19 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import {
-  triggers, beginRespins, stepRespins, isCycleOver, settleRespins,
-} from "@open-rgs/holdwin";
-
-const JACKPOTS = { MINI: 8, MINOR: 20, MAJOR: 60, GRAND: 400 };
-const CONFIG   = { respins: 3, fullBoardAward: "GRAND" };
-
-if (triggers(grid, 6)) {           // 6 coins on a 5x3
-  let s = beginRespins(grid, CONFIG);
-  while (!isCycleOver(s)) s = stepRespins(s, landCoins(s.grid), CONFIG);
-  const mult = settleRespins(s, CONFIG, JACKPOTS);
-}`;
 ---
 
 <BaseLayout
@@ -27,14 +14,50 @@ if (triggers(grid, 6)) {           // 6 coins on a 5x3
 
     <p class="lede">A landing resets the counter.</p>
 
+    <h2 data-section="&sect; 1">The cycle</h2>
+
+    <p>N coins on a base board trigger respins. Coins lock, and every new coin resets the counter rather than decrementing it. That single rule is what makes the feature feel alive - and why a cycle has no natural end, so the max-win cap is what makes the round finite.</p>
+
     <Anim kind="holdwin-meter" caption="Respins burn down, then a coin lands and the counter snaps back to full." />
+
+    <Code code={`import { triggers, beginRespins, stepRespins, isCycleOver, settleRespins } from "@open-rgs/holdwin";
+
+const CONFIG = { respins: 3, fullBoardAward: "GRAND" };
+
+if (triggers(grid, 6)) {                 // 6 coins on a 5x3
+  let s = beginRespins(grid, CONFIG);
+  while (!isCycleOver(s)) s = stepRespins(s, landed, CONFIG);
+}`} />
+
+    <h2 data-section="&sect; 2">Five mechanics, one shape</h2>
+
+    <p>Collector, payer, multiplier, upgrader and spawner are the same mechanism with different selectors. Adding &quot;collect only from the same column&quot; is a selector, not a new engine.</p>
+
     <Anim kind="holdwin-collect" caption="A collector absorbs the value of every coin it targets." />
+
+    <Code code={`import { collector, payer, upgrader, cashCells, tierCells } from "@open-rgs/holdwin";
+
+collector(cashCells(), JACKPOTS);        // collect cash, leave jackpots
+upgrader(tierCells(["MINI"]));           // bump only a MINI
+payer(5, coinCells());                   // add 5 to every coin`} />
+
+    <h2 data-section="&sect; 3">Tiers resolve through one table</h2>
+
+    <p>A jackpot coin carries a tier, not a number, so retuning GRAND never means touching every coin. A collected coin is emptied rather than removed - it still fills the board but cannot be harvested twice.</p>
+
     <Anim kind="holdwin-full" caption="Filling the board pays the top tier." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { mixedCoinSet, coin, settleRespins } from "@open-rgs/holdwin";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>A landing resets rather than decrements. That single rule makes the feature feel alive, and it is why a cycle has no natural end - so the max-win cap is what makes the round finite. The five coin mechanics are one shape with different selectors, not five features.</p>
+const JACKPOTS = { MINI: 8, MINOR: 20, MAJOR: 60, GRAND: 400 };
+
+const COINS = mixedCoinSet(
+  [{ item: coin(1), weight: 46 }, { item: coin(5), weight: 8 }],
+  { MINI: 5, MINOR: 1.6, MAJOR: 0.35 },
+);
+
+settleRespins(state, CONFIG, JACKPOTS);   // includes the full-board award`} />
+
+
   </main>
 </BaseLayout>

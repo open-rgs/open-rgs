@@ -2,22 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { runCascade } from "@open-rgs/cascade";
-
-const run = runCascade(
-  start,
-  (g) => {
-    const wins = evalAllClusters(g, PAY, { roles });
-    return { multiplier: totalMultiplier(wins), positions: wins.flatMap((w) => w.positions) };
-  },
-  (next) => symbols.pick(next()),
-  host.rng_next,
-  { stepMultipliers: [1, 2, 3, 5], maxSteps: 30 },
-);
-
-run.multiplier;  // total across every step
-run.truncated;   // true if the cap fired`;
 ---
 
 <BaseLayout
@@ -30,14 +14,43 @@ run.truncated;   // true if the cap fired`;
 
     <p class="lede">Clear, fall, refill, repeat.</p>
 
+    <h2 data-section="&sect; 1">Gravity is per column</h2>
+
+    <p>A short reel drops its symbols a shorter distance. Treating the board as a rectangle mixes symbols between columns - a bug that reads as a shuffle rather than a fall, and still looks plausible on screen.</p>
+
     <Anim kind="cascade-fall" caption="Winners clear, survivors fall, a fresh symbol drops in on top." />
+
+    <Code code={`import { clear, collapse, refill, tumble } from "@open-rgs/cascade";
+
+// One move, as three steps or as one call.
+const next = tumble(grid, winningCells, (n) => symbols.pick(n()), host.rng_next);`} />
+
+    <h2 data-section="&sect; 2">The ladder applies per step</h2>
+
+    <p>It multiplies that step's own win, never the running total. Applying it to the total compounds across steps and inflates RTP badly.</p>
+
     <Anim kind="cascade-ladder" caption="The ladder climbs per step and applies to that step's own win." />
+
+    <Code code={`import { runCascade } from "@open-rgs/cascade";
+
+const run = runCascade(start, evaluate, pick, host.rng_next, {
+  stepMultipliers: [1, 2, 3, 5, 8, 12],
+  maxSteps: 30,
+});
+
+run.steps[1].paid;   // baseMultiplier * stepMultiplier`} />
+
+    <h2 data-section="&sect; 3">The loop is bounded</h2>
+
+    <p>A refill can always produce another win, so in principle a cascade never ends. Unbounded, one unlucky spin hangs the process; the cap turns that into a finite, auditable round.</p>
+
     <Anim kind="cascade-bounded" caption="The loop is capped, because a refill can always win again." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`run.truncated;   // true if the cap fired rather than the board going quiet
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>Gravity is per column: a short reel drops a shorter distance, and treating the board as a rectangle produces a shuffle rather than a fall. The ladder applies to each step's own win - applying it to the running total compounds and inflates RTP badly.</p>
+// Seeing this in simulation means the cap is too low, or the paytable
+// sustains itself. Either is worth knowing before it ships.`} />
+
+
   </main>
 </BaseLayout>

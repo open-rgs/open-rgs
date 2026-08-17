@@ -2,16 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { sampler, pickDistinct } from "@open-rgs/weights";
-
-const symbols = sampler({ LOW: 60, MID: 30, HIGH: 9, WILD: 1 });
-
-symbols.probabilityOf("WILD");  // 0.01 - readable, not inferred
-symbols.pick(host.rng_next());  // draws from the injected stream
-
-// Three different high symbols, never the same one twice.
-pickDistinct(highs, 3, host.rng_next);`;
 ---
 
 <BaseLayout
@@ -24,14 +14,44 @@ pickDistinct(highs, 3, host.rng_next);`;
 
     <p class="lede">The number you read is the number you get.</p>
 
+    <h2 data-section="&sect; 1">Probability you can read</h2>
+
+    <p>A reel strip encodes odds indirectly - you move symbols around an array to shift them. A weighted set answers the question directly, and that is the whole balancing story: RTP is a sum of probability times payout.</p>
+
     <Anim kind="weights-bands" caption="The pointer lands in each band exactly as often as its declared weight." />
-    <Anim kind="weights-zero" caption="A zero-weight symbol is unreachable at every draw, including the very top of the range." />
-    <Anim kind="weights-distinct" caption="pickDistinct draws without replacement, and refuses rather than returning fewer than asked." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { sampler } from "@open-rgs/weights";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>A reel strip encodes probability indirectly - you move symbols around an array to shift odds. A weighted set answers the question directly, and that readability is the balancing story: RTP is a sum of probability times payout.</p>
+const symbols = sampler({ LOW: 60, MID: 30, HIGH: 9, WILD: 1 });
+
+symbols.probabilityOf("WILD");  // 0.01
+symbols.distribution();         // the table you balance against
+symbols.pick(host.rng_next());  // draws from the injected stream`} />
+
+    <h2 data-section="&sect; 2">Zero weight means unreachable</h2>
+
+    <p>A symbol that exists in the game but cannot be drawn in this mode is a real thing - a scatter excluded from a respin set. It stays in the set, reports probability zero, and never comes out at any draw.</p>
+
+    <Anim kind="weights-zero" caption="Unreachable at every value, including the very top of the range." />
+
+    <Code code={`const respin = sampler({ COIN: 70, BLANK: 30, SC: 0 });
+
+respin.probabilityOf("SC");  // 0
+respin.pick(0.999999);       // never "SC"`} />
+
+    <h2 data-section="&sect; 3">Refusing beats under-delivering</h2>
+
+    <p>A placement that declared three symbols has already priced three into its RTP. Handing back two would corrupt the model with nothing downstream able to notice, so it throws instead.</p>
+
+    <Anim kind="weights-distinct" caption="pickDistinct draws without replacement, one value per item." />
+
+    <Code code={`import { pickDistinct } from "@open-rgs/weights";
+
+const highs = sampler({ H1: 1, H2: 1, H3: 1 });
+
+pickDistinct(highs, 3, host.rng_next);  // three different symbols
+pickDistinct(highs, 4, host.rng_next);  // throws - only 3 are drawable`} />
+
+
   </main>
 </BaseLayout>

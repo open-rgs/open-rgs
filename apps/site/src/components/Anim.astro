@@ -233,13 +233,30 @@ const n = (k: number) => Array.from({ length: k });
     {kind === "holdwin-full" && (
       <div class="g3">{n(9).map((_, i) => <i class={`a fillseq f${i}`}></i>)}</div>
     )}
-
     {kind === "multiways-heights" && (
-      <div class="row">
-        <div class="colr grow g1"><i class="a"></i><i class="a"></i></div>
-        <div class="colr grow g2"><i class="a"></i><i class="a"></i><i class="a"></i></div>
-        <div class="colr grow g3c"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></div>
-        <div class="colr grow g1"><i class="a"></i><i class="a"></i></div>
+      <div class="row gap">
+        <div class="mw">
+          <div class="mwf f1">
+            <div class="mwc">{n(2).map(() => <i class="a"></i>)}</div>
+            <div class="mwc">{n(3).map(() => <i class="a"></i>)}</div>
+            <div class="mwc">{n(4).map(() => <i class="a"></i>)}</div>
+          </div>
+          <div class="mwf f2">
+            <div class="mwc">{n(5).map(() => <i class="a"></i>)}</div>
+            <div class="mwc">{n(2).map(() => <i class="a"></i>)}</div>
+            <div class="mwc">{n(6).map(() => <i class="a"></i>)}</div>
+          </div>
+          <div class="mwf f3">
+            <div class="mwc">{n(3).map(() => <i class="a"></i>)}</div>
+            <div class="mwc">{n(7).map(() => <i class="a"></i>)}</div>
+            <div class="mwc">{n(3).map(() => <i class="a"></i>)}</div>
+          </div>
+        </div>
+        <div class="mwn">
+          <span class="num f1">24 ways</span>
+          <span class="num f2">60 ways</span>
+          <span class="num f3">63 ways</span>
+        </div>
       </div>
     )}
     {kind === "multiways-product" && (
@@ -380,6 +397,24 @@ const n = (k: number) => Array.from({ length: k });
   @keyframes growCol { 0%,100%{transform:scaleY(.55);transform-origin:top} 50%{transform:scaleY(1);transform-origin:top} }
   .grow { animation: growCol 3.4s infinite; }
   .g2 { animation-delay:.25s } .g3c { animation-delay:.5s }
+
+  /* Multiways: reels always fill the SAME height however many symbols they
+     hold, so the board reads as one board reconfiguring rather than columns
+     growing and shrinking. Three fixed frames cross-fade; the ways count
+     fades with them. */
+  .mw { position: relative; width: 78px; height: 84px; }
+  .mwf {
+    position: absolute; inset: 0; display: flex; gap: 3px;
+    opacity: 0; animation: frameShow 6s infinite;
+  }
+  .mwc { display: flex; flex-direction: column; gap: 2px; flex: 1 1 0; height: 100%; }
+  .mwc i { flex: 1 1 0; width: auto; height: auto; min-height: 0; }
+  .mwn { position: relative; width: 66px; height: 1.1rem; }
+  .mwn .num { position: absolute; left: 0; top: 0; opacity: 0; animation: frameShow 6s infinite; }
+  .f1 { animation-delay: 0s }
+  .f2 { animation-delay: 2s }
+  .f3 { animation-delay: 4s }
+  @keyframes frameShow { 0%{opacity:0} 4%,29%{opacity:1} 33%,100%{opacity:0} }
 
   @keyframes scPulse { 0%,100%{background:#8A5A15;border-color:#8A5A15} 50%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
   .sc { animation: scPulse 2.6s infinite; }

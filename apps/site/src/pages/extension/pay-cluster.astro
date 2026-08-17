@@ -2,13 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { evalAllClusters, clustersOf, largestCluster } from "@open-rgs/pay-cluster";
-
-const wins = evalAllClusters(grid, CLUSTER, { roles });
-
-clustersOf(grid, "HIGH", roles);     // groups, for presentation
-largestCluster(grid, "HIGH", roles); // biggest group size`;
 ---
 
 <BaseLayout
@@ -21,14 +14,42 @@ largestCluster(grid, "HIGH", roles); // biggest group size`;
 
     <p class="lede">A wild belongs to every cluster it touches.</p>
 
-    <Anim kind="pay-cluster-wild" caption="The outlined wild is counted in the teal group and the amber one." />
+    <h2 data-section="&sect; 1">Orthogonal flood fill</h2>
+
+    <p>A win is a group of the same symbol connected up, down, left or right - never diagonally - paid by how many cells it holds.</p>
+
     <Anim kind="pay-cluster-flood" caption="A flood fill from each real occurrence, spreading through neighbours." />
+
+    <Code code={`import { evalAllClusters, clustersOf } from "@open-rgs/pay-cluster";
+
+const wins = evalAllClusters(grid, CLUSTER, { roles });
+
+clustersOf(grid, "HIGH", roles);   // the groups, for presentation`} />
+
+    <h2 data-section="&sect; 2">Wilds are the whole difficulty</h2>
+
+    <p>A wild sitting between two clusters is legitimately part of both. So the fill runs per symbol and consumes only real matches - consume the wild for the first and the second silently shrinks by one, with nothing on the board looking wrong.</p>
+
+    <Anim kind="pay-cluster-wild" caption="The outlined wild is counted in the teal group and the amber one." />
+
+    <Code code={`// HIGH HIGH WILD LOW LOW
+//   clustersOf(grid, "HIGH")  ->  3 cells
+//   clustersOf(grid, "LOW")   ->  3 cells
+// The wild is in both, and is never consumed by either.`} />
+
+    <h2 data-section="&sect; 3">Never seeded from a wild</h2>
+
+    <p>Growing a cluster around a symbol that is not actually present would invent wins out of a lone wild. A wild-only region pays nothing: with no real symbol to be, there is no paytable row to read.</p>
+
     <Anim kind="pay-cluster-diag" caption="Orthogonal only. Diagonals do not connect." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { largestCluster } from "@open-rgs/pay-cluster";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>Wilds are the whole difficulty. The fill runs per symbol and consumes only real matches - consume the wild for the first cluster and the second silently shrinks by one, with nothing on the board looking wrong. A cluster is never seeded from a wild, or a lone wild would invent wins.</p>
+largestCluster(grid, "HIGH", roles);   // biggest group size
+
+// A board of pure wilds pays nothing.
+evalAllClusters(allWilds, CLUSTER, { roles });   // []`} />
+
+
   </main>
 </BaseLayout>

@@ -2,17 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { rect, makeGrid, at, countOf } from "@open-rgs/grid";
-
-// Rectangular is the case where every column happens to match.
-const SHAPE  = rect(5, 3);          // [3, 3, 3, 3, 3]
-const RAGGED = [4, 5, 5, 5, 5, 4];  // ordinary, not a special case
-
-const board = makeGrid(SHAPE, () => "LOW");
-
-at(board, 1, 4);       // undefined - off the grid, reported not thrown
-countOf(board, "LOW"); // 15`;
 ---
 
 <BaseLayout
@@ -25,14 +14,46 @@ countOf(board, "LOW"); // 15`;
 
     <p class="lede">Shape is a height per column, not width by height.</p>
 
+    <h2 data-section="&sect; 1">Ragged is not a special case</h2>
+
+    <p>A shape is a list of column heights. Rectangular boards are the case where every entry happens to match, so a 4-5-5-5-5-4 reel set needs no separate code path.</p>
+
     <Anim kind="grid-ragged" caption="The fifth cell exists in the tall reels and is simply absent from the short ones." />
+
+    <Code code={`import { rect, makeGrid } from "@open-rgs/grid";
+
+const SHAPE  = rect(5, 3);          // [3, 3, 3, 3, 3]
+const RAGGED = [4, 5, 5, 5, 5, 4];  // ordinary, not a special case
+
+const board = makeGrid(RAGGED, () => "LOW");`} />
+
+    <h2 data-section="&sect; 2">Off the grid reports, never throws</h2>
+
+    <p>On a ragged board an out-of-range row is normal, not exceptional - a payline crossing a short reel simply has no cell there. So reads report their absence instead of raising.</p>
+
     <Anim kind="grid-order" caption="Cells are stored flat, column-major. One array per board, not one per column." />
-    <Anim kind="grid-neighbours" caption="Neighbours are asked for, never computed - on a ragged board a cell can have a left neighbour and no right one." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { at, indexOf, countOf } from "@open-rgs/grid";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>Ragged reel sets are ordinary in production slots. An evaluator written against a rectangle bakes that assumption into every traversal, so adding ragged support later is a rewrite of everything that reads a grid.</p>
+at(board, 1, 4);        // "LOW"
+at(board, 0, 4);        // undefined - column 0 is only 4 tall
+indexOf(RAGGED, 0, 4);  // -1
+
+countOf(board, "LOW");  // 28`} />
+
+    <h2 data-section="&sect; 3">Neighbours are asked for</h2>
+
+    <p>Cluster evaluation walks neighbours, and on a ragged board a cell can have a left neighbour and no right one. Computing that from width and height gets it wrong; asking the shape does not.</p>
+
+    <Anim kind="grid-neighbours" caption="Only the neighbours that exist on this shape come back." />
+
+    <Code code={`import { neighbours, positionsWhere } from "@open-rgs/grid";
+
+neighbours(RAGGED, { col: 1, row: 4 });   // whatever actually exists
+
+// The workhorse behind scatter counts, collectors and cascade removal.
+positionsWhere(board, (s) => s === "SC");`} />
+
+
   </main>
 </BaseLayout>

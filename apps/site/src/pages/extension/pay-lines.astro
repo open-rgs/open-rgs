@@ -2,14 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { evalLines, rowLines } from "@open-rgs/pay-lines";
-import { totalMultiplier } from "@open-rgs/paytable";
-
-const LINES = rowLines(5, 3);   // three straight rows
-
-const wins = evalLines(grid, LINES, PAY, { roles, bothWays: false });
-const mult = totalMultiplier(wins);`;
 ---
 
 <BaseLayout
@@ -22,14 +14,48 @@ const mult = totalMultiplier(wins);`;
 
     <p class="lede">Longest run, paid once.</p>
 
+    <h2 data-section="&sect; 1">Anchored, and paid once</h2>
+
+    <p>A payline is a row index per column. Evaluation walks it left to right and pays the longest qualifying run - paying every prefix as well roughly doubles a game's RTP.</p>
+
     <Anim kind="pay-lines-run" caption="A run must be anchored at the leftmost reel." />
-    <Anim kind="pay-lines-wildopen" caption="A wild-opening run pays whichever reading is worth more." />
-    <Anim kind="pay-lines-bothways" caption="Under bothWays the two directions compete rather than accumulate." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { evalLines, rowLines } from "@open-rgs/pay-lines";
+import { totalMultiplier } from "@open-rgs/paytable";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>Paying every prefix - three of a kind and four and five on the same run - roughly doubles a game's RTP. A wild never substitutes for a scatter, or it manufactures feature triggers, and feature frequency is usually the biggest term in RTP.</p>
+const LINES = rowLines(5, 3);   // three straight rows
+
+const wins = evalLines(grid, LINES, PAY, { roles });
+totalMultiplier(wins);`} />
+
+    <h2 data-section="&sect; 2">A wild-opening run is ambiguous</h2>
+
+    <p>It can be read as the wild's own symbol or as whatever it substitutes for further along. The convention is to pay whichever is worth more; reading it only as the wild silently underpays the best board in the game.</p>
+
+    <Anim kind="pay-lines-wildopen" caption="The reading worth more is the one that pays." />
+
+    <Code code={`// WILD WILD LOW LOW LOW
+//   read as 5 LOW  -> 20
+//   read as 2 WILD -> nothing
+// pays 20
+
+// WILD WILD WILD WILD LOW
+//   read as 4 WILD -> 100
+//   read as 5 LOW  -> 20
+// pays 100`} />
+
+    <h2 data-section="&sect; 3">Both ways compete</h2>
+
+    <p>A game paying from either end evaluates both directions and keeps the better one. Paying both would double-count a run that spans the whole grid.</p>
+
+    <Anim kind="pay-lines-bothways" caption="The two directions compete rather than accumulate." />
+
+    <Code code={`const wins = evalLines(grid, LINES, PAY, { roles, bothWays: true });
+
+// A ragged shape needs no special handling: a line naming a row the
+// column does not have simply ends there.
+evalLine(grid, [2, 2, 2, 2, 2], PAY, { roles });`} />
+
+
   </main>
 </BaseLayout>

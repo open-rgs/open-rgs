@@ -2,20 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { withScatters, probabilityOfAtLeast, oneInFor } from "@open-rgs/scatters";
-
-// The base reels carry SC at weight ZERO - it cannot appear naturally.
-const config = {
-  symbol:   "SC",
-  count:    { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
-  reels:    [1, 2, 3],
-  protects: ["WILD"],
-};
-
-const board = withScatters(reels, config);
-
-oneInFor(config, 3);  // 200 - the feature fires 1 spin in 200`;
 ---
 
 <BaseLayout
@@ -28,14 +14,53 @@ oneInFor(config, 3);  // 200 - the feature fires 1 spin in 200`;
 
     <p class="lede">The trigger rate is a parameter, not an emergent property.</p>
 
+    <h2 data-section="&sect; 1">Declared, not discovered</h2>
+
+    <p>With a natural scatter the trigger rate emerges from per-cell probability and grid size, and you tune it by guessing a weight and re-simulating. Draw the board with the scatter at weight zero and spawn instead, and the count distribution becomes the trigger rate.</p>
+
     <Anim kind="spawn-count" caption="The count distribution is declared, so the trigger rate is written down." />
-    <Anim kind="spawn-onereel" caption="At most one per reel by default, which is what makes the count exact." />
+
+    <Code code={`import { withScatters, oneInFor, probabilityOfAtLeast } from "@open-rgs/scatters";
+
+const config = {
+  symbol: "SC",
+  count:  { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
+};
+
+oneInFor(config, 3);              // 200 - the feature fires 1 spin in 200
+probabilityOfAtLeast(config, 3);  // 0.005`} />
+
+    <h2 data-section="&sect; 2">One per reel, and which reels</h2>
+
+    <p>At most one per reel is the genre norm, and it is what makes the count distribution exactly controllable. Excluded reels never receive one.</p>
+
+    <Anim kind="spawn-onereel" caption="At most one per reel by default; excluded reels never receive one." />
+
+    <Code code={`const config = {
+  symbol:     "SC",
+  count:      { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
+  reels:      [1, 2, 3],    // never the outer reels
+  onePerReel: true,         // the default
+};
+
+const board = withScatters(reels, config);`} />
+
+    <h2 data-section="&sect; 3">Protected symbols stay</h2>
+
+    <p>A wild the player can see is about to pay must not be eaten. If protections leave too few legal cells, the spawn places what it can and reports both numbers - throwing would crash a legitimate spin, and silence would break the declared rate with nothing to notice it.</p>
+
     <Anim kind="spawn-protect" caption="Protected symbols are never eaten - a wild about to pay stays put." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { spawnOn, assertFeasible } from "@open-rgs/scatters";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>With a natural scatter the trigger rate is an emergent property of per-cell probability and grid size, tuned by guessing a weight and re-simulating. Spawning inverts that: the count distribution is the trigger rate, readable without a simulation.</p>
+const result = spawnOn(grid, { ...config, protects: ["WILD"] }, host.rng_next);
+
+result.wanted;    // what the distribution drew
+result.spawned;   // what the board could host
+
+// Structurally impossible configs fail at build time instead.
+assertFeasible(config, 5);`} />
+
+
   </main>
 </BaseLayout>

@@ -2,15 +2,6 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
 import Code from "../../components/Code.astro";
-
-const sample = `import { paytable, bands, totalMultiplier } from "@open-rgs/paytable";
-
-const PAY = paytable({ HIGH: { 3: 10, 4: 50, 5: 200 } });
-
-// Cluster games pay by size range. 49 = the grid size.
-const CLUSTER = paytable(bands({ HIGH: [[5, 2], [9, 6], [12, 22]] }, 49));
-
-const roles = { wilds: ["WILD"], scatters: ["SC"] };`;
 ---
 
 <BaseLayout
@@ -23,14 +14,45 @@ const roles = { wilds: ["WILD"], scatters: ["SC"] };`;
 
     <p class="lede">One shared notion of payout, wild and scatter.</p>
 
-    <Anim kind="paytable-bands" caption="bands() expands size ranges into the exact counts a paytable stores." />
+    <h2 data-section="&sect; 1">One table, four evaluators</h2>
+
+    <p>Lines, ways, anywhere and cluster all read this, so a symbol means the same thing in each. When each carried its own idea of a wild, a game using two of them could disagree with itself and the two RTPs would quietly differ.</p>
+
     <Anim kind="paytable-wild" caption="A wild substitutes for anything except a scatter." />
-    <Anim kind="paytable-topband" caption="The top band is open-ended and runs all the way to maxCount." />
 
-    <h2 data-section="&sect; 1">Using it</h2>
-    <Code code={sample} />
+    <Code code={`import { paytable, substitutes } from "@open-rgs/paytable";
 
-    <h2 data-section="&sect; 2">Why</h2>
-    <p>All four evaluators read this, so a symbol means the same thing in each. Watch the top band: it is open-ended. On a 49-cell board seven or more scatters is common, not a lottery ticket, and the intuition from a five-reel grid does not transfer.</p>
+const PAY   = paytable({ HIGH: { 3: 10, 4: 50, 5: 200 } });
+const roles = { wilds: ["WILD"], scatters: ["SC"] };
+
+substitutes("WILD", "HIGH", roles);  // true
+substitutes("WILD", "SC",   roles);  // false - never a scatter`} />
+
+    <h2 data-section="&sect; 2">Bands for cluster games</h2>
+
+    <p>Cluster games pay by size range while a paytable stores exact counts, so there is never interpolation to reason about. bands() bridges the two.</p>
+
+    <Anim kind="paytable-bands" caption="Size ranges expanded into the exact counts a paytable stores." />
+
+    <Code code={`import { bands } from "@open-rgs/paytable";
+
+// 49 = the grid size, the largest cluster the board can hold.
+const CLUSTER = paytable(bands({
+  HIGH: [[5, 2], [9, 6], [12, 22], [15, 90]],
+}, 49));`} />
+
+    <h2 data-section="&sect; 3">Watch the top band</h2>
+
+    <p>The top band is open-ended: it runs from its start all the way to maxCount. On a five-reel grid seven scatters is impossible, so the intuition is that it is a lottery ticket. On 49 cells it is not.</p>
+
+    <Anim kind="paytable-topband" caption="The top band runs all the way to maxCount." />
+
+    <Code code={`// A demo game gave SC a 6% weight and a [7, 200] band on a 49-cell board.
+// That lands 2.7% of the time and paid 536% RTP on its own.
+
+PAY.maxCount("HIGH");   // where the table actually stops
+PAY.best("HIGH");       // the largest payout available`} />
+
+
   </main>
 </BaseLayout>
