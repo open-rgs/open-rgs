@@ -6,7 +6,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/open-rgs/libs.git" },
   "workspaces": ["packages/*", "games/*"],
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/grid",
+    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights",
     "test": "bun test",
     "changeset": "changeset",
     "release": "changeset publish"
