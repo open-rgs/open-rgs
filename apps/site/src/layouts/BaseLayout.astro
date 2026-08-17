@@ -1,4 +1,12 @@
 ---
+// Self-hosted so the site looks the same everywhere. The old stack was system
+// fonts only, which meant it rendered as New York on macOS and fell through to
+// Georgia or a generic serif everywhere else.
+import "@fontsource-variable/literata";
+// wght-italic, not opsz-italic: index.css is the wght roman, and pairing it
+// with the optical-size italic mixes two different axes of the same family.
+import "@fontsource-variable/literata/wght-italic.css";
+import "@fontsource-variable/jetbrains-mono";
 interface Props {
   title?: string;
   description?: string;
@@ -251,8 +259,8 @@ const jsonLd = isLanding
 
     <style is:global>
       :root {
-        --serif: ui-serif, Charter, "Iowan Old Style", "Source Serif 4", "Source Serif Pro", Georgia, serif;
-        --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+        --serif: "Literata Variable", ui-serif, Charter, "Iowan Old Style", Georgia, serif;
+        --mono:  "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
 
