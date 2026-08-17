@@ -3,8 +3,9 @@
 ---
 
 Docs: new `/libs` page covering the `@open-rgs/*` slot libraries - the three
-signatures every piece shares, the layer stack, a complete worked game, an
-extension guide, and the package surface.
+signatures every piece shares, what each layer settles, and how to extend it.
+Kept deliberately short: the animatics carry the lessons, so the prose beside
+them is a sentence or two rather than a paragraph.
 
 Includes four looped CSS animatics for the rules that are easy to state and
 easy to implement wrongly: cascade gravity being per-column, stickiness moving

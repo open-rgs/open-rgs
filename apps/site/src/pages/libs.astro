@@ -10,68 +10,49 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <h1>Slot libraries</h1>
 
     <p class="lede">
-      Thirteen small packages that compose into a slot. They are ordinary
-      TypeScript libraries your math file imports  - there is no plugin system,
-      because TS math can simply <code>import</code>.
+      Thirteen small packages a math file imports. No plugin system  - TS math
+      can just <code>import</code>.
     </p>
 
     <h2 data-section="§ 1">Three signatures</h2>
 
-    <p>
-      Every piece in the stack is a pure function of a stream of floats. Nothing
-      owns randomness; everything receives it.
-    </p>
-
-    <pre><code>{`Generator<S> = (next) => Grid<S>              // makes a board
-Selector<S>  = (grid, next) => Pos[]          // picks cells
-Effect       = (grid, pos, next) => Grid      // changes a board`}</code></pre>
+    <pre><code>{`Generator<S> = (next) => Grid<S>          // makes a board
+Selector<S>  = (grid, next) => Pos[]      // picks cells
+Effect       = (grid, pos, next) => Grid  // changes a board`}</code></pre>
 
     <p>
-      <code>next</code> is always <code>host.rng_next</code>. That uniformity is
-      not tidiness for its own sake  - it is what makes replay work. Because no
-      piece can reach an ambient generator, a round is determined entirely by
-      <code>(seed, carry)</code>, and <code>loadTsMath</code>'s
-      <code>rngMode: "seed-expand"</code> can hand you one number that
-      reconstructs it exactly.
+      <code>next</code> is always <code>host.rng_next</code>. Nothing here makes
+      randomness; everything receives it. That is what lets one recorded seed
+      replay a whole round.
     </p>
 
-    <h2 data-section="§ 2">The layers</h2>
+    <h2 data-section="§ 2">What each layer settles</h2>
 
     <table>
-      <thead><tr><th>Layer</th><th>Packages</th><th>What it settles</th></tr></thead>
       <tbody>
         <tr>
-          <td>substrate</td>
           <td><code>grid</code> <code>weights</code> <code>selectors</code></td>
-          <td>Shape (ragged-first), exact weighted sampling, and "which cells?"</td>
+          <td>Shape (ragged-first), exact weighted draws, and "which cells?"</td>
         </tr>
         <tr>
-          <td>generation</td>
           <td><code>fill</code> <code>markov</code> <code>recipes</code></td>
           <td>Frequency, then stacking, then a mixture of named boards</td>
         </tr>
         <tr>
-          <td>evaluation</td>
           <td><code>paytable</code> <code>pay-lines</code> <code>pay-ways</code> <code>pay-anywhere</code> <code>pay-cluster</code></td>
           <td>Turning a board into a multiplier</td>
         </tr>
         <tr>
-          <td>features</td>
           <td><code>cascade</code> <code>holdwin</code></td>
           <td>Tumbles and respin cycles</td>
         </tr>
       </tbody>
     </table>
 
-    <h2 data-section="§ 3">Four rules worth watching</h2>
-
-    <p>
-      Each of these is easy to state and easy to implement wrongly, and each
-      costs real money when it is wrong.
-    </p>
+    <h2 data-section="§ 3">Four rules that cost money when wrong</h2>
 
     <div class="anim">
-      <span class="anim-head">Cascade &middot; clear, fall, refill</span>
+      <span class="anim-head">Cascade gravity is per column</span>
       <div class="stage">
         <div>
           <div class="casc">
@@ -80,20 +61,16 @@ Effect       = (grid, pos, next) => Grid      // changes a board`}</code></pre>
             <div class="sq c s2"></div>
             <div class="sq a s3"></div>
           </div>
-          <div class="cap">one column</div>
         </div>
         <p>
-          The winner flashes, clears, and everything above falls by exactly one
-          cell before a fresh symbol drops in. Gravity is
-          <strong>per column</strong>  - a short reel drops a shorter distance,
-          and treating the board as a rectangle produces a shuffle rather than a
-          fall.
+          A short reel drops a shorter distance. Treat the board as a rectangle
+          and you get a shuffle, not a fall.
         </p>
       </div>
     </div>
 
     <div class="anim">
-      <span class="anim-head">Stickiness changes clumping, not frequency</span>
+      <span class="anim-head">Stickiness moves clumping, not frequency</span>
       <div class="stage">
         <div>
           <div class="col roll loose">
@@ -110,17 +87,15 @@ Effect       = (grid, pos, next) => Grid      // changes a board`}</code></pre>
           <div class="cap">s = 0.8</div>
         </div>
         <p>
-          Both columns draw the same symbols at the same rates; only the runs
-          differ. With <code>sticky(base, s)</code> the chain's stationary
-          distribution is exactly <code>base</code> for every <code>s &lt; 1</code>,
-          so this knob is pure feel and cannot move your RTP. That is the
-          property a reel strip cannot offer.
+          Same symbols, same rates, different runs. Under
+          <code>sticky(base, s)</code> the stationary distribution is exactly
+          <code>base</code>, so this knob cannot move your RTP.
         </p>
       </div>
     </div>
 
     <div class="anim">
-      <span class="anim-head">One wild, two clusters</span>
+      <span class="anim-head">A wild belongs to every cluster it touches</span>
       <div class="stage">
         <div>
           <div class="wgrid">
@@ -128,135 +103,63 @@ Effect       = (grid, pos, next) => Grid      // changes a board`}</code></pre>
             <div class="sq a lft"></div><div class="sq w both"></div><div class="sq b rgt"></div>
             <div class="sq c"></div><div class="sq b rgt"></div><div class="sq b rgt"></div>
           </div>
-          <div class="cap">outlined wild sits in both</div>
         </div>
         <p>
-          The centre wild belongs to both clusters, so the flood fill runs
-          <strong>per symbol</strong> and consumes only real matches. Consume the
-          wild for the first cluster and the second silently shrinks by one, with
-          nothing on the board looking wrong.
+          So the fill runs per symbol. Consume the wild for the first cluster and
+          the second silently shrinks, with nothing on the board looking wrong.
         </p>
       </div>
     </div>
 
     <div class="anim">
-      <span class="anim-head">Hold &amp; win &middot; a landing RESETS the counter</span>
+      <span class="anim-head">A landing resets the respin counter</span>
       <div class="stage">
         <div>
           <div class="meter">
             <div class="sq a"></div><div class="sq a m2"></div><div class="sq a m3"></div>
           </div>
-          <div class="cap">respins left</div>
         </div>
-        <div>
-          <div class="sq b landing"></div>
-          <div class="cap">new coin</div>
-        </div>
+        <div><div class="sq b landing"></div></div>
         <p>
-          Respins burn down, then a coin lands and the counter snaps back to
-          full. That rule is what makes the feature feel alive  - and why a cycle
-          has <strong>no natural end</strong>. A max-win cap is not optional in
-          this genre; it is what makes the round finite.
+          Not decrements  - resets. Which is why a hold &amp; win cycle has no
+          natural end, and why the max-win cap is what makes the round finite.
         </p>
       </div>
     </div>
 
-    <h2 data-section="§ 4">A whole game</h2>
+    <h2 data-section="§ 4">Writing a board</h2>
 
-    <pre><code>{`import type { MathHost, SimpleMath } from "@open-rgs/contract";
-import { rect } from "@open-rgs/grid";
-import { stackyFill } from "@open-rgs/markov";
-import { recipes, place, stack } from "@open-rgs/recipes";
-import { randomN, cols } from "@open-rgs/selectors";
-import { paytable, totalMultiplier } from "@open-rgs/paytable";
-import { evalLines, rowLines } from "@open-rgs/pay-lines";
+    <pre><code>{`const reels = stackyFill(rect(5, 3), { LOW: 55, HIGH: 12, WILD: 5, SC: 3 }, 0.35);
 
-const SHAPE = rect(5, 3);
-const BASE  = { LOW: 55, MID: 25, HIGH: 12, WILD: 5, SC: 3 };
-const reels = stackyFill(SHAPE, BASE, 0.35);   // 0.35 = stackiness
-const LINES = rowLines(5, 3);
-const roles = { wilds: ["WILD"], scatters: ["SC"] };
-const PAY   = paytable({ HIGH: { 3: 10, 4: 50, 5: 200 }, LOW: { 3: 2, 4: 5, 5: 20 } });
-
-// Every board comes from exactly one named recipe, at a declared rate.
+// Every board comes from exactly one named recipe, at a declared rate -
+// so a tease is priced into RTP and measurable, never a decoration.
 const board = recipes([
-  { name: "base",        p: 0.94, draw: reels },
+  { name: "base",        p: 0.95, draw: reels },
   { name: "two-scatter", p: 0.05, draw: place(2, "SC", randomN(2, cols([0, 1])), reels) },
-  { name: "high-stack",  p: 0.01, draw: stack("HIGH", 2, reels) },
 ]);
 
-export default (host: MathHost): SimpleMath => ({
-  kind: "simple", name: "demo", version: "1.0.0", rtp: 0.96,
-  play: () => {
-    const { grid, recipe } = board(host.rng_next);
-    const wins = evalLines(grid, LINES, PAY, { roles });
-    const mult = totalMultiplier(wins);
-    return {
-      multiplier: mult,
-      ops: [{ kind: "spin", grid: grid.cells, recipe }],
-      type: mult > 0 ? "win" : "loss",
-    };
-  },
-});`}</code></pre>
-
-    <p class="note">
-      Note the shape: it default-exports a <strong>factory</strong> taking the
-      host. That is the RNG seam  - the math has no other source of randomness,
-      and <code>loadTsMath</code> rejects a bare object for exactly that reason.
-    </p>
+const { grid, recipe } = board(host.rng_next);
+const mult = totalMultiplier(evalLines(grid, rowLines(5, 3), PAY, { roles }));`}</code></pre>
 
     <h2 data-section="§ 5">Extending it</h2>
 
     <p>
-      There is no plugin system to learn. Every extension point is one of the
-      three signatures above, so extending means writing an ordinary function.
+      Every extension point is one of the three signatures, so extending means
+      writing a function. "Collect only from the same column" is a selector, not
+      a new engine.
     </p>
 
-    <pre><code>{`// A generator is (next) => Grid. Nothing to register.
-const mirrored = (next) => {
-  const left = reels(next);
-  return fromColumns([...toColumns(left), ...toColumns(left).reverse()]);
-};
-
-// A selector is (grid, next) => Pos[]. Compose with the built-ins.
-const topRow      = (grid, next) => rows([0])(grid, next);
-const freeTopRow  = except(topRow, holding("WILD"));
-
-// "Collect only from the same column" is a SELECTOR, not a new engine.
-const sameColumn  = (src) => (grid, next) =>
+    <pre><code>{`const sameColumn = (src) => (grid, next) =>
   coinCells()(grid, next).filter((p) => p.col === src.col);
-const columnCollector = (src) => collector(sameColumn(src), JACKPOTS);
 
-// A new pay rule returns Win[] and concatenates with every other evaluator.
-totalMultiplier([...evalLines(...), ...evalDiagonals(...)]);`}</code></pre>
+const columnCollector = (src) => collector(sameColumn(src), JACKPOTS);`}</code></pre>
 
     <p class="warn">
-      <strong>The one rule for anything you add:</strong> take <code>next</code>,
-      never make it. A function that reaches for <code>Math.random()</code> looks
-      correct, passes every test you would think to write, and silently destroys
-      seed reproducibility  - which voids any RTP measured from a replay.
+      <strong>The one rule:</strong> take <code>next</code>, never make it. Code
+      that reaches for <code>Math.random()</code> looks right, passes every test
+      you would think to write, and silently voids any RTP measured from a
+      replay.
     </p>
-
-    <h2 data-section="§ 6">Package surface</h2>
-
-    <table>
-      <thead><tr><th>Package</th><th>Reach for</th></tr></thead>
-      <tbody>
-        <tr><td><code>grid</code></td><td>rect &middot; makeGrid &middot; fromColumns &middot; at &middot; positionsWhere &middot; countOf &middot; withAt &middot; neighbours</td></tr>
-        <tr><td><code>weights</code></td><td>sampler &middot; pickDistinct &middot; probabilityOf &middot; distribution</td></tr>
-        <tr><td><code>selectors</code></td><td>all &middot; cols &middot; rows &middot; where &middot; holding &middot; randomN &middot; upTo &middot; union &middot; except &middot; not</td></tr>
-        <tr><td><code>fill</code></td><td>fillWeights &middot; fillWeightsPerColumn &middot; constant &middot; expectedCount</td></tr>
-        <tr><td><code>markov</code></td><td>stackyFill &middot; sticky &middot; transitions &middot; stationary &middot; meanRunLength</td></tr>
-        <tr><td><code>recipes</code></td><td>recipes &middot; place &middot; placeAt &middot; placeDrawn &middot; stack &middot; fixed</td></tr>
-        <tr><td><code>paytable</code></td><td>paytable &middot; bands &middot; substitutes &middot; isWild &middot; isScatter &middot; totalMultiplier</td></tr>
-        <tr><td><code>pay-lines</code></td><td>evalLine &middot; evalLines &middot; rowLines</td></tr>
-        <tr><td><code>pay-ways</code></td><td>evalWay &middot; evalWays &middot; totalWays</td></tr>
-        <tr><td><code>pay-anywhere</code></td><td>evalAnywhere &middot; evalScatters &middot; triggersOn &middot; shortOfTrigger</td></tr>
-        <tr><td><code>pay-cluster</code></td><td>clustersOf &middot; evalClusters &middot; evalAllClusters &middot; largestCluster</td></tr>
-        <tr><td><code>cascade</code></td><td>runCascade &middot; tumble &middot; clear &middot; collapse &middot; refill</td></tr>
-        <tr><td><code>holdwin</code></td><td>triggers &middot; beginRespins &middot; stepRespins &middot; settleRespins &middot; collector &middot; payer &middot; multiplier &middot; upgrader &middot; spawner</td></tr>
-      </tbody>
-    </table>
   </main>
 </BaseLayout>
 
@@ -264,11 +167,11 @@ totalMultiplier([...evalLines(...), ...evalDiagonals(...)]);`}</code></pre>
   /* Animatics: square divs, no rounded corners, CSS keyframes only. */
   .anim {
     border: 1px solid var(--fg-mute, #888);
-    padding: 1.4rem;
-    margin: 0 0 1rem;
+    padding: 1.2rem;
+    margin: 0 0 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.85rem;
   }
   .anim-head {
     font-family: var(--mono, monospace);
@@ -277,17 +180,17 @@ totalMultiplier([...evalLines(...), ...evalDiagonals(...)]);`}</code></pre>
     text-transform: uppercase;
     color: var(--fg-mute, #888);
   }
-  .stage { display: flex; align-items: flex-start; gap: 1.9rem; flex-wrap: wrap; }
+  .stage { display: flex; align-items: flex-start; gap: 1.6rem; flex-wrap: wrap; }
   .stage p { flex: 1; min-width: 15rem; margin: 0; }
   .col { display: flex; flex-direction: column; gap: 3px; }
   .cap {
     font-family: var(--mono, monospace);
     font-size: 0.68rem;
     color: var(--fg-mute, #888);
-    margin-top: 0.4rem;
+    margin-top: 0.35rem;
   }
   .sq {
-    width: 26px; height: 26px;
+    width: 24px; height: 24px;
     background: var(--bg-soft, #eee);
     border: 1px solid var(--fg-mute, #888);
     border-radius: 0;
@@ -297,11 +200,11 @@ totalMultiplier([...evalLines(...), ...evalDiagonals(...)]);`}</code></pre>
   .sq.c { background: #4A6570; border-color: #4A6570; }
   .sq.w { background: transparent; border: 2px solid #0E6B62; }
 
-  .casc { position: relative; height: 116px; width: 26px; overflow: hidden; }
+  .casc { position: relative; height: 108px; width: 24px; overflow: hidden; }
   .casc .sq { position: absolute; left: 0; }
   @keyframes fallOne {
     0%, 22%   { transform: translateY(0); }
-    30%, 100% { transform: translateY(29px); }
+    30%, 100% { transform: translateY(27px); }
   }
   @keyframes clearOne {
     0%, 18%  { opacity: 1; outline: 0 solid #0E6B62; }
@@ -310,13 +213,13 @@ totalMultiplier([...evalLines(...), ...evalDiagonals(...)]);`}</code></pre>
     100%     { opacity: 0; }
   }
   @keyframes dropIn {
-    0%, 26%   { opacity: 0; transform: translateY(-29px); }
+    0%, 26%   { opacity: 0; transform: translateY(-27px); }
     36%, 100% { opacity: 1; transform: translateY(0); }
   }
   .casc .s0 { top: 0;    animation: dropIn 3.2s infinite ease-out; }
-  .casc .s1 { top: 29px; animation: fallOne 3.2s infinite ease-in; }
-  .casc .s2 { top: 58px; animation: fallOne 3.2s infinite ease-in; }
-  .casc .s3 { top: 87px; animation: clearOne 3.2s infinite; }
+  .casc .s1 { top: 27px; animation: fallOne 3.2s infinite ease-in; }
+  .casc .s2 { top: 54px; animation: fallOne 3.2s infinite ease-in; }
+  .casc .s3 { top: 81px; animation: clearOne 3.2s infinite; }
 
   .roll .sq { animation: rollA 4s infinite steps(1, end); }
   @keyframes rollA { 0%{background:#0E6B62;border-color:#0E6B62}25%{background:#8A5A15;border-color:#8A5A15}50%{background:#4A6570;border-color:#4A6570}75%{background:#0E6B62;border-color:#0E6B62} }
@@ -329,7 +232,7 @@ totalMultiplier([...evalLines(...), ...evalDiagonals(...)]);`}</code></pre>
   .tight .sq:nth-child(3){animation-name:rollA}.tight .sq:nth-child(4){animation-name:rollB}
   .tight .sq:nth-child(5){animation-name:rollB}.tight .sq:nth-child(6){animation-name:rollC}
 
-  .wgrid { display: grid; grid-template-columns: repeat(3, 26px); gap: 3px; }
+  .wgrid { display: grid; grid-template-columns: repeat(3, 24px); gap: 3px; }
   @keyframes ringL { 0%,45%{outline:3px solid #0E6B62;outline-offset:-3px}50%,100%{outline:0 solid transparent} }
   @keyframes ringR { 0%,45%{outline:0 solid transparent}50%,100%{outline:3px solid #8A5A15;outline-offset:-3px} }
   .wgrid .lft  { animation: ringL 3s infinite; }
