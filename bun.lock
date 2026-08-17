@@ -39,6 +39,42 @@
         "@open-rgs/weights": "0.1.0",
       },
     },
+    "packages/pay-anywhere": {
+      "name": "@open-rgs/pay-anywhere",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-cluster": {
+      "name": "@open-rgs/pay-cluster",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-lines": {
+      "name": "@open-rgs/pay-lines",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/pay-ways": {
+      "name": "@open-rgs/pay-ways",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+      },
+    },
+    "packages/paytable": {
+      "name": "@open-rgs/paytable",
+      "version": "0.1.0",
+    },
     "packages/recipes": {
       "name": "@open-rgs/recipes",
       "version": "0.1.0",
@@ -116,6 +152,16 @@
     "@open-rgs/holdwin": ["@open-rgs/holdwin@workspace:packages/holdwin"],
 
     "@open-rgs/markov": ["@open-rgs/markov@workspace:packages/markov"],
+
+    "@open-rgs/pay-anywhere": ["@open-rgs/pay-anywhere@workspace:packages/pay-anywhere"],
+
+    "@open-rgs/pay-cluster": ["@open-rgs/pay-cluster@workspace:packages/pay-cluster"],
+
+    "@open-rgs/pay-lines": ["@open-rgs/pay-lines@workspace:packages/pay-lines"],
+
+    "@open-rgs/pay-ways": ["@open-rgs/pay-ways@workspace:packages/pay-ways"],
+
+    "@open-rgs/paytable": ["@open-rgs/paytable@workspace:packages/paytable"],
 
     "@open-rgs/recipes": ["@open-rgs/recipes@workspace:packages/recipes"],
 
