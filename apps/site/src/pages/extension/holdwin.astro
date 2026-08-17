@@ -1,24 +1,40 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import {
+  triggers, beginRespins, stepRespins, isCycleOver, settleRespins,
+} from "@open-rgs/holdwin";
+
+const JACKPOTS = { MINI: 8, MINOR: 20, MAJOR: 60, GRAND: 400 };
+const CONFIG   = { respins: 3, fullBoardAward: "GRAND" };
+
+if (triggers(grid, 6)) {           // 6 coins on a 5x3
+  let s = beginRespins(grid, CONFIG);
+  while (!isCycleOver(s)) s = stepRespins(s, landCoins(s.grid), CONFIG);
+  const mult = settleRespins(s, CONFIG, JACKPOTS);
+}`;
 ---
 
 <BaseLayout
   title="@open-rgs/holdwin  - Respins"
-  description="Hold &amp; win: A landing RESETS the counter."
+  description="Hold and win: A landing resets the counter."
 >
   <main>
     <p class="dim"><a href="/extension">&larr; extensions</a></p>
     <h1>@open-rgs/holdwin</h1>
 
-    <p class="lede">A landing RESETS the counter.</p>
+    <p class="lede">A landing resets the counter.</p>
 
-    <Anim kind="holdwin" caption="MINI / MINOR / MAJOR / GRAND resolve through one table, so retuning GRAND never means touching every coin. A collected coin is emptied, not removed - so it still fills the board but cannot be harvested twice." />
+    <Anim kind="holdwin-meter" caption="Respins burn down, then a coin lands and the counter snaps back to full." />
+    <Anim kind="holdwin-collect" caption="A collector absorbs the value of every coin it targets." />
+    <Anim kind="holdwin-full" caption="Filling the board pays the top tier." />
 
-    <p>Not decrements - resets. That single rule is what makes the feature feel alive, and it is also why a cycle has no natural end, so a max-win cap is what makes the round finite. The five coin mechanics are one shape with different selectors, not five features.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/holdwin";`}</code></pre>
-    <p class="dim">triggers(grid, 6)  &middot;  beginRespins  &middot;  stepRespins  &middot;  settleRespins  &middot;  collector  &middot;  payer  &middot;  multiplier  &middot;  upgrader  &middot;  spawner</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>A landing resets rather than decrements. That single rule makes the feature feel alive, and it is why a cycle has no natural end - so the max-win cap is what makes the round finite. The five coin mechanics are one shape with different selectors, not five features.</p>
   </main>
 </BaseLayout>

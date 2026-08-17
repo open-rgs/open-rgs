@@ -1,0 +1,45 @@
+---
+// Syntax-coloured code block. Tiny regex tokeniser rather than a highlighter
+// dependency: these samples are short, TypeScript-only, and shipping a
+// highlighter to colour twenty lines is not a trade worth making.
+interface Props { code: string }
+const { code } = Astro.props;
+
+const KEYWORDS = /\b(import|from|export|default|const|let|return|function|if|else|for|of|type|interface|as|new|await|async)\b/g;
+
+function highlight(src: string): string {
+  const esc = src
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Order matters: comments first, then strings, then keywords/numbers - so a
+  // keyword inside a comment is not re-coloured.
+  return esc
+    .replace(/(\/\/[^\n]*)/g, '<span class="c-com">$1</span>')
+    .replace(/(&quot;[^&\n]*&quot;|"[^"\n]*"|'[^'\n]*')/g, '<span class="c-str">$1</span>')
+    .replace(KEYWORDS, '<span class="c-key">$&</span>')
+    .replace(/\b(\d+\.?\d*)\b/g, '<span class="c-num">$1</span>')
+    .replace(/\b([a-zA-Z_$][\w$]*)(?=\()/g, '<span class="c-fn">$1</span>');
+}
+---
+
+<pre class="hl"><code set:html={highlight(code)} /></pre>
+
+<style>
+  .hl {
+    background: var(--bg-code, #10181c);
+    color: var(--fg, #d6e2e4);
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.65;
+    border-radius: 0;
+    margin: 0 0 1rem;
+  }
+  .hl :global(.c-com) { color: #6c8189; }
+  .hl :global(.c-str) { color: #c7a96b; }
+  .hl :global(.c-key) { color: #6fc3b5; }
+  .hl :global(.c-num) { color: #d99a7a; }
+  .hl :global(.c-fn)  { color: #8fb8d8; }
+</style>

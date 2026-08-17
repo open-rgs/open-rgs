@@ -1,6 +1,17 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { stackyFill, sticky, stationary, meanRunLength } from "@open-rgs/markov";
+
+const BASE = { LOW: 60, MID: 30, HIGH: 10 };
+
+// 0.35 gives visible stacking. Turn it up and frequency does not move.
+const reels = stackyFill(SHAPE, BASE, 0.35);
+
+stationary(sticky(BASE, 0.9));      // still { LOW: .6, MID: .3, HIGH: .1 }
+meanRunLength(BASE, 0.35, "HIGH");  // how tall the stacks look`;
 ---
 
 <BaseLayout
@@ -13,12 +24,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Changes how clumpy reels look. Provably does not change frequency.</p>
 
-    <Anim kind="markov" caption="Two columns, same symbols, same rates - only the runs differ. Left is s = 0, right is s = 0.8." />
+    <Anim kind="markov-pair" caption="Two columns, same symbols, same rates. Only the runs differ." />
+    <Anim kind="markov-runs" caption="High stickiness produces natural stacks, which is the one thing a strip gave you." />
+    <Anim kind="markov-stationary" caption="The chain settles on exactly the base distribution, whatever the stickiness." />
 
-    <p>Under <code>sticky(base, s)</code> the chain's stationary distribution is exactly <code>base</code> for every s &lt; 1. So s is a pure feel knob - turn it up for stacks and your RTP does not move. That is the property a reel strip cannot offer.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/markov";`}</code></pre>
-    <p class="dim">stackyFill(shape, base, 0.35)  &middot;  sticky  &middot;  transitions  &middot;  stationary  &middot;  meanRunLength</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>Under sticky(base, s) the stationary distribution is exactly base for every s below 1. So s is a pure feel knob: turn it up for stacks and your RTP does not move. That is the property a reel strip cannot offer, because a strip tangles frequency and adjacency together.</p>
   </main>
 </BaseLayout>

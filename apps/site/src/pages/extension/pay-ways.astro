@@ -1,6 +1,16 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { evalWays, totalWays } from "@open-rgs/pay-ways";
+
+const wins = evalWays(grid, PAY, { roles });
+
+totalWays(grid);   // 1024 on a 4x5, 243 on a 3x5 - a consequence, not a setting
+
+// wins[0].ways is the product of per-column MATCH counts,
+// which is why a variable-height board needs no special evaluator.`;
 ---
 
 <BaseLayout
@@ -13,12 +23,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Paid by the product of per-column counts.</p>
 
-    <Anim kind="pay-ways" caption="Each column contributes its own count. Ways games are dense, so a prefix-paying bug here is far worse than on lines - nearly every spin would win." />
+    <Anim kind="pay-ways-cols" caption="Two on the first reel, one on the second, three on the third: six ways." />
+    <Anim kind="pay-ways-gap" caption="A gap ends the run. Counting past it inflates both the count and the multiplier." />
+    <Anim kind="pay-ways-heights" caption="On a multiways board the heights vary per spin, and this needs no change." />
 
-    <p>2 on reel 0, 1 on reel 1, 3 on reel 2 is 2 x 1 x 3 = 6 ways. "1024 ways" is just 4^5 - a consequence of the grid, not a setting. A gap ENDS the run; counting non-contiguous columns inflates both the count and the multiplier.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/pay-ways";`}</code></pre>
-    <p class="dim">evalWay  &middot;  evalWays  &middot;  totalWays</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>Ways games are dense, so a prefix-paying bug here is far worse than on lines: nearly every spin would win. Each symbol pays at most once, for its longest contiguous run from the first reel.</p>
   </main>
 </BaseLayout>

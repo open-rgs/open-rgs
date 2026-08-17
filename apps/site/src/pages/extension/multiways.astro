@@ -1,0 +1,36 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { heights, multiwaysFillWeights, expectedWays, expectedWaysPayout } from "@open-rgs/multiways";
+
+const H = heights({ 2: 20, 3: 25, 4: 25, 5: 15, 6: 10, 7: 5 }, 6);
+
+const reels = multiwaysFillWeights(H, { LOW: 55, HIGH: 12, WILD: 5 });
+
+expectedWays(H);  // the marketing number
+expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));  // what to balance against`;
+---
+
+<BaseLayout
+  title="@open-rgs/multiways  - Variable reel heights"
+  description="Multiways: Each reel draws its own height, every spin."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/multiways</h1>
+
+    <p class="lede">Each reel draws its own height, every spin.</p>
+
+    <Anim kind="multiways-heights" caption="Reels grow and shrink independently, so the ways count moves with them." />
+    <Anim kind="multiways-product" caption="Ways is the product of the heights the spin drew." />
+    <Anim kind="pay-ways-cols" caption="pay-ways needs no change: it multiplies match counts, never heights." />
+
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
+
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>The board ways and the multiplier a win receives are different numbers. A k-column win scales as h to the k while the board scales as h to the reel count, so only a paytable weighted entirely on full-length runs tracks board ways. Rescaling a fixed-height paytable by expected ways over-prices the game.</p>
+  </main>
+</BaseLayout>

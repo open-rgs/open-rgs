@@ -1,172 +1,367 @@
 ---
 // Looped explainer animatics. Square divs, no rounded corners, CSS keyframes -
-// no script, and `prefers-reduced-motion` stops them properly.
+// no script, and `prefers-reduced-motion` stops every one of them.
 //
-// `kind` picks which animation to render; `caption` is the one-line lesson.
+// One component with a branch per `kind` so the markup lives in a single file
+// and a page just names the idea it wants shown.
 interface Props { kind: string; caption?: string }
 const { kind, caption } = Astro.props;
+const n = (k: number) => Array.from({ length: k });
 ---
 
 <figure class="anim" data-kind={kind}>
   <div class="stage">
-    {kind === "grid" && (
-      <div class="ragged">
-        <div class="colr h4"><i></i><i></i><i></i><i></i></div>
-        <div class="colr h5"><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="colr h5"><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="colr h4"><i></i><i></i><i></i><i></i></div>
+
+    {kind === "grid-ragged" && (
+      <div class="row">
+        <div class="colr"><i></i><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i><i></i><i class="a blink"></i></div>
+        <div class="colr"><i></i><i></i><i></i><i></i><i class="a blink"></i></div>
+        <div class="colr"><i></i><i></i><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "grid-order" && (
+      <div class="row">
+        {n(4).map((_, c) => (
+          <div class="colr">{n(3).map((_, r) => <i class={`seq s${c * 3 + r}`}></i>)}</div>
+        ))}
+      </div>
+    )}
+    {kind === "grid-neighbours" && (
+      <div class="g3 nb">
+        <i></i><i class="up"></i><i></i>
+        <i class="lf"></i><i class="a"></i><i class="rt"></i>
+        <i></i><i class="dn"></i><i></i>
       </div>
     )}
 
-    {kind === "weights" && (
-      <div class="bar">
-        <span class="w1"></span><span class="w2"></span><span class="w3"></span>
-        <b class="ptr"></b>
+    {kind === "weights-bands" && (
+      <div class="bar"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "weights-zero" && (
+      <div class="bar"><span class="w50 a"></span><span class="w0 ghost"></span><span class="w50 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "weights-distinct" && (
+      <div class="row">{n(4).map((_, i) => <i class={`pickseq p${i}`}></i>)}</div>
+    )}
+
+    {kind === "selectors-pick" && (
+      <div class="g3">{n(9).map((_, i) => <i class={i % 3 === 1 ? "pick" : ""}></i>)}</div>
+    )}
+    {kind === "selectors-compose" && (
+      <div class="row">
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i < 3 ? "a" : ""}></i>)}</div>
+        <span class="op">&minus;</span>
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i === 1 ? "b" : ""}></i>)}</div>
+        <span class="op">=</span>
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i === 0 || i === 2 ? "a blink" : ""}></i>)}</div>
+      </div>
+    )}
+    {kind === "selectors-random" && (
+      <div class="g3 randg">{n(9).map(() => <i></i>)}</div>
+    )}
+
+    {kind === "fill-roll" && <div class="g3 rollg">{n(9).map(() => <i></i>)}</div>}
+    {kind === "fill-percolumn" && (
+      <div class="row">
+        <div class="colr"><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i class="a blink"></i><i></i></div>
+        <div class="colr"><i class="a blink d1"></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i class="a blink d2"></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "fill-expected" && (
+      <div class="row">
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i === 2 || i === 6 ? "b blink" : ""}></i>)}</div>
+        <span class="op">=</span><span class="num">0.9</span>
       </div>
     )}
 
-    {kind === "selectors" && (
-      <div class="g3">
-        {Array.from({ length: 9 }).map((_, i) => <i class={i % 3 === 1 ? "pick" : ""}></i>)}
+    {kind === "markov-pair" && (
+      <div class="row gap">
+        <div><div class="colr roll loose">{n(6).map(() => <i></i>)}</div><em>s = 0</em></div>
+        <div><div class="colr roll tight">{n(6).map(() => <i></i>)}</div><em>s = 0.8</em></div>
+      </div>
+    )}
+    {kind === "markov-runs" && (
+      <div class="colr"><i class="a"></i><i class="a"></i><i class="a"></i><i class="b"></i><i class="c"></i><i class="c"></i></div>
+    )}
+    {kind === "markov-stationary" && (
+      <div class="row gap">
+        <div class="bar sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
+        <span class="op">=</span>
+        <div class="bar sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
       </div>
     )}
 
-    {kind === "fill" && (
-      <div class="g3 rollg">
-        {Array.from({ length: 9 }).map(() => <i></i>)}
+    {kind === "recipes-mix" && (
+      <div class="bar"><span class="w94 a"></span><span class="w5 b"></span><span class="w1 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "recipes-tease" && (
+      <div class="row">
+        <div class="colr"><i class="b blink"></i><i></i><i></i></div>
+        <div class="colr"><i></i><i class="b blink d1"></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "recipes-place" && (
+      <div class="g3">{n(9).map((_, i) => <i class={i === 0 || i === 4 || i === 8 ? "a dropseq" : ""}></i>)}</div>
+    )}
+
+    {kind === "paytable-bands" && (
+      <div class="bar"><span class="w22 c"></span><span class="w20 b"></span><span class="w18 a"></span><span class="w40 a open"></span></div>
+    )}
+    {kind === "paytable-wild" && (
+      <div class="row">
+        <i class="wild"></i><span class="op">&rarr;</span><i class="a blink"></i><i class="b blink d1"></i><i class="c blink d2"></i>
+      </div>
+    )}
+    {kind === "paytable-topband" && (
+      <div class="bar"><span class="w20 c"></span><span class="w80 a open"></span></div>
+    )}
+
+    {kind === "pay-lines-run" && (
+      <div class="g5">{n(15).map((_, i) => <i class={i >= 5 && i < 8 ? "run" : ""}></i>)}</div>
+    )}
+    {kind === "pay-lines-wildopen" && (
+      <div class="row">
+        <i class="wild"></i><i class="wild"></i><i class="a"></i><i class="a"></i><i class="a"></i>
+        <span class="op">=</span><span class="num">5&times;A</span>
+      </div>
+    )}
+    {kind === "pay-lines-bothways" && (
+      <div class="row">
+        <i></i><i></i><i class="run"></i><i class="run d1"></i><i class="run d2"></i>
+        <span class="op arrowl">&larr;</span>
       </div>
     )}
 
-    {kind === "markov" && (
-      <div class="pair">
-        <div class="colr roll loose"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="colr roll tight"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      </div>
-    )}
-
-    {kind === "recipes" && (
-      <div class="mix">
-        <span class="m1"></span><span class="m2"></span><span class="m3"></span>
-        <b class="ptr"></b>
-      </div>
-    )}
-
-    {kind === "pay-lines" && (
-      <div class="g5">
-        {Array.from({ length: 15 }).map((_, i) => <i class={i >= 5 && i < 8 ? "run" : ""}></i>)}
-      </div>
-    )}
-
-    {kind === "pay-ways" && (
-      <div class="ways">
+    {kind === "pay-ways-cols" && (
+      <div class="row">
         <div class="colr"><i class="hit"></i><i class="hit"></i><i></i></div>
-        <div class="colr"><i class="hit"></i><i></i><i></i></div>
-        <div class="colr"><i class="hit"></i><i class="hit"></i><i class="hit"></i></div>
+        <div class="colr"><i class="hit d1"></i><i></i><i></i></div>
+        <div class="colr"><i class="hit d2"></i><i class="hit d2"></i><i class="hit d2"></i></div>
+        <span class="op">=</span><span class="num">6</span>
+      </div>
+    )}
+    {kind === "pay-ways-gap" && (
+      <div class="row">
+        <div class="colr"><i class="hit"></i><i></i></div>
+        <div class="colr"><i class="hit"></i><i></i></div>
+        <div class="colr gapx"><i></i><i></i></div>
+        <div class="colr"><i class="hit dim"></i><i></i></div>
+      </div>
+    )}
+    {kind === "pay-ways-heights" && (
+      <div class="row">
+        <div class="colr grow g1"><i class="a"></i><i class="a"></i></div>
+        <div class="colr grow g2"><i class="a"></i><i class="a"></i><i class="a"></i></div>
+        <div class="colr grow g3c"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></div>
       </div>
     )}
 
-    {kind === "pay-anywhere" && (
-      <div class="g3">
-        {[0, 4, 8].includes(0) && null}
-        {Array.from({ length: 9 }).map((_, i) => <i class={[0, 4, 8].includes(i) ? "sc" : ""}></i>)}
+    {kind === "pay-anywhere-scatter" && (
+      <div class="g3">{n(9).map((_, i) => <i class={[0, 4, 8].includes(i) ? "sc" : ""}></i>)}</div>
+    )}
+    {kind === "pay-anywhere-nowild" && (
+      <div class="row">
+        <i class="sc"></i><i class="wild strike"></i><i class="sc"></i>
+        <span class="op">=</span><span class="num">2</span>
+      </div>
+    )}
+    {kind === "pay-anywhere-trigger" && (
+      <div class="row">
+        <i class="sc"></i><i class="sc"></i><i class="sc d2 pop"></i>
+        <span class="op">&ge;</span><span class="num">3</span>
       </div>
     )}
 
-    {kind === "pay-cluster" && (
+    {kind === "pay-cluster-wild" && (
       <div class="g3 wgrid">
         <i class="a lft"></i><i class="a lft"></i><i class="b rgt"></i>
         <i class="a lft"></i><i class="wild both"></i><i class="b rgt"></i>
         <i class="c"></i><i class="b rgt"></i><i class="b rgt"></i>
       </div>
     )}
-
-    {kind === "cascade" && (
-      <div class="casc">
-        <i class="a s0"></i><i class="b s1"></i><i class="c s2"></i><i class="a s3"></i>
+    {kind === "pay-cluster-flood" && (
+      <div class="g3">
+        <i class="a fl0"></i><i class="a fl1"></i><i></i>
+        <i class="a fl1"></i><i class="a fl2"></i><i></i>
+        <i></i><i class="a fl3"></i><i></i>
+      </div>
+    )}
+    {kind === "pay-cluster-diag" && (
+      <div class="g3">
+        <i class="a"></i><i></i><i></i>
+        <i></i><i class="a"></i><i></i>
+        <i></i><i></i><i class="a"></i>
       </div>
     )}
 
-    {kind === "holdwin" && (
-      <div class="hw">
+    {kind === "cascade-fall" && (
+      <div class="casc"><i class="a s0"></i><i class="b s1"></i><i class="c s2"></i><i class="a s3"></i></div>
+    )}
+    {kind === "cascade-ladder" && (
+      <div class="row">
+        <span class="num st1">1&times;</span><span class="num st2">2&times;</span>
+        <span class="num st3">3&times;</span><span class="num st4">5&times;</span>
+      </div>
+    )}
+    {kind === "cascade-bounded" && (
+      <div class="row"><div class="bar sm2"><span class="w80 a"></span><span class="w20 stop"></span></div></div>
+    )}
+
+    {kind === "holdwin-meter" && (
+      <div class="row gap">
         <div class="meter"><i class="a"></i><i class="a m2"></i><i class="a m3"></i></div>
         <i class="b landing"></i>
       </div>
     )}
-
-    {kind === "paytable" && (
-      <div class="ladder">
-        <span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="r4"></span>
+    {kind === "holdwin-collect" && (
+      <div class="row">
+        <i class="a pull"></i><i class="b fade1"></i><i class="b fade2"></i><i class="b fade3"></i>
       </div>
     )}
+    {kind === "holdwin-tiers" && (
+      <div class="row">
+        <i class="c"></i><i class="b"></i><i class="a"></i><i class="a big"></i>
+      </div>
+    )}
+    {kind === "holdwin-full" && (
+      <div class="g3">{n(9).map((_, i) => <i class={`a fillseq f${i}`}></i>)}</div>
+    )}
+
+    {kind === "multiways-heights" && (
+      <div class="row">
+        <div class="colr grow g1"><i class="a"></i><i class="a"></i></div>
+        <div class="colr grow g2"><i class="a"></i><i class="a"></i><i class="a"></i></div>
+        <div class="colr grow g3c"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></div>
+        <div class="colr grow g1"><i class="a"></i><i class="a"></i></div>
+      </div>
+    )}
+    {kind === "multiways-product" && (
+      <div class="row"><span class="num">2</span><span class="op">&times;</span><span class="num">3</span><span class="op">&times;</span><span class="num">4</span><span class="op">=</span><span class="num big2">24</span></div>
+    )}
+
+    {kind === "big-fit" && (
+      <div class="row">
+        <div class="colr"><i></i><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i class="a bigblk"></i><i class="a bigblk"></i><i></i></div>
+        <div class="colr"><i></i><i class="a bigblk"></i><i class="a bigblk"></i><i></i></div>
+        <div class="colr short"><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "big-counts" && (
+      <div class="row">
+        <div class="g2 blk"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></div>
+        <span class="op">=</span><span class="num">4</span>
+      </div>
+    )}
+
+    {kind === "spawn-count" && (
+      <div class="bar"><span class="w90 dimb"></span><span class="w7 a"></span><span class="w25 b"></span><span class="w05 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "spawn-onereel" && (
+      <div class="row">
+        {n(5).map((_, c) => (
+          <div class="colr">{n(3).map((_, r) => <i class={r === (c % 3) && c !== 4 ? `sc pop d${c}` : ""}></i>)}</div>
+        ))}
+      </div>
+    )}
+    {kind === "spawn-protect" && (
+      <div class="row">
+        <i class="wild lock"></i><i class="sc pop"></i><i class="wild lock"></i><i class="sc pop d1"></i>
+      </div>
+    )}
+
   </div>
-  {caption && <figcaption>{caption}</figcaption>}
+  {caption && <figcaption set:html={caption} />}
 </figure>
 
 <style>
   .anim {
     border: 1px solid var(--fg-mute, #888);
-    padding: 1.1rem 1.2rem;
-    margin: 0 0 1.2rem;
-    display: flex; flex-direction: column; gap: 0.7rem;
+    padding: 1rem 1.1rem; margin: 0 0 0.9rem;
+    display: flex; flex-direction: column; gap: 0.6rem;
   }
-  .stage { display: flex; align-items: flex-start; gap: 1.2rem; min-height: 84px; }
-  figcaption {
-    font-family: var(--mono, monospace);
-    font-size: 0.72rem; line-height: 1.5;
-    color: var(--fg-mute, #888);
-  }
+  .stage { display: flex; align-items: center; gap: 0.9rem; min-height: 60px; flex-wrap: wrap; }
+  figcaption { font-family: var(--mono, monospace); font-size: 0.7rem; line-height: 1.5; color: var(--fg-mute, #888); }
 
-  /* shared cell */
-  i, span, b {
-    display: block;
-    width: 22px; height: 22px;
-    background: var(--bg-soft, #eee);
-    border: 1px solid var(--fg-mute, #888);
-    border-radius: 0;
-  }
+  i, span.w60, span.w30, span.w10, span.w50, span.w0, span.w94, span.w5, span.w1,
+  span.w22, span.w20, span.w18, span.w40, span.w80, span.w90, span.w7, span.w25,
+  span.w05, b { display: block; border-radius: 0; }
+  i { width: 20px; height: 20px; background: var(--bg-soft, #eee); border: 1px solid var(--fg-mute, #888); }
+  .row { display: flex; gap: 3px; align-items: center; }
+  .row.gap { gap: 1rem; }
   .colr { display: flex; flex-direction: column; gap: 3px; }
-  .g3 { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
-  .g5 { display: grid; grid-template-columns: repeat(5, 22px); gap: 3px; }
-  .a, .hit { background: #0E6B62; border-color: #0E6B62; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 20px); gap: 3px; }
+  .g3.sm { grid-template-columns: repeat(3, 13px); }
+  .g3.sm i { width: 13px; height: 13px; }
+  .g5 { display: grid; grid-template-columns: repeat(5, 20px); gap: 3px; }
+  .g2 { display: grid; grid-template-columns: repeat(2, 20px); gap: 0; }
+  .g2.blk i { border-width: 2px; border-color: #0E6B62; }
+  em { display: block; font-family: var(--mono, monospace); font-size: 0.65rem; color: var(--fg-mute, #888); margin-top: 4px; font-style: normal; }
+  .op { font-family: var(--mono, monospace); color: var(--fg-mute, #888); font-size: 0.85rem; }
+  .num { font-family: var(--mono, monospace); color: var(--fg, #ccc); font-size: 0.85rem; }
+  .num.big2 { font-size: 1.1rem; color: #0E6B62; }
+
+  .a { background: #0E6B62; border-color: #0E6B62; }
   .b { background: #8A5A15; border-color: #8A5A15; }
   .c { background: #4A6570; border-color: #4A6570; }
+  .hit { background: #0E6B62; border-color: #0E6B62; }
+  .sc { background: #8A5A15; border-color: #8A5A15; }
   .wild { background: transparent; border: 2px solid #0E6B62; }
+  .dim { opacity: .25; }
+  .big { width: 26px; height: 26px; }
 
-  /* grid - ragged columns, breathing to show shape is per column */
-  .ragged { display: flex; gap: 3px; align-items: flex-start; }
-  @keyframes raggedPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-  .ragged .h5 i:last-child { animation: raggedPulse 2.4s infinite; background:#0E6B62; border-color:#0E6B62; }
-
-  /* weights - a pointer sweeping proportional bands */
-  .bar, .mix, .ladder { position: relative; display: flex; width: 264px; height: 22px; }
-  .bar span, .mix span { height: 22px; border-radius: 0; }
-  .w1 { width: 60%; background:#0E6B62; border-color:#0E6B62; }
-  .w2 { width: 30%; background:#8A5A15; border-color:#8A5A15; }
-  .w3 { width: 10%; background:#4A6570; border-color:#4A6570; }
-  .m1 { width: 94%; background:#0E6B62; border-color:#0E6B62; }
-  .m2 { width: 5%;  background:#8A5A15; border-color:#8A5A15; }
-  .m3 { width: 1%;  background:#4A6570; border-color:#4A6570; }
-  .ptr {
-    position: absolute; top: -7px; width: 2px; height: 36px;
-    background: var(--fg, #222); border: 0;
-    animation: sweep 4s infinite ease-in-out;
-  }
+  .bar { position: relative; display: flex; width: 250px; height: 20px; }
+  .bar.sm2 { width: 120px; height: 14px; }
+  .bar span { height: 100%; }
+  .w60{width:60%}.w30{width:30%}.w10{width:10%}.w50{width:50%}.w0{width:0}
+  .w94{width:94%}.w5{width:5%}.w1{width:1%}.w22{width:22%}.w20{width:20%}
+  .w18{width:18%}.w40{width:40%}.w80{width:80%}.w90{width:90%}.w7{width:7%}
+  .w25{width:2.5%}.w05{width:0.5%}
+  .ghost { border: 1px dashed var(--fg-mute,#888); }
+  .dimb { background: var(--bg-soft,#eee); border: 1px solid var(--fg-mute,#888); }
+  .stop { background: #A32E28; }
+  .ptr { position: absolute; top: -6px; width: 2px; height: 32px; background: var(--fg,#222); animation: sweep 4s infinite ease-in-out; }
   @keyframes sweep { 0%,100%{left:2%} 50%{left:97%} }
+  @keyframes openEnded { 0%,100%{opacity:.45} 50%{opacity:1} }
+  .open { animation: openEnded 2.4s infinite; }
 
-  /* selectors - a subset lighting up */
-  @keyframes pick { 0%,40%{background:var(--bg-soft,#eee)} 50%,90%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
-  .pick { animation: pick 3s infinite; }
+  @keyframes blink { 0%,45%{opacity:1} 55%,100%{opacity:.2} }
+  .blink { animation: blink 2.2s infinite; }
+  .d1 { animation-delay: .25s } .d2 { animation-delay: .5s }
+  .d3 { animation-delay: .75s } .d4 { animation-delay: 1s }
 
-  /* fill - independent per-cell re-roll */
-  @keyframes rollA { 0%{background:#0E6B62;border-color:#0E6B62}33%{background:#8A5A15;border-color:#8A5A15}66%{background:#4A6570;border-color:#4A6570} }
-  @keyframes rollB { 0%{background:#8A5A15;border-color:#8A5A15}33%{background:#4A6570;border-color:#4A6570}66%{background:#0E6B62;border-color:#0E6B62} }
-  @keyframes rollC { 0%{background:#4A6570;border-color:#4A6570}33%{background:#0E6B62;border-color:#0E6B62}66%{background:#8A5A15;border-color:#8A5A15} }
+  @keyframes seqOn { 0%,100%{background:var(--bg-soft,#eee)} 8%,16%{background:#0E6B62} }
+  .seq { animation: seqOn 4.8s infinite; }
+  .s0{animation-delay:0s}.s1{animation-delay:.2s}.s2{animation-delay:.4s}
+  .s3{animation-delay:.6s}.s4{animation-delay:.8s}.s5{animation-delay:1s}
+  .s6{animation-delay:1.2s}.s7{animation-delay:1.4s}.s8{animation-delay:1.6s}
+  .s9{animation-delay:1.8s}.s10{animation-delay:2s}.s11{animation-delay:2.2s}
+
+  @keyframes nbPulse { 0%,100%{background:var(--bg-soft,#eee)} 50%{background:#8A5A15;border-color:#8A5A15} }
+  .nb .up,.nb .dn,.nb .lf,.nb .rt { animation: nbPulse 2.4s infinite; }
+  .nb .dn { animation-delay:.15s } .nb .lf { animation-delay:.3s } .nb .rt { animation-delay:.45s }
+
+  @keyframes pickA { 0%,40%{background:var(--bg-soft,#eee)} 50%,90%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
+  .pick { animation: pickA 3s infinite; }
+  .pickseq { animation: pickA 3.2s infinite; }
+  .p0{animation-delay:0s}.p1{animation-delay:.35s}.p2{animation-delay:.7s}.p3{animation-delay:1.05s}
+  @keyframes randHop { 0%,20%{background:#0E6B62;border-color:#0E6B62} 21%,100%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
+  .randg i { animation: randHop 2.7s infinite; }
+  .randg i:nth-child(2){animation-delay:.3s}.randg i:nth-child(5){animation-delay:.6s}
+  .randg i:nth-child(7){animation-delay:.9s}.randg i:nth-child(9){animation-delay:1.2s}
+
+  @keyframes rollA {0%{background:#0E6B62;border-color:#0E6B62}33%{background:#8A5A15;border-color:#8A5A15}66%{background:#4A6570;border-color:#4A6570}}
+  @keyframes rollB {0%{background:#8A5A15;border-color:#8A5A15}33%{background:#4A6570;border-color:#4A6570}66%{background:#0E6B62;border-color:#0E6B62}}
+  @keyframes rollC {0%{background:#4A6570;border-color:#4A6570}33%{background:#0E6B62;border-color:#0E6B62}66%{background:#8A5A15;border-color:#8A5A15}}
   .rollg i { animation: rollA 3s infinite steps(1,end); }
-  .rollg i:nth-child(3n+2) { animation-name: rollB; }
-  .rollg i:nth-child(3n+3) { animation-name: rollC; }
-
-  /* markov - same rates, different runs */
-  .pair { display: flex; gap: 1.2rem; }
+  .rollg i:nth-child(3n+2){animation-name:rollB}.rollg i:nth-child(3n+3){animation-name:rollC}
   .roll i { animation: rollA 4s infinite steps(1,end); }
   .loose i:nth-child(2){animation-name:rollC}.loose i:nth-child(3){animation-name:rollB}
   .loose i:nth-child(5){animation-name:rollC}.loose i:nth-child(6){animation-name:rollB}
@@ -174,63 +369,72 @@ const { kind, caption } = Astro.props;
   .tight i:nth-child(4),.tight i:nth-child(5){animation-name:rollB}
   .tight i:nth-child(6){animation-name:rollC}
 
-  /* pay-lines - a left-anchored run flashing */
   @keyframes runFlash { 0%,30%{background:var(--bg-soft,#eee)} 40%,80%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
   .run { animation: runFlash 3s infinite; }
+  .arrowl { animation: blink 3s infinite; }
 
-  /* pay-ways - per-column counts multiplying */
-  .ways { display: flex; gap: 3px; }
-  @keyframes waysPulse { 0%,100%{opacity:.35} 50%{opacity:1} }
-  .ways .hit { animation: waysPulse 2.4s infinite; }
-  .ways .colr:nth-child(2) .hit { animation-delay: .3s; }
-  .ways .colr:nth-child(3) .hit { animation-delay: .6s; }
+  @keyframes waysPulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+  .hit { animation: waysPulse 2.4s infinite; }
+  .gapx i { opacity: .2 }
 
-  /* pay-anywhere - scattered, position-independent */
+  @keyframes growCol { 0%,100%{transform:scaleY(.55);transform-origin:top} 50%{transform:scaleY(1);transform-origin:top} }
+  .grow { animation: growCol 3.4s infinite; }
+  .g2 { animation-delay:.25s } .g3c { animation-delay:.5s }
+
   @keyframes scPulse { 0%,100%{background:#8A5A15;border-color:#8A5A15} 50%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
   .sc { animation: scPulse 2.6s infinite; }
+  @keyframes popIn { 0%,55%{opacity:0;transform:scale(.5)} 65%,100%{opacity:1;transform:scale(1)} }
+  .pop { animation: popIn 3s infinite; }
+  .d0{animation-delay:0s}
+  @keyframes strikeOut { 0%,45%{opacity:1} 55%,100%{opacity:.15} }
+  .strike { animation: strikeOut 2.6s infinite; }
+  @keyframes lockPulse { 0%,100%{border-color:#0E6B62} 50%{border-color:#A32E28} }
+  .lock { animation: lockPulse 2.4s infinite; }
 
-  /* pay-cluster - the wild in two groups */
-  @keyframes ringL { 0%,45%{outline:3px solid #0E6B62;outline-offset:-3px}50%,100%{outline:0 solid transparent} }
-  @keyframes ringR { 0%,45%{outline:0 solid transparent}50%,100%{outline:3px solid #8A5A15;outline-offset:-3px} }
-  .wgrid .lft { animation: ringL 3s infinite; }
-  .wgrid .rgt { animation: ringR 3s infinite; }
-  .wgrid .both { animation: ringL 3s infinite, ringR 3s infinite; }
+  @keyframes ringL {0%,45%{outline:3px solid #0E6B62;outline-offset:-3px}50%,100%{outline:0 solid transparent}}
+  @keyframes ringR {0%,45%{outline:0 solid transparent}50%,100%{outline:3px solid #8A5A15;outline-offset:-3px}}
+  .wgrid .lft{animation:ringL 3s infinite}.wgrid .rgt{animation:ringR 3s infinite}
+  .wgrid .both{animation:ringL 3s infinite,ringR 3s infinite}
+  @keyframes floodOn { 0%,100%{opacity:.2} 30%,90%{opacity:1} }
+  .fl0{animation:floodOn 3s infinite}.fl1{animation:floodOn 3s infinite .2s}
+  .fl2{animation:floodOn 3s infinite .4s}.fl3{animation:floodOn 3s infinite .6s}
 
-  /* cascade - clear, fall, refill */
-  .casc { position: relative; height: 100px; width: 22px; }
+  .casc { position: relative; height: 92px; width: 20px; }
   .casc i { position: absolute; left: 0; }
-  @keyframes fallOne { 0%,22%{transform:translateY(0)} 30%,100%{transform:translateY(25px)} }
-  @keyframes clearOne {
-    0%,18%{opacity:1;outline:0 solid #0E6B62}
-    22%{opacity:1;outline:3px solid #0E6B62;outline-offset:-3px}
-    28%,92%{opacity:0;outline:0 solid #0E6B62} 100%{opacity:0}
-  }
-  @keyframes dropIn { 0%,26%{opacity:0;transform:translateY(-25px)} 36%,100%{opacity:1;transform:translateY(0)} }
-  .casc .s0 { top:0;    animation: dropIn 3.2s infinite ease-out; }
-  .casc .s1 { top:25px; animation: fallOne 3.2s infinite ease-in; }
-  .casc .s2 { top:50px; animation: fallOne 3.2s infinite ease-in; }
-  .casc .s3 { top:75px; animation: clearOne 3.2s infinite; }
+  @keyframes fallOne {0%,22%{transform:translateY(0)}30%,100%{transform:translateY(23px)}}
+  @keyframes clearOne {0%,18%{opacity:1;outline:0 solid #0E6B62}22%{opacity:1;outline:3px solid #0E6B62;outline-offset:-3px}28%,92%{opacity:0}100%{opacity:0}}
+  @keyframes dropIn {0%,26%{opacity:0;transform:translateY(-23px)}36%,100%{opacity:1;transform:translateY(0)}}
+  .casc .s0{top:0;animation:dropIn 3.2s infinite ease-out}
+  .casc .s1{top:23px;animation:fallOne 3.2s infinite ease-in}
+  .casc .s2{top:46px;animation:fallOne 3.2s infinite ease-in}
+  .casc .s3{top:69px;animation:clearOne 3.2s infinite}
+  @keyframes stepUp { 0%,100%{opacity:.25} 50%{opacity:1;color:#0E6B62} }
+  .st1{animation:stepUp 4s infinite}.st2{animation:stepUp 4s infinite 1s}
+  .st3{animation:stepUp 4s infinite 2s}.st4{animation:stepUp 4s infinite 3s}
 
-  /* holdwin - the counter resets on a landing */
-  .hw { display: flex; gap: 1.2rem; align-items: flex-start; }
   .meter { display: flex; gap: 3px; }
-  @keyframes burn3 { 0%,24%{opacity:1}25%,66%{opacity:.15}67%,100%{opacity:1} }
-  @keyframes burn2 { 0%,49%{opacity:1}50%,66%{opacity:.15}67%,100%{opacity:1} }
-  @keyframes coinLand { 0%,60%{opacity:0;transform:translateY(-10px)}67%,100%{opacity:1;transform:translateY(0)} }
-  .meter .m3 { animation: burn3 4s infinite steps(1,end); }
-  .meter .m2 { animation: burn2 4s infinite steps(1,end); }
-  .landing { animation: coinLand 4s infinite; }
+  @keyframes burn3 {0%,24%{opacity:1}25%,66%{opacity:.15}67%,100%{opacity:1}}
+  @keyframes burn2 {0%,49%{opacity:1}50%,66%{opacity:.15}67%,100%{opacity:1}}
+  @keyframes coinLand {0%,60%{opacity:0;transform:translateY(-9px)}67%,100%{opacity:1;transform:translateY(0)}}
+  .meter .m3{animation:burn3 4s infinite steps(1,end)}
+  .meter .m2{animation:burn2 4s infinite steps(1,end)}
+  .landing{animation:coinLand 4s infinite}
+  @keyframes pullIn { 0%,100%{transform:scale(1)} 55%{transform:scale(1.35)} }
+  .pull { animation: pullIn 3s infinite; }
+  @keyframes drain { 0%,30%{opacity:1} 60%,100%{opacity:.12} }
+  .fade1{animation:drain 3s infinite}.fade2{animation:drain 3s infinite .12s}.fade3{animation:drain 3s infinite .24s}
+  @keyframes fillBoard { 0%,100%{opacity:.15} 40%,90%{opacity:1} }
+  .fillseq { animation: fillBoard 4s infinite; }
+  .f0{animation-delay:0s}.f1{animation-delay:.12s}.f2{animation-delay:.24s}
+  .f3{animation-delay:.36s}.f4{animation-delay:.48s}.f5{animation-delay:.6s}
+  .f6{animation-delay:.72s}.f7{animation-delay:.84s}.f8{animation-delay:.96s}
 
-  /* paytable - bands, the top one open-ended */
-  .ladder span { border-radius: 0; }
-  .r1 { width: 22%; background:#4A6570; border-color:#4A6570; }
-  .r2 { width: 20%; background:#8A5A15; border-color:#8A5A15; }
-  .r3 { width: 18%; background:#0E6B62; border-color:#0E6B62; }
-  @keyframes openEnded { 0%,100%{opacity:.4} 50%{opacity:1} }
-  .r4 { width: 40%; background:#0E6B62; border-color:#0E6B62; animation: openEnded 2.4s infinite; }
+  .short i { opacity: .35 }
+  @keyframes blockPulse { 0%,100%{outline:0 solid transparent} 50%{outline:2px solid #0E6B62;outline-offset:-1px} }
+  .bigblk { animation: blockPulse 2.6s infinite; }
 
   @media (prefers-reduced-motion: reduce) {
-    .anim :is(i, span, b) { animation: none !important; }
+    .anim :is(i, span, b, em) { animation: none !important; }
     .casc .s3 { opacity: .3; }
   }
 </style>

@@ -1,6 +1,20 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { fillWeights, fillWeightsPerColumn, expectedCount } from "@open-rgs/fill";
+
+const reels = fillWeights(SHAPE, { LOW: 55, HIGH: 12, WILD: 5 });
+
+// No wild on the outer reels.
+const gated = fillWeightsPerColumn(SHAPE, [
+  { LOW: 60, HIGH: 12, WILD: 0 },
+  { LOW: 55, HIGH: 12, WILD: 5 },
+  { LOW: 55, HIGH: 12, WILD: 5 },
+  { LOW: 55, HIGH: 12, WILD: 5 },
+  { LOW: 60, HIGH: 12, WILD: 0 },
+]);`;
 ---
 
 <BaseLayout
@@ -13,12 +27,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Weighted draws, one cell at a time.</p>
 
-    <Anim kind="fill" caption="Every cell drawn independently. <code>expectedCount</code> makes &quot;how many scatters per spin&quot; arithmetic rather than a simulation." />
+    <Anim kind="fill-roll" caption="Every cell drawn independently from the same weighted set." />
+    <Anim kind="fill-percolumn" caption="Per-column sets let a wild land only on the middle reels." />
+    <Anim kind="fill-expected" caption="expectedCount makes &quot;how many scatters per spin&quot; arithmetic rather than a simulation." />
 
-    <p>This is the direct strip replacement, and it deliberately does NOT do adjacency - that belongs to markov, layered on top. Most balancing work is frequency work and should not require thinking about neighbours.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/fill";`}</code></pre>
-    <p class="dim">fillWeights(shape, weights)  &middot;  fillWeightsPerColumn  &middot;  constant  &middot;  expectedCount</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>This is the direct strip replacement, and it deliberately does not do adjacency - that belongs to markov, layered on top. Most balancing work is frequency work and should not require thinking about neighbours.</p>
   </main>
 </BaseLayout>

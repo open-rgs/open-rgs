@@ -24,9 +24,14 @@ Effect       = (grid, pos, next) => Grid  // changes a board`}</code></pre>
       receives it, and that is what lets one recorded seed replay a round.
     </p>
 
+    <p class="note">
+      New here? <a href="/extension/build-a-slot">Build a slot</a> walks the
+      whole set end to end, from an empty grid to a running server.
+    </p>
+
     <h2 data-section="&sect; 1">The packages</h2>
     <ul>
-      <li><a href="/extension/grid">@open-rgs/grid</a>  - <span class="dim">Shape is a height PER COLUMN, not width x height.</span></li>
+      <li><a href="/extension/grid">@open-rgs/grid</a>  - <span class="dim">Shape is a height per column, not width by height.</span></li>
       <li><a href="/extension/weights">@open-rgs/weights</a>  - <span class="dim">The number you read is the number you get.</span></li>
       <li><a href="/extension/selectors">@open-rgs/selectors</a>  - <span class="dim">One primitive serving placement and hold-and-win targeting.</span></li>
       <li><a href="/extension/fill">@open-rgs/fill</a>  - <span class="dim">Weighted draws, one cell at a time.</span></li>
@@ -38,7 +43,10 @@ Effect       = (grid, pos, next) => Grid  // changes a board`}</code></pre>
       <li><a href="/extension/pay-anywhere">@open-rgs/pay-anywhere</a>  - <span class="dim">Total count, position irrelevant.</span></li>
       <li><a href="/extension/pay-cluster">@open-rgs/pay-cluster</a>  - <span class="dim">A wild belongs to every cluster it touches.</span></li>
       <li><a href="/extension/cascade">@open-rgs/cascade</a>  - <span class="dim">Clear, fall, refill, repeat.</span></li>
-      <li><a href="/extension/holdwin">@open-rgs/holdwin</a>  - <span class="dim">A landing RESETS the counter.</span></li>
+      <li><a href="/extension/holdwin">@open-rgs/holdwin</a>  - <span class="dim">A landing resets the counter.</span></li>
+      <li><a href="/extension/multiways">@open-rgs/multiways</a>  - <span class="dim">Each reel draws its own height, every spin.</span></li>
+      <li><a href="/extension/big-symbols">@open-rgs/big-symbols</a>  - <span class="dim">One symbol across a block of cells.</span></li>
+      <li><a href="/extension/scatters">@open-rgs/scatters</a>  - <span class="dim">The trigger rate is a parameter, not an emergent property.</span></li>
     </ul>
 
     <h2 data-section="&sect; 2">Writing your own</h2>

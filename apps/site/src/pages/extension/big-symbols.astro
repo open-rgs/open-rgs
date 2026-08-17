@@ -1,0 +1,36 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { placements, placeRandomBig, blocksOf } from "@open-rgs/big-symbols";
+
+placements(grid.shape, 2, 2);   // every legal top-left corner
+
+const g = placeRandomBig(grid, "WILD", 2, 2, host.rng_next);
+
+// For presentation only - the maths never needs it.
+blocksOf(g, "WILD", [[2, 2], [3, 3]]);`;
+---
+
+<BaseLayout
+  title="@open-rgs/big-symbols  - Blocks"
+  description="Big symbols: One symbol across a block of cells."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/big-symbols</h1>
+
+    <p class="lede">One symbol across a block of cells.</p>
+
+    <Anim kind="big-fit" caption="A block needs every column it covers to be tall enough." />
+    <Anim kind="big-counts" caption="A 2x2 wild really does act as four wilds." />
+    <Anim kind="grid-ragged" caption="On a ragged board a block that fits elsewhere may not fit here." />
+
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
+
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>A big symbol is the same symbol repeated across every cell it covers. No overlay, no marker. That is what makes it work with every evaluator for free, and it matches what players are paid. placeBig refuses rather than clipping, because a clipped 2x2 is a 2x1 pretending to be one.</p>
+  </main>
+</BaseLayout>

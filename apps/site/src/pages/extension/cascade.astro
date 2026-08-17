@@ -1,6 +1,23 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { runCascade } from "@open-rgs/cascade";
+
+const run = runCascade(
+  start,
+  (g) => {
+    const wins = evalAllClusters(g, PAY, { roles });
+    return { multiplier: totalMultiplier(wins), positions: wins.flatMap((w) => w.positions) };
+  },
+  (next) => symbols.pick(next()),
+  host.rng_next,
+  { stepMultipliers: [1, 2, 3, 5], maxSteps: 30 },
+);
+
+run.multiplier;  // total across every step
+run.truncated;   // true if the cap fired`;
 ---
 
 <BaseLayout
@@ -13,12 +30,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Clear, fall, refill, repeat.</p>
 
-    <Anim kind="cascade" caption="The loop is bounded. A refill can always win again, so unbounded, one unlucky spin hangs the process; <code>truncated</code> reports when the cap fired." />
+    <Anim kind="cascade-fall" caption="Winners clear, survivors fall, a fresh symbol drops in on top." />
+    <Anim kind="cascade-ladder" caption="The ladder climbs per step and applies to that step's own win." />
+    <Anim kind="cascade-bounded" caption="The loop is capped, because a refill can always win again." />
 
-    <p>Gravity is per column: a short reel drops a shorter distance, and treating the board as a rectangle produces a shuffle rather than a fall. The multiplier ladder applies to each step's OWN win - applying it to the running total compounds and inflates RTP badly.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/cascade";`}</code></pre>
-    <p class="dim">runCascade  &middot;  tumble  &middot;  clear  &middot;  collapse  &middot;  refill  &middot;  multiplierForStep</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>Gravity is per column: a short reel drops a shorter distance, and treating the board as a rectangle produces a shuffle rather than a fall. The ladder applies to each step's own win - applying it to the running total compounds and inflates RTP badly.</p>
   </main>
 </BaseLayout>

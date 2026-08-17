@@ -1,0 +1,41 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { withScatters, probabilityOfAtLeast, oneInFor } from "@open-rgs/scatters";
+
+// The base reels carry SC at weight ZERO - it cannot appear naturally.
+const config = {
+  symbol:   "SC",
+  count:    { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
+  reels:    [1, 2, 3],
+  protects: ["WILD"],
+};
+
+const board = withScatters(reels, config);
+
+oneInFor(config, 3);  // 200 - the feature fires 1 spin in 200`;
+---
+
+<BaseLayout
+  title="@open-rgs/scatters  - Spawned as an event"
+  description="Scatters: The trigger rate is a parameter, not an emergent property."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/scatters</h1>
+
+    <p class="lede">The trigger rate is a parameter, not an emergent property.</p>
+
+    <Anim kind="spawn-count" caption="The count distribution is declared, so the trigger rate is written down." />
+    <Anim kind="spawn-onereel" caption="At most one per reel by default, which is what makes the count exact." />
+    <Anim kind="spawn-protect" caption="Protected symbols are never eaten - a wild about to pay stays put." />
+
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
+
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>With a natural scatter the trigger rate is an emergent property of per-cell probability and grid size, tuned by guessing a weight and re-simulating. Spawning inverts that: the count distribution is the trigger rate, readable without a simulation.</p>
+  </main>
+</BaseLayout>

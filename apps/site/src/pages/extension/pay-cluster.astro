@@ -1,6 +1,14 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { evalAllClusters, clustersOf, largestCluster } from "@open-rgs/pay-cluster";
+
+const wins = evalAllClusters(grid, CLUSTER, { roles });
+
+clustersOf(grid, "HIGH", roles);     // groups, for presentation
+largestCluster(grid, "HIGH", roles); // biggest group size`;
 ---
 
 <BaseLayout
@@ -13,12 +21,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">A wild belongs to every cluster it touches.</p>
 
-    <Anim kind="pay-cluster" caption="Orthogonal only - diagonals do not connect. The outlined wild is counted in both the teal group and the amber one." />
+    <Anim kind="pay-cluster-wild" caption="The outlined wild is counted in the teal group and the amber one." />
+    <Anim kind="pay-cluster-flood" caption="A flood fill from each real occurrence, spreading through neighbours." />
+    <Anim kind="pay-cluster-diag" caption="Orthogonal only. Diagonals do not connect." />
 
-    <p>Which is the whole difficulty. The flood fill runs per symbol and consumes only real matches - consume the wild for the first cluster and the second silently shrinks by one, with nothing on the board looking wrong. A cluster is never seeded from a wild either.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/pay-cluster";`}</code></pre>
-    <p class="dim">clustersOf  &middot;  evalClusters  &middot;  evalAllClusters  &middot;  largestCluster</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>Wilds are the whole difficulty. The fill runs per symbol and consumes only real matches - consume the wild for the first cluster and the second silently shrinks by one, with nothing on the board looking wrong. A cluster is never seeded from a wild, or a lone wild would invent wins.</p>
   </main>
 </BaseLayout>

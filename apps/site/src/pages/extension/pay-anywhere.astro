@@ -1,6 +1,14 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { evalScatters, triggersOn, shortOfTrigger } from "@open-rgs/pay-anywhere";
+
+const wins = evalScatters(grid, PAY, { roles });
+
+triggersOn(grid, "SC", 3);      // does the feature start?
+shortOfTrigger(grid, "SC", 3);  // the number a tease is built around`;
 ---
 
 <BaseLayout
@@ -13,12 +21,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Total count, position irrelevant.</p>
 
-    <Anim kind="pay-anywhere" caption="Triggering is kept separate from paying: plenty of games trigger on 3 scatters while paying nothing for them." />
+    <Anim kind="pay-anywhere-scatter" caption="Counted anywhere on the board, in any arrangement." />
+    <Anim kind="pay-anywhere-nowild" caption="A wild never counts. Substitution here would manufacture triggers." />
+    <Anim kind="pay-anywhere-trigger" caption="Triggering is a separate question from paying." />
 
-    <p>The smallest evaluator with the largest effect on a game's shape, because it is almost always what triggers the feature - and feature frequency is usually the single biggest term in RTP. Only literal matches count, never a wild.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/pay-anywhere";`}</code></pre>
-    <p class="dim">evalAnywhere  &middot;  evalScatters  &middot;  triggersOn  &middot;  shortOfTrigger</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>The smallest evaluator with the largest effect on a game's shape, because it is almost always what starts the feature. Plenty of games trigger on three scatters while paying nothing for them, so the two questions stay separate.</p>
   </main>
 </BaseLayout>

@@ -1,6 +1,15 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { evalLines, rowLines } from "@open-rgs/pay-lines";
+import { totalMultiplier } from "@open-rgs/paytable";
+
+const LINES = rowLines(5, 3);   // three straight rows
+
+const wins = evalLines(grid, LINES, PAY, { roles, bothWays: false });
+const mult = totalMultiplier(wins);`;
 ---
 
 <BaseLayout
@@ -13,12 +22,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Longest run, paid once.</p>
 
-    <Anim kind="pay-lines" caption="A run must start at the leftmost reel. Under bothWays the two directions COMPETE rather than accumulate, or a full-width run is counted twice." />
+    <Anim kind="pay-lines-run" caption="A run must be anchored at the leftmost reel." />
+    <Anim kind="pay-lines-wildopen" caption="A wild-opening run pays whichever reading is worth more." />
+    <Anim kind="pay-lines-bothways" caption="Under bothWays the two directions compete rather than accumulate." />
 
-    <p>Paying every prefix - 3 of a kind AND 4 AND 5 on the same run - roughly doubles a game's RTP. A wild-opening run is ambiguous and pays whichever reading is worth more. And a wild never substitutes for a scatter, or it manufactures feature triggers.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/pay-lines";`}</code></pre>
-    <p class="dim">evalLine  &middot;  evalLines  &middot;  rowLines(5, 3)  &middot;  &#123; bothWays: true &#125;</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>Paying every prefix - three of a kind and four and five on the same run - roughly doubles a game's RTP. A wild never substitutes for a scatter, or it manufactures feature triggers, and feature frequency is usually the biggest term in RTP.</p>
   </main>
 </BaseLayout>

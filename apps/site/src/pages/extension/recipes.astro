@@ -1,6 +1,19 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const sample = `import { recipes, place, stack } from "@open-rgs/recipes";
+import { randomN, cols } from "@open-rgs/selectors";
+
+const board = recipes([
+  { name: "base",        p: 0.94, draw: reels },
+  { name: "two-scatter", p: 0.05, draw: place(2, "SC", randomN(2, cols([0, 1])), reels) },
+  { name: "high-stack",  p: 0.01, draw: stack("HIGH", 2, reels) },
+]);
+
+const { grid, recipe } = board(host.rng_next);
+board.probabilityOf("two-scatter");  // 0.05 - the tease rate, declared`;
 ---
 
 <BaseLayout
@@ -13,12 +26,14 @@ import Anim from "../../components/Anim.astro";
 
     <p class="lede">Every board comes from exactly one declared recipe.</p>
 
-    <Anim kind="recipes" caption="The pointer picks a recipe at its declared rate. Probabilities must sum to 1: a mixture summing to 0.98 silently misprices every spin." />
+    <Anim kind="recipes-mix" caption="One recipe chosen per board, at its declared probability." />
+    <Anim kind="recipes-tease" caption="A tease is a real draw that goes through the pay evaluator honestly." />
+    <Anim kind="recipes-place" caption="place() writes symbols into cells a selector picked." />
 
-    <p>So RTP is a sum over recipes, each independently measurable, and a tease is a REAL draw that goes through the pay evaluator honestly. Decorating a drawn board instead would misprice RTP silently - and build the near-miss behaviour regulators prohibit.</p>
+    <h2 data-section="&sect; 1">Using it</h2>
+    <Code code={sample} />
 
-    <h2 data-section="&sect;">Reach for</h2>
-    <pre><code>{`import { ... } from "@open-rgs/recipes";`}</code></pre>
-    <p class="dim">recipes([&#123; name, p, draw &#125;])  &middot;  place  &middot;  placeAt  &middot;  placeDrawn  &middot;  stack  &middot;  fixed</p>
+    <h2 data-section="&sect; 2">Why</h2>
+    <p>RTP becomes a sum over recipes, each independently measurable. Decorating a drawn board instead would misprice RTP silently, and build the near-miss behaviour regulators prohibit. Probabilities must sum to 1: a mixture summing to 0.98 misprices every spin.</p>
   </main>
 </BaseLayout>
