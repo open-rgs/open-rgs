@@ -1,0 +1,318 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Code from "../components/Code.astro";
+import Anim from "../components/Anim.astro";
+
+const send = `await rgs.spin({ betIndex: 0, idempotencyKey: "tok-A" });
+await rgs.spin({ betIndex: 0, idempotencyKey: "tok-A" });`;
+
+const off = `createServer({
+  manifest,
+  platform,
+  requestCache: false,
+});`;
+
+const tune = `createServer({
+  manifest,
+  platform,
+  requestCache: { ttlMs: 120_000, max: 10_000 },
+});`;
+
+const opsShape = `{
+  "ops": [
+    { "kind": "board", "shape": [3, 3, 3], "cells": ["A", "A", "B", "K", "A", "Q", "B", "B", "A"] },
+    { "kind": "win", "symbol": "A", "count": 3, "amount": 2, "cells": [0, 4, 8], "ways": 4 },
+    { "kind": "cascade", "step": 1, "cleared": [0, 4, 8], "multiplier": 2 },
+    { "kind": "message", "text": "Big win" }
+  ]
+}`;
+
+const opsMix = `import { canonicalOps, opsTotal } from "@open-rgs/contract/ops";
+
+const drawable = canonicalOps(res.ops);
+const shown = opsTotal(res.ops);`;
+
+const client = `import { RgsClient, UniversalClient, describeRound } from "@open-rgs/client";
+
+const rgs = new RgsClient("ws://localhost:8080/wss");
+await rgs.connect();
+
+const uc = new UniversalClient(rgs);
+const init = await uc.init(sid);
+
+await uc.resumeIfUnfinished(init);
+
+const round = await uc.playRound(0);
+console.log(describeRound(round));`;
+
+const transcript = `spin
+  board [3,3,3] A A B K A Q B B A
+  win A x3 = 2 (4 ways)
+  cascade 1 cleared=3 x2
+  message Big win
+= 2x  balance 98000  ops 2x`;
+
+const decide = `const uc = new UniversalClient(rgs, {
+  decide: (awaiting) => awaiting.type === "gamble"
+    ? { type: "gamble", value: "red" }
+    : { type: awaiting.type },
+  maxSteps: 50,
+  retries: 3,
+});`;
+---
+
+<BaseLayout
+  title="Retries, canonical ops and the universal client  - open-rgs"
+  description="Request-level idempotency so a retry cannot pay twice, an optional op vocabulary any client can render, and a client that drives any game to completion."
+>
+  <main>
+    <h1>Retries, ops and the universal client</h1>
+
+    <p class="lede">
+      Three pieces that go together: a retry that cannot pay twice, a vocabulary
+      a client can read without knowing the game, and a runner that plays either
+      round shape and prints what happened.
+    </p>
+
+    <h2 data-section="&sect; 1">A retry must not pay twice</h2>
+
+    <p>
+      open-rgs already derives a stable idempotency key for the wallet, so a
+      resent call arrives with the same key and a compliant wallet collapses it
+      to one money movement. That guarantee has a hole in it, and the hole is
+      not hypothetical: it depends on the wallet. Some wire protocols have no
+      field to carry the key at all  -
+      <code>@open-rgs/adapter-artube</code> is one. Against a wallet like that,
+      a client retry after a timeout runs the math a second time and moves money
+      a second time.
+    </p>
+
+    <p>
+      So the orchestrator caches the call. Keyed on session plus the client's
+      own token, a repeat is answered from cache and never reaches math or the
+      wallet, which means the guarantee no longer depends on the wallet honouring
+      anything. It is on by default.
+    </p>
+
+    <Code code={send} />
+
+    <p>
+      The second call above returns the first call's response, byte for byte.
+      One round ran, one settle happened, the balance moved once.
+    </p>
+
+    <h2 data-section="&sect; 2">The retry that actually hurts</h2>
+
+    <p>
+      The dangerous resend is not the one that arrives after the first finished.
+      It is the one that arrives <em>while</em> the first is still running  - a
+      client that gave up at five seconds against a round still executing at six.
+      A cache holding only completed responses misses that case entirely and lets
+      both run.
+    </p>
+
+    <Anim
+      kind="retry-inflight"
+      caption="Second arrival coalesces onto the first call's promise rather than starting a second round."
+    />
+
+    <p>
+      The entry is created before the work starts and holds the promise, so the
+      second caller awaits the first. Both callers get one result because there
+      was only ever one round.
+    </p>
+
+    <h2 data-section="&sect; 3">Failures stay retryable</h2>
+
+    <p>
+      Only successes are kept. A failed call is dropped from the cache, because
+      the honest answer to "your spin failed with <code>PLATFORM_UNAVAILABLE</code>"
+      is that the client should be able to try again for real. Caching the
+      failure would turn a transient wallet blip into a permanently poisoned
+      token.
+    </p>
+
+    <Anim
+      kind="retry-fail"
+      caption="A rejection clears its own entry, so the same token can run for real on the next attempt."
+    />
+
+    <h2 data-section="&sect; 4">Scoping and limits</h2>
+
+    <p>
+      Tokens are chosen by clients, so two players can pick the same one.
+      Entries are scoped by session, which makes a collision between players
+      impossible; within one session a collision is the player's own client
+      resending, which is the whole point.
+    </p>
+
+    <Anim
+      kind="retry-scope"
+      caption="Same token, different sessions, different entries. Cross-player collision cannot happen."
+    />
+
+    <p>
+      Calls are also tagged by phase, so a client reusing one token across a spin
+      and a close does not collapse them into each other. Entries expire on a TTL
+      and the store is bounded, oldest evicted first  - the window only needs to
+      outlive a client's retry behaviour, not a session.
+    </p>
+
+    <Code code={tune} />
+
+    <p class="warn">
+      <strong>This is per process, not per cluster.</strong> A retry that lands
+      on a different pod finds an empty cache and runs for real. The
+      cross-pod guard is still the wallet's own dedupe on the idempotency key,
+      and this does not replace it  - it closes the case where the wallet cannot
+      help. The per-session lock keeps a single pod's concurrent calls in order;
+      sticky sessions make the cache effective in practice, and are not a
+      correctness requirement for anything else.
+    </p>
+
+    <p>
+      A call with no token is not cached, because there is nothing stable to
+      deduplicate on. That is the documented cost of not sending one. Turning
+      the cache off entirely restores the previous behaviour:
+    </p>
+
+    <Code code={off} />
+
+    <h2 data-section="&sect; 5">An op vocabulary, opt in</h2>
+
+    <p>
+      <code>Op</code> is <code>unknown</code> in the contract on purpose: math
+      authors define their own visual instructions and the engine only forwards
+      them. That is the right default and it is not changing. The cost is that
+      every client is bespoke  - nothing generic can render a game it has never
+      seen, so smoke tests, replay tools and integration harnesses end up
+      game-specific too.
+    </p>
+
+    <p>
+      <code>@open-rgs/contract/ops</code> is the middle ground. Nine shapes
+      covering what a slot actually needs to say, and stopping there: board, win,
+      cascade, respin, coin, award, feature, meter, message.
+    </p>
+
+    <Code code={opsShape} />
+
+    <p>
+      A game that emits these can be driven by any client that understands them.
+      A game that does not is unaffected: nothing in the engine reads or
+      validates ops, and the module is types plus a type guard with no runtime
+      cost unless you call it.
+    </p>
+
+    <h2 data-section="&sect; 6">Mixing your own in</h2>
+
+    <p>
+      Canonical and bespoke ops travel in the same stream. A generic client
+      renders what it recognises and ignores the rest, so adopting the
+      vocabulary is not all-or-nothing  - use it for the parts a tool should be
+      able to read, and keep your own shapes for the parts only your client
+      draws.
+    </p>
+
+    <Anim
+      kind="ops-decode"
+      caption="Canonical ops are decoded and drawn. An unrecognised op passes through untouched."
+    />
+
+    <Code code={opsMix} />
+
+    <h2 data-section="&sect; 7">Ops describe, they never pay</h2>
+
+    <p>
+      This is a visual log, not a settlement record. The round's
+      <code>multiplier</code> is what pays; an op saying
+      <code>amount: 250</code> is describing what to draw. Divergence between
+      them is a presentation bug and never a money one, because nothing
+      downstream of the client reads these.
+    </p>
+
+    <Anim
+      kind="ops-total"
+      caption="opsTotal sums win and award ops. Compare it against the settled multiplier in a test."
+    />
+
+    <p>
+      Which makes <code>opsTotal</code> a cheap assertion worth having: if the
+      ops add up to something other than what the round paid, the presentation
+      and the math have drifted apart, and you would rather find that in CI than
+      in a player complaint.
+    </p>
+
+    <h2 data-section="&sect; 8">A client that plays anything</h2>
+
+    <p>
+      <code>RgsClient</code> speaks the wire. <code>UniversalClient</code> is the
+      layer above it that every integration otherwise rewrites: play a round to
+      completion whatever shape it is, retry safely, keep a readable log, and
+      finish a round the last session left open.
+    </p>
+
+    <Code code={client} />
+
+    <p>
+      It is not a game client and has no opinion about presentation. It is for
+      smoke-testing a build, driving an integration against a wallet sandbox,
+      capturing a transcript to diff after a change, and proving a deferred-close
+      round survives a disconnect.
+    </p>
+
+    <h2 data-section="&sect; 9">Round shape is discovered, not declared</h2>
+
+    <p>
+      It tries a simple spin first. A complex mode answers
+      <code>INVALID_MODE</code>, and the runner switches to open, step, close
+      rather than needing to be told which kind of game it is talking to.
+    </p>
+
+    <Anim
+      kind="universal-probe"
+      caption="Spin is refused, so the runner opens the round and steps it to a terminal state."
+    />
+
+    <p>
+      Every call carries a token, and a retry inside the client reuses it, so the
+      server answers from cache instead of running the round again. Retries only
+      fire on transport and platform failures  - a rejection the client caused
+      will reject identically next time, so retrying it just wastes the round.
+    </p>
+
+    <Code code={decide} />
+
+    <p>
+      <code>decide</code> answers whatever a round is waiting for; the default
+      picks the first offered option, which walks most games end to end.
+      <code>maxSteps</code> is the guard against a math bug that never reaches a
+      terminal state  - without it a broken <code>isTerminal</code> hangs the
+      runner instead of failing it.
+    </p>
+
+    <h2 data-section="&sect; 10">A transcript you can diff</h2>
+
+    <p>
+      <code>describeRound</code> renders the round as one stable line per event.
+      For a test fixture, a CI log, or a bug report attachment  - greppable text
+      rather than a pretty picture.
+    </p>
+
+    <Code code={transcript} />
+
+    <p>
+      And resuming is one call. A deferred-close game answers <code>init</code>
+      with a resume block; <code>resumeIfUnfinished</code> returns undefined when
+      there is nothing to resume, so it is safe to call unconditionally after
+      every init.
+    </p>
+
+    <nav class="related">
+      <a href="/rest">REST &amp; deferred close</a>
+      <a href="/wire">Wire</a>
+      <a href="/adapter">Platform adapter</a>
+      <a href="/errors">Errors</a>
+    </nav>
+  </main>
+</BaseLayout>

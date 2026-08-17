@@ -37,6 +37,7 @@ import * as sessions from "./session.js";
 import * as promo from "./promo.js";
 import { settleAmount } from "./money.js";
 import { deriveIdempotencyKey } from "./idempotency.js";
+import { createRequestCache, type RequestCacheOptions } from "./request-cache.js";
 import type { AuditLog, AuditInput } from "./audit-log.js";
 import { log } from "./log.js";
 import { isAwaitingEndRound } from "./deferred-close.js";
@@ -70,6 +71,14 @@ export interface OrchestratorConfig {
    *  failures; "mandatory" awaits it and FAILS the step if it's dropped  - for
    *  jurisdictions that require a server-side action log. */
   auditMode?: "best-effort" | "mandatory";
+  /** Request-level idempotency. A client call carrying an `idempotencyKey`
+   *  runs once; a retry with the same key gets the first call's response
+   *  without re-running math or touching the wallet.
+   *
+   *  This is deliberately independent of whether the WALLET honours an
+   *  idempotency key - some wires have no field for one at all - so the
+   *  guarantee holds either way. Pass `false` to disable. */
+  requestCache?: RequestCacheOptions | false;
   /** Idempotency-key generator + retention. Defaults to uuid-v4 +
    *  5-minute TTL (a hint for upstream caches). */
   idempotency?: IdempotencyConfig;
@@ -160,6 +169,9 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   const auditLog = cfg.auditLog;
   const auditMode = cfg.auditMode ?? "best-effort";
   const genIdemKey = cfg.idempotency?.generate ?? defaultIdempotencyKey;
+  const requestCache = cfg.requestCache === false
+    ? undefined
+    : createRequestCache(cfg.requestCache ?? {});
 
   // Record one tamper-evident audit event per money-moving round. Never let
   // an audit-sink failure break the round (the sink owns durability).
@@ -210,6 +222,19 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   // round. Autoclose from platform events goes through the same lock.
   const sessionChains = new Map<string, Promise<unknown>>();
 
+  /** Wrap a call so a repeat carrying the same client token returns the first
+   *  call's response. The phase tag keeps a client that reuses one token across
+   *  different calls from collapsing a spin and a close into each other. */
+  function deduped<T>(
+    sid: string | null | undefined,
+    key: string | undefined,
+    phase: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    if (!requestCache || !sid || !key) return fn();
+    return requestCache.run(sid, `${phase}:${key}`, fn);
+  }
+
   function runLocked<T>(sid: string | null | undefined, fn: () => Promise<T>): Promise<T> {
     // No session id yet (e.g. a request missing sid)  - nothing to serialize
     // against; run directly and let the impl throw the proper error.
@@ -257,9 +282,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         }).catch((err) => log.exception("autoclose-on-session-close failed", err, {
           "event.category": "orchestrator",
           "session.id": e.sessionId,
-        })).finally(() => { sessions.remove(e.sessionId); metrics?.sessionsActive.dec(); });
+        })).finally(() => { sessions.remove(e.sessionId); requestCache?.clearScope(e.sessionId); metrics?.sessionsActive.dec(); });
       } else {
         sessions.remove(e.sessionId);
+        requestCache?.clearScope(e.sessionId);
         metrics?.sessionsActive.dec();
       }
     } else if (e.type === "promoGranted") {
@@ -1107,10 +1133,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   // throws the appropriate "missing session" error inside the impl.
   return {
     init: (req, conn) => runLocked(req.sid, () => init(req, conn)),
-    spin: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => spin(req, conn)),
-    openRound: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => openRound(req, conn)),
-    stepRound: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => stepRound(req, conn)),
-    closeRound: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => closeRound(req, conn)),
+    spin: (req, conn) => deduped(req.sid ?? conn.sessionId, req.idempotencyKey, "spin",
+      () => runLocked(req.sid ?? conn.sessionId, () => spin(req, conn))),
+    openRound: (req, conn) => deduped(req.sid ?? conn.sessionId, req.idempotencyKey, "open",
+      () => runLocked(req.sid ?? conn.sessionId, () => openRound(req, conn))),
+    stepRound: (req, conn) => deduped(req.sid ?? conn.sessionId, req.idempotencyKey, "step",
+      () => runLocked(req.sid ?? conn.sessionId, () => stepRound(req, conn))),
+    closeRound: (req, conn) => deduped(req.sid ?? conn.sessionId, req.idempotencyKey, "close",
+      () => runLocked(req.sid ?? conn.sessionId, () => closeRound(req, conn))),
     promoAccept: (req, conn) => runLocked(req.sid ?? conn.sessionId, () => promoAccept(req, conn)),
     autocloseRound,
     onDisconnect,

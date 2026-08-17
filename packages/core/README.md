@@ -127,9 +127,38 @@ import { loadTsMath, cryptoRng } from "@open-rgs/core";
 const math = await loadTsMath("./maths/spin.ts", { rng: cryptoRng });
 ```
 
+## Retries pay once
+
+A resent `spin`, `openRound`, `stepRound` or `closeRound` carrying the same
+client token returns the first call's result without running the round again.
+
+```ts
+await createServer({ manifest, platform });                       // on
+await createServer({ manifest, platform, requestCache: false });  // off
+await createServer({ manifest, platform, requestCache: { ttlMs: 120_000, max: 10_000 } });
+```
+
+The wallet idempotency key already covers this WHEN the wallet honours it.
+Some wallet protocols have no field for the key at all, and against those a
+client retry after a timeout ran the math and moved money twice. This closes
+that without depending on the wallet.
+
+The entry is created before the work starts, so a repeat arriving while the
+first is still running coalesces onto it rather than starting a second round -
+which is the retry a client timeout actually produces. Failures clear their own
+entry, so a transient wallet blip cannot poison a token permanently. Entries
+are scoped by session and tagged by phase, so two players cannot collide and
+one token cannot collapse a spin into a close.
+
+It is per process: a retry reaching a different pod finds an empty cache and
+runs for real, so the wallet's own dedupe is still the cross-pod guarantee. A
+call with no client token is not cached  - there is nothing stable to
+deduplicate on.
+
 ## Also exported
 
 `createOrchestrator` (drive rounds without a transport), `binaryTransport`,
+`restTransport`, `withDeferredClose`, `createRequestCache`,
 `startAdmin` + admin/probe handlers, `createAuditLog` / `verifyChain` (hash-
 chained audit log), `createRgsMetrics` + a Prometheus-style `Registry`,
 `settleAmount` / `roundHalfEven` (integer minor-unit money), `uuidV4` /

@@ -241,6 +241,13 @@ Adapters MUST forward this key downstream when the underlying protocol
 supports it; if not, the adapter is responsible for local dedupe. The
 `IdempotencyConfig.ttlMs` (default 5 min) is the recommended dedupe window.
 
+A wallet protocol with no field for the key at all leaves this contract
+unenforceable from the adapter's side. For that case the orchestrator also
+caches the client call itself, so a resend never reaches the adapter  -
+see "Request-level idempotency" in Spec 02. That cache is per process and
+does NOT replace wallet-side dedupe, which remains the only cross-pod
+guarantee.
+
 ## Reference adapter behavior (illustrative)
 
 A typical persistent-WebSocket adapter (such as the one in the external

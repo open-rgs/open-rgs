@@ -58,6 +58,17 @@ the end-to-end guarantee; the transport guard only tightens the single-socket
 case. Sticky sessions do NOT change this: routing a player back to the same
 pod does not extend the guard across sockets.
 
+There are three layers, and they are not interchangeable:
+
+| Layer | Scope | Guards |
+|-------|-------|--------|
+| `$seq` transport guard | one socket | a resend on the same connection |
+| `requestCache` (Spec 02) | one process, per session | a resend across reconnects to the same pod, including one arriving mid-flight |
+| wallet idempotency key (Spec 05) | end to end | everything, IF the wallet honours the key |
+
+The request cache exists because the bottom row's "if" is not always true:
+a wallet whose wire has no key field cannot dedupe at all.
+
 ## Message types
 
 | Code | Direction | Logical message            | Payload type |

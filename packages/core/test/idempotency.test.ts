@@ -62,7 +62,7 @@ const complexMath: ComplexMath = {
   close: () => ({ multiplier: 2, ops: [], type: "win" }),
 };
 
-function makeOrchestrator() {
+function makeOrchestrator(opts: { requestCache?: false } = {}) {
   const platform = new SpyPlatform();
   const manifest = defineGame({
     id: "g", declaredRtp: 1, defaultMode: "base", maxWinMultiplier: 1000,
@@ -71,7 +71,7 @@ function makeOrchestrator() {
       cx: { math: complexMath, stakeMultiplier: 1 },
     },
   });
-  const orch = createOrchestrator({ manifest, platform, isDev: false });
+  const orch = createOrchestrator({ manifest, platform, isDev: false, ...opts });
   const conn: ConnectionMeta = { connectionId: "c1", sessionId: null, demo: false };
   return { orch, platform, conn };
 }
@@ -107,7 +107,10 @@ describe("orchestrator close keys (C3 / C4 race)", () => {
 
 describe("orchestrator spin keys (C3)", () => {
   test("client token -> deterministic, stable across resends", async () => {
-    const { orch, platform, conn } = makeOrchestrator();
+    // Derivation only. With the request cache off, the wallet sees both calls
+    // and both carry the identical key, which is the property a compliant
+    // wallet dedupes on.
+    const { orch, platform, conn } = makeOrchestrator({ requestCache: false });
     await orch.init({ sid: "sess1" }, conn);
     await orch.spin({ idempotencyKey: "tok-A" }, conn);
     await orch.spin({ idempotencyKey: "tok-A" }, conn);
@@ -115,6 +118,17 @@ describe("orchestrator spin keys (C3)", () => {
       "sess1:spin:tok-A",
       "sess1:spin:tok-A",
     ]);
+  });
+
+  test("with the request cache on, the retry never reaches the wallet at all", async () => {
+    // The stronger guarantee, and the reason the cache exists: it does not
+    // depend on the wallet honouring anything. Artube's wire has no
+    // idempotency field, so wallet-side dedupe is simply unavailable there.
+    const { orch, platform, conn } = makeOrchestrator();
+    await orch.init({ sid: "sess1" }, conn);
+    await orch.spin({ idempotencyKey: "tok-A" }, conn);
+    await orch.spin({ idempotencyKey: "tok-A" }, conn);
+    expect(platform.settleKeys).toEqual(["sess1:spin:tok-A"]);
   });
 
   test("no client token -> random fallback, distinct per call", async () => {

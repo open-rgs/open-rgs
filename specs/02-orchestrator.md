@@ -259,6 +259,48 @@ for closes  - see Spec 05) are the wallet-level backstop. Operations on
 The lock guards in-process ordering only; it is not a substitute for the
 wallet being the source of truth across processes.
 
+### Request-level idempotency (`requestCache`)
+
+The per-session lock orders concurrent calls; it does not stop a *resent*
+call from being a second real round. That job belongs to the idempotency
+key, and the key only works if the wallet honours it. Some wallet
+protocols have no field to carry one  - `@open-rgs/adapter-artube` is the
+worked example  - and against those, a client retry after a timeout runs
+the math again and moves money again.
+
+So the orchestrator caches the call itself. `spin`, `openRound`,
+`stepRound` and `closeRound` are keyed on `(sessionId, phase, client
+token)`; a repeat is answered from the first call's result and never
+reaches math or the wallet. The guarantee no longer depends on the wallet
+honouring anything. It is on by default and disabled with
+`createServer({ requestCache: false })`.
+
+Four properties decide whether this is correct:
+
+- **In-flight coalescing.** The entry is created BEFORE the work starts
+  and holds the promise, so a repeat arriving while the first is still
+  running awaits it rather than starting a second round. A cache holding
+  only completed responses would miss exactly the case a client timeout
+  produces.
+- **Only successes are kept.** A rejection clears its own entry, so a
+  transient `PLATFORM_UNAVAILABLE` does not permanently poison the token.
+- **Scoped by session and phase.** Tokens are client-chosen, so two
+  players may pick the same one; scoping by session makes a cross-player
+  collision impossible, and the phase tag stops one token collapsing a
+  spin into a close.
+- **Bounded.** Entries expire on a TTL (default 120s) and the store is
+  capped (default 10,000), oldest evicted first. The window needs to
+  outlive a client's retry behaviour, not a session.
+
+The cache sits OUTSIDE the per-session lock, so a coalesced retry does not
+hold the queue while it waits.
+
+**Scope: per process.** A retry landing on a different pod finds an empty
+cache and runs for real; the cross-pod guard remains the wallet's own
+dedupe on the idempotency key (Spec 05). This does not replace that  - it
+closes the case where the wallet cannot help. A call carrying no client
+token is not cached, because there is nothing stable to deduplicate on.
+
 ### Connection concurrency (`ConcurrencyPolicy`)
 
 INIT arbitrates when the session is already attached to ANOTHER live

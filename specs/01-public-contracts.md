@@ -107,6 +107,31 @@ interface CloseOutcome {        // complex / close + autoclose
 `Op` is `unknown` to core. Math owns the format; the client knows the
 format. Core forwards untouched.
 
+### The canonical op vocabulary (opt in)
+
+`Op` staying `unknown` is deliberate and is not changing. Its cost is that
+nothing generic can render a game it has never seen, so smoke tests,
+replay tools and integration harnesses end up game-specific too.
+
+`@open-rgs/contract/ops` is the opt-in middle ground: nine shapes covering
+what a slot needs to say  - `board`, `win`, `cascade`, `respin`, `coin`,
+`award`, `feature`, `meter`, `message`  - plus `isCanonicalOp`,
+`canonicalOps` and `opsTotal`. A game emitting these can be driven by any
+client that understands them, including `@open-rgs/client`'s
+`UniversalClient`.
+
+Three rules keep this from becoming a second contract:
+
+- **Core never reads it.** Nothing in the engine validates, transforms or
+  depends on op shape. The module is types plus a type guard.
+- **Mixing is expected.** Canonical and game-specific ops travel in one
+  stream; a generic client renders what it recognises and passes the rest
+  through, so adoption is not all-or-nothing.
+- **Ops describe, they never pay.** This is a visual log, not a settlement
+  record: the round's `multiplier` is what pays. `opsTotal` exists to
+  CHECK a presentation against the settled multiplier in a test, and a
+  mismatch is a presentation bug, never a reason to move money.
+
 ### Breaking-change policy
 
 - Adding a new optional field to `MathModule` or its outcomes is non-breaking.

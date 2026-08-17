@@ -4,6 +4,7 @@ export { createServer, type ServerConfig, type ServerHandle } from "./server.js"
 export { createOrchestrator, defaultIdempotencyKey, UNFINISHED_ROUND_MESSAGE } from "./orchestrator.js";
 export { settleAmount, roundHalfEven } from "./money.js";
 export { deriveIdempotencyKey, uuidV4 } from "./idempotency.js";
+export { createRequestCache, type RequestCache, type RequestCacheOptions } from "./request-cache.js";
 export {
   createAuditLog, verifyChain, memoryAuditSink, jsonlStdoutAuditSink, AUDIT_GENESIS_HASH,
   type AuditLog, type AuditSink, type AuditEvent, type AuditInput, type RoundOutcomeStatus,

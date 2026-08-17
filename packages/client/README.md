@@ -35,6 +35,52 @@ c.disconnect();
 
 All types come from `@open-rgs/contract`.
 
+`stepRound` and `closeRound` also accept `idempotencyKey`, so every
+money-moving call can be resent safely.
+
+## UniversalClient
+
+`RgsClient` speaks the wire. `UniversalClient` is the layer above it that
+every integration otherwise rewrites: play a round to completion whatever
+shape it is, retry safely, and print what happened.
+
+```ts
+import { RgsClient, UniversalClient, describeRound } from "@open-rgs/client";
+
+const rgs = new RgsClient("ws://localhost:8080/wss");
+await rgs.connect();
+
+const uc = new UniversalClient(rgs);
+const init = await uc.init("session-1");
+
+await uc.resumeIfUnfinished(init);
+
+const round = await uc.playRound(0);
+console.log(describeRound(round));
+```
+
+It tries a simple spin first; a complex mode answers `INVALID_MODE` and it
+switches to open/step/close, so it never needs telling which kind of game it
+is talking to. Every call carries an idempotency token that a retry reuses, so
+a retry is deduplicated server-side rather than replayed as a second round.
+
+| Option | Default | What it does |
+|---|---|---|
+| `decide(awaiting, steps)` | picks the first offered option | answers whatever a round waits for |
+| `maxSteps` | 200 | guard against math that never reaches a terminal state |
+| `keyFor(call, n)` | a counter | mint the idempotency token per logical call |
+| `retries` | 2 | attempts on a transport or platform failure |
+
+`describeRound()` renders a stable, greppable line per event  - for a test
+fixture, a CI log, or a bug report. Games emitting the canonical ops from
+`@open-rgs/contract/ops` get their ops rendered; games emitting their own
+shapes still run, still settle, and still produce a transcript.
+
+This is not a game client and has no opinion about presentation. It is for
+smoke-testing a build, driving an integration against a wallet sandbox,
+capturing a transcript to diff after a change, and proving a deferred-close
+round survives a disconnect.
+
 ## Errors
 
 Server-side `RGSError`s come back as `RgsServerError(code, message)`:

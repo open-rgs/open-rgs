@@ -36,10 +36,10 @@ const n = (k: number) => Array.from({ length: k });
     )}
 
     {kind === "weights-bands" && (
-      <div class="bar"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span><b class="ptr"></b></div>
+      <div class="gauge"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span><b class="ptr"></b></div>
     )}
     {kind === "weights-zero" && (
-      <div class="bar"><span class="w50 a"></span><span class="w0 ghost"></span><span class="w50 c"></span><b class="ptr"></b></div>
+      <div class="gauge"><span class="w50 a"></span><span class="w0 ghost"></span><span class="w50 c"></span><b class="ptr"></b></div>
     )}
     {kind === "weights-distinct" && (
       <div class="row">{n(4).map((_, i) => <i class={`pickseq p${i}`}></i>)}</div>
@@ -89,14 +89,14 @@ const n = (k: number) => Array.from({ length: k });
     )}
     {kind === "markov-stationary" && (
       <div class="row gap">
-        <div class="bar sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
+        <div class="gauge sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
         <span class="op">=</span>
-        <div class="bar sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
+        <div class="gauge sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
       </div>
     )}
 
     {kind === "recipes-mix" && (
-      <div class="bar"><span class="w94 a"></span><span class="w5 b"></span><span class="w1 c"></span><b class="ptr"></b></div>
+      <div class="gauge"><span class="w94 a"></span><span class="w5 b"></span><span class="w1 c"></span><b class="ptr"></b></div>
     )}
     {kind === "recipes-tease" && (
       <div class="row">
@@ -112,7 +112,7 @@ const n = (k: number) => Array.from({ length: k });
     )}
 
     {kind === "paytable-bands" && (
-      <div class="bar"><span class="w22 c"></span><span class="w20 b"></span><span class="w18 a"></span><span class="w40 a open"></span></div>
+      <div class="gauge"><span class="w22 c"></span><span class="w20 b"></span><span class="w18 a"></span><span class="w40 a open"></span></div>
     )}
     {kind === "paytable-wild" && (
       <div class="row">
@@ -120,7 +120,7 @@ const n = (k: number) => Array.from({ length: k });
       </div>
     )}
     {kind === "paytable-topband" && (
-      <div class="bar"><span class="w20 c"></span><span class="w80 a open"></span></div>
+      <div class="gauge"><span class="w20 c"></span><span class="w80 a open"></span></div>
     )}
 
     {kind === "pay-lines-run" && (
@@ -152,7 +152,7 @@ const n = (k: number) => Array.from({ length: k });
         <div class="colr"><i class="hit"></i><i></i></div>
         <div class="colr"><i class="hit"></i><i></i></div>
         <div class="colr gapx"><i></i><i></i></div>
-        <div class="colr"><i class="hit dim"></i><i></i></div>
+        <div class="colr"><i class="hit faint"></i><i></i></div>
       </div>
     )}
     {kind === "pay-ways-heights" && (
@@ -211,7 +211,7 @@ const n = (k: number) => Array.from({ length: k });
       </div>
     )}
     {kind === "cascade-bounded" && (
-      <div class="row"><div class="bar sm2"><span class="w80 a"></span><span class="w20 stop"></span></div></div>
+      <div class="row"><div class="gauge sm2"><span class="w80 a"></span><span class="w20 stop"></span></div></div>
     )}
 
     {kind === "holdwin-meter" && (
@@ -281,7 +281,7 @@ const n = (k: number) => Array.from({ length: k });
     )}
 
     {kind === "spawn-count" && (
-      <div class="bar"><span class="w90 dimb"></span><span class="w7 a"></span><span class="w25 b"></span><span class="w05 c"></span><b class="ptr"></b></div>
+      <div class="gauge"><span class="w90 dimb"></span><span class="w7 a"></span><span class="w25 b"></span><span class="w05 c"></span><b class="ptr"></b></div>
     )}
     {kind === "spawn-onereel" && (
       <div class="row">
@@ -293,6 +293,50 @@ const n = (k: number) => Array.from({ length: k });
     {kind === "spawn-protect" && (
       <div class="row">
         <i class="wild lock"></i><i class="sc pop"></i><i class="wild lock"></i><i class="sc pop d1"></i>
+      </div>
+    )}
+
+    {kind === "retry-inflight" && (
+      <div class="row gap">
+        <div class="colr">
+          <span class="tok">tok-A</span>
+          <span class="tok rq2">tok-A</span>
+        </div>
+        <div class="gauge sm2 track"><span class="w90 a runbar"></span></div>
+        <span class="num">1 round</span>
+      </div>
+    )}
+    {kind === "retry-fail" && (
+      <div class="row gap">
+        <div class="colr">
+          <span class="tok bad">fail</span>
+          <span class="tok rq2 ok2">ok</span>
+        </div>
+        <span class="op">entry dropped, next attempt runs</span>
+      </div>
+    )}
+    {kind === "retry-scope" && (
+      <div class="colr">
+        <div class="row"><span class="lane">player-a</span><span class="tok">k</span><i class="a"></i></div>
+        <div class="row"><span class="lane">player-b</span><span class="tok">k</span><i class="b"></i></div>
+      </div>
+    )}
+    {kind === "ops-decode" && (
+      <div class="row">
+        <i class="a uq1"></i><i class="a uq2"></i><i class="a uq3"></i><i class="faint"></i>
+        <span class="op">3 rendered, 1 passed through</span>
+      </div>
+    )}
+    {kind === "ops-total" && (
+      <div class="row gap">
+        <div class="row"><i class="a"></i><span class="num">2</span><span class="op">+</span><i class="a"></i><span class="num">1</span></div>
+        <span class="num big2">= 3x</span>
+      </div>
+    )}
+    {kind === "universal-probe" && (
+      <div class="colr">
+        <div class="row"><span class="lane">spin</span><span class="tok bad">INVALID_MODE</span></div>
+        <div class="row"><span class="lane">open</span><i class="a uq1"></i><i class="a uq2"></i><i class="a uq3"></i><span class="op">close</span></div>
       </div>
     )}
 
@@ -333,12 +377,46 @@ const n = (k: number) => Array.from({ length: k });
   .hit { background: #0E6B62; border-color: #0E6B62; }
   .sc { background: #8A5A15; border-color: #8A5A15; }
   .wild { background: transparent; border: 2px solid #0E6B62; }
-  .dim { opacity: .25; }
+  .faint { opacity: .25; }
   .big { width: 26px; height: 26px; }
 
-  .bar { position: relative; display: flex; width: 250px; height: 20px; }
-  .bar.sm2 { width: 120px; height: 14px; }
-  .bar span { height: 100%; }
+
+  /* Retries, canonical ops, universal client. */
+  .tok {
+    font-family: var(--mono, monospace); font-size: 0.68rem;
+    border: 1px solid var(--fg-mute, #888); padding: 1px 5px; display: block;
+  }
+  .tok.bad { border-color: #8A5A15; color: #8A5A15; }
+  .tok.ok2 { border-color: #0E6B62; color: #0E6B62; }
+  .lane {
+    font-family: var(--mono, monospace); font-size: 0.68rem;
+    color: var(--fg-mute, #888); width: 62px;
+  }
+  .gauge.track { border: 1px solid var(--fg-mute, #888); }
+  /* Sequential highlight that never hides a square. popIn is invisible for the
+     first 55% of its cycle, which reads as a missing diagram in a still. */
+  .uq1, .uq2, .uq3 { animation: seqlit 2.7s infinite; opacity: .35; }
+  .uq2 { animation-delay: .3s; }
+  .uq3 { animation-delay: .6s; }
+  @keyframes seqlit { 0%, 12% { opacity: 1; } 40%, 100% { opacity: .35; } }
+  .rq2 { animation: coalesce 3.2s infinite; }
+  .runbar { animation: runbar 3.2s infinite; }
+  /* Never reaches 0: a frame where the second request is invisible reads as a
+     broken diagram rather than as a request that has not arrived yet. */
+  @keyframes coalesce {
+    0%, 20% { opacity: .18; }
+    38%, 70% { opacity: 1; }
+    86%, 100% { opacity: .35; }
+  }
+  @keyframes runbar {
+    0% { width: 8%; } 62%, 100% { width: 100%; }
+  }
+  /* Named to avoid the global .bar in BaseLayout: it is is:global, sets
+     align-items: baseline, and silently collapsed the fill inside these to
+     zero height. Anything defined here must not reuse a global class name. */
+  .gauge { position: relative; display: flex; width: 250px; height: 20px; }
+  .gauge.sm2 { width: 120px; height: 14px; }
+  .gauge span { height: 100%; }
   .w60{width:60%}.w30{width:30%}.w10{width:10%}.w50{width:50%}.w0{width:0}
   .w94{width:94%}.w5{width:5%}.w1{width:1%}.w22{width:22%}.w20{width:20%}
   .w18{width:18%}.w40{width:40%}.w80{width:80%}.w90{width:90%}.w7{width:7%}

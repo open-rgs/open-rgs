@@ -76,14 +76,19 @@ injected randomness: `(prev_carry, rng, params) -> multiplier + ops + carry`.
 No bet, no balance, no currency, no clock, no I/O.
 
 - **Enforced by:** `SpinContext` carries only `{ mode, params }`  - never a
-  bet or balance (`specs/01-public-contracts.md`). The TypeScript runtime is
-  sandboxed: `os`, `io`, `debug`, `package`, `load*` are nil'd, and randomness
-  is routed through the injected `host.rng_next` (`specs/03-math-runtime.md`).
-- **Prevents:** an entire class of exploit *structurally*  - a math file
-  **cannot** value a payout by a switched bet, leak through the filesystem, or
-  produce a non-deterministic-but-for-RNG result, because it is never handed
-  the tools. Bet-aware safety (e.g. stake-locks on deferred payouts) therefore
-  lives where it belongs: in the bet-aware adapter, not the math.
+  bet or balance (`specs/01-public-contracts.md`). Randomness reaches the math
+  only through the injected `host.rng_next`, and `loadTsMath`'s purity gate
+  rejects a source that reaches for ambient randomness, the clock, I/O, or the
+  escape hatches that would restore them (`specs/03-math-runtime.md`).
+- **Not a sandbox.** The purity gate is a source scan: it catches the accident,
+  not the adversary. A determined author can defeat it, and TypeScript math
+  runs with the process's own authority. **Math files are code you ship**  -
+  review them like code, not like content.
+- **Prevents:** an entire class of MISTAKE *structurally*  - a math file is
+  never handed a bet, so it cannot value a payout by a switched one, and the
+  gate stops the ordinary slips that would make a round unreplayable. Bet-aware
+  safety (e.g. stake-locks on deferred payouts) therefore lives where it
+  belongs: in the bet-aware adapter, not the math.
 - **Integrators must not:** smuggle the bet into `params` and have the math
   branch on it for payout value. Math returns a dimensionless multiplier; the
   engine multiplies by a bet the math never learns.
@@ -138,16 +143,19 @@ The same logical operation  - retried after a dropped response, re-sent on
 reconnect, or raced from a second connection  - settles a single time.
 
 - **Enforced by:** per-session operation serialization in the orchestrator (at
-  most one operation per session runs at a time), idempotency keys on every
-  money-moving wallet call (`deriveIdempotencyKey`,
-  `specs/05-platform-protocol.md`), and an optional transport-level
-  operation-sequence guard that drops duplicates/rejects gaps at the socket
-  (`specs/04-wire-protocol.md`).
+  most one operation per session runs at a time), a request cache that answers
+  a resent call from the first call's result without re-running it
+  (`specs/02-orchestrator.md`), idempotency keys on every money-moving wallet
+  call (`deriveIdempotencyKey`, `specs/05-platform-protocol.md`), and an
+  optional transport-level operation-sequence guard that drops
+  duplicates/rejects gaps at the socket (`specs/04-wire-protocol.md`).
 - **Prevents:** double-spend / double-credit via replay or concurrency.
 - **Integrators must not:** rely on the engine alone if your wallet is a
   separate service  - the wallet **must** dedupe on the idempotency key for the
   guarantee to hold end-to-end. The engine derives and forwards the key; the
-  wallet honours it.
+  wallet honours it. The request cache narrows the gap when a wallet cannot
+  (no field on the wire for the key) but is per process: a retry reaching a
+  different pod still relies on the wallet.
 
 ## 7 . Bounded Payout
 
@@ -173,10 +181,10 @@ it fires the outcome is stamped so the cap is visible and auditable.
 |---|-----------|---------------------|------|
 | 1 | No Money, No Honey | settle carries money+carry; nothing written before | [05](./05-platform-protocol.md) |
 | 2 | One Round, One Record | atomic settle + reversal contract (latest-first, whole-record) | [05](./05-platform-protocol.md) |
-| 3 | Blind Math | `SpinContext` has no money; sandboxed VM | [01](./01-public-contracts.md), [03](./03-math-runtime.md) |
+| 3 | Blind Math | `SpinContext` has no money; injected RNG + purity gate | [01](./01-public-contracts.md), [03](./03-math-runtime.md) |
 | 4 | House Computes, Client Asks | request carries intent only; server computes outcome | [04](./04-wire-protocol.md) |
 | 5 | Fail Closed | sanitize / funded-win / watchdog / RNG fail-closed | [02](./02-orchestrator.md), [03](./03-math-runtime.md) |
-| 6 | At Most Once | per-session lock + idempotency keys + op-seq guard | [04](./04-wire-protocol.md), [05](./05-platform-protocol.md) |
+| 6 | At Most Once | per-session lock + request cache + idempotency keys + op-seq guard | [02](./02-orchestrator.md), [04](./04-wire-protocol.md), [05](./05-platform-protocol.md) |
 | 7 | Bounded Payout | max-win cap enforced engine-side | [02](./02-orchestrator.md) |
 
 ## What this is not

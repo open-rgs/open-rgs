@@ -43,8 +43,19 @@ export type CarryState = string;
 export type RoundState = string;
 
 /** Opaque-to-core visual ops. Math authors define the shape; the client
- *  replays them. Core only forwards. */
+ *  replays them. Core only forwards.
+ *
+ *  A canonical vocabulary is available in `@open-rgs/contract/ops` for games
+ *  that want a generic client, replay tooling or an integration harness to
+ *  understand their stream without being written against that one game. Opting
+ *  in is a game-side choice; nothing in the engine reads or validates ops. */
 export type Op = unknown;
+
+export type {
+  BaseOp, BoardOp, WinOp, CascadeOp, RespinOp, CoinOp, AwardOp, FeatureOp,
+  MeterOp, MessageOp, CanonicalOp,
+} from "./ops.js";
+export { isCanonicalOp, canonicalOps, opsTotal } from "./ops.js";
 
 /** Player-supplied action during a complex round (e.g. {type:"hit"}). */
 export type PlayerAction = { type: string; [k: string]: unknown };
@@ -693,12 +704,31 @@ export interface ClientRequestSpin {
    *  (spin/open) has no server-side round id yet, so the ONLY way to make a
    *  blind retry of it deduplicable is for the client to resend the same
    *  token. Supply a stable token (e.g. a UUID minted once per logical
-   *  spin) and reuse it across every retry of that spin. */
+   *  spin) and reuse it across every retry of that spin.
+   *
+   *  With a token, the orchestrator's request cache answers the resend from
+   *  the first call's result and the round never runs twice, whatever the
+   *  wallet does with the derived key. Without one, retry-safety falls back
+   *  entirely to the wallet, and a wallet whose wire cannot carry the key
+   *  cannot provide it. */
   idempotencyKey?: string;
 }
 export interface ClientRequestOpenRound  { sid?: string; mode?: string; betIndex?: number; priceMultiplier?: number; params?: Record<string, unknown>; idempotencyKey?: string }
-export interface ClientRequestStepRound  { sid?: string; action: PlayerAction }
-export interface ClientRequestCloseRound { sid?: string }
+export interface ClientRequestStepRound  {
+  sid?: string;
+  action: PlayerAction;
+  /** Optional client-generated idempotency token. A retried step carrying the
+   *  same token returns the first attempt's response instead of advancing the
+   *  round a second time. */
+  idempotencyKey?: string;
+}
+export interface ClientRequestCloseRound {
+  sid?: string;
+  /** Optional client-generated idempotency token. A retried close carrying the
+   *  same token returns the first attempt's response rather than settling
+   *  again. */
+  idempotencyKey?: string;
+}
 export interface ClientRequestPromoAccept { sid?: string; accept: boolean }
 
 export interface ClientResponseInit {
