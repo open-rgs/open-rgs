@@ -81,6 +81,44 @@ smoke-testing a build, driving an integration against a wallet sandbox,
 capturing a transcript to diff after a change, and proving a deferred-close
 round survives a disconnect.
 
+## open-rgs-play
+
+The same thing as a command, for a server you just deployed. No game code, no
+fixtures, no knowledge of which modes are simple and which are complex.
+
+```bash
+bunx open-rgs-play ws://localhost:8080/wss
+bunx open-rgs-play ws://localhost:8080/wss --rounds 20 --mode bonus
+bunx open-rgs-play ws://localhost:8080/wss --rounds 5 --retry-token
+```
+
+| Flag | What it does |
+|---|---|
+| `--sid ID` | session id (default: a fresh one per run) |
+| `--rounds N` | how many rounds to play (default 1) |
+| `--bet N` | bet index (default 0) |
+| `--mode NAME` | game mode |
+| `--retry-token` | send every round with the SAME token |
+| `--abandon` | open a round and disconnect without closing it |
+| `--resume` | finish a round a previous session left open |
+| `--json` | machine-readable output |
+| `--quiet` | suppress the running commentary |
+
+`--retry-token` is the fastest way to see whether retries are being
+deduplicated: the balance must move exactly once however many rounds you ask
+for, and the command exits non-zero if it does not.
+
+`--abandon` and `--resume` exercise the replay path end to end - the first
+walks away mid-round like a player closing the tab, the second comes back:
+
+```bash
+bunx open-rgs-play ws://localhost:8080/wss --sid s1 --mode deferred --abandon
+bunx open-rgs-play ws://localhost:8080/wss --sid s1 --resume
+```
+
+A single round prints its full transcript; a run of them prints one line each
+and a summary. Exit code is 1 on any failure, so it drops straight into CI.
+
 ## Errors
 
 Server-side `RGSError`s come back as `RgsServerError(code, message)`:

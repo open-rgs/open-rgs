@@ -52,6 +52,11 @@ const transcript = `spin
   message Big win
 = 2x  balance 98000  ops 2x`;
 
+const cli = `bunx open-rgs-play ws://localhost:8080/wss --rounds 20
+bunx open-rgs-play ws://localhost:8080/wss --rounds 5 --retry-token
+bunx open-rgs-play ws://localhost:8080/wss --sid s1 --mode deferred --abandon
+bunx open-rgs-play ws://localhost:8080/wss --sid s1 --resume`;
+
 const decide = `const uc = new UniversalClient(rgs, {
   decide: (awaiting) => awaiting.type === "gamble"
     ? { type: "gamble", value: "red" }
@@ -306,6 +311,30 @@ const decide = `const uc = new UniversalClient(rgs, {
       with a resume block; <code>resumeIfUnfinished</code> returns undefined when
       there is nothing to resume, so it is safe to call unconditionally after
       every init.
+    </p>
+
+    <h2 data-section="&sect; 11">The same thing as a command</h2>
+
+    <p>
+      For a server you just deployed, <code>open-rgs-play</code> is the runner
+      without the script around it. No game code, no fixtures, no knowledge of
+      which modes are simple and which are complex.
+    </p>
+
+    <Code code={cli} />
+
+    <p>
+      <code>--retry-token</code> sends every round with the same token, so the
+      balance must move exactly once however many rounds you ask for; the
+      command exits non-zero if it does not. <code>--abandon</code> walks away
+      mid-round like a player closing the tab, and <code>--resume</code> comes
+      back to it, which is the replay path end to end in two commands.
+    </p>
+
+    <p>
+      A single round prints its full transcript, a run of them prints one line
+      each and a summary, and <code>--json</code> gives you the whole thing
+      structured. Exit code is 1 on any failure, so it drops straight into CI.
     </p>
 
     <nav class="related">

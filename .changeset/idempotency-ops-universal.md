@@ -42,3 +42,9 @@ rather than needing to be told which shape it is talking to. Every call carries
 a token that a retry reuses, `resumeIfUnfinished()` finishes a round the last
 session left open, and `describeRound()` renders a stable, greppable transcript
 for a test fixture, a CI log, or a bug report.
+
+**`open-rgs-play`.** The same runner as a command, for a server you just
+deployed: `bunx open-rgs-play ws://host/wss --rounds 20`. `--retry-token`
+sends every round with the same token and fails the run if the balance moved
+more than once, and `--abandon` / `--resume` walk the replay path end to end.
+Exit code is 1 on any failure, so it drops straight into CI as a smoke test.

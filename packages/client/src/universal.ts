@@ -282,7 +282,9 @@ export function describeRound(r: RoundResult): string {
             (op.cause ? ` (${op.cause})` : ""));
           break;
         case "award":
-          out.push(`  award ${op.label ?? ""} ${op.amount}`.replace(/\s+/g, " "));
+          // Collapse only the gap the missing label leaves, not the indent
+          // every other line in the transcript shares.
+          out.push(`  award ${`${op.label ?? ""} ${op.amount}`.replace(/\s+/g, " ").trim()}`);
           break;
         case "feature":
           out.push(`  feature ${op.name} ${op.phase}${op.count ? ` x${op.count}` : ""}`);
