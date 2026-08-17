@@ -45,3 +45,22 @@ outcomes from the same RNG stream):
 the language - in-process TS crosses nothing. It changes nothing about serving
 (compute is rounding error against the wallet RPC) and everything about
 simulation: a 1M-spin tuning run goes from 17 seconds to 13 milliseconds.
+
+**Replay.** `loadTsMath(path, { rngMode: "seed-expand" })` draws ONE seed per
+entry-point call and expands it deterministically, so a whole call collapses to
+a single recordable number. The returned math gains `lastSeed` (a JSON-safe
+integer below 2^53) and `withSeed(seed, fn)`; given the same seed and the same
+carry, the outcome reproduces byte for byte - on a different instance, on a
+fresh load, and after thousands of intervening spins.
+
+The Lua tier's contract already claimed a call was "fully reconstructable from
+its seed", but nothing ever surfaced the seed, so the property was unusable.
+With `contentHash` (which math), carry (from what state), and `lastSeed` (on
+which stream), a round is now fully reconstructable in practice.
+
+Note this is a REPLAY feature, not a performance one: in the Lua tier
+seed-expand mainly dodges per-draw JS<->WASM crossings, and in-process TS has no
+boundary to dodge. `isTerminal` deliberately does not reseed - it is a pure
+predicate over state, and reseeding there would shift the stream out from under
+a recorded seed. Default stays `"per-draw"`, which is unpredictable and
+unreplayable, as a CSPRNG has no seed to write down.

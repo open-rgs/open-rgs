@@ -11,7 +11,7 @@ export {
 export { binaryTransport } from "./transport-binary.js";
 export { loadLuaMath, cryptoRng, type LoadLuaMathOptions } from "./lua-math.js";
 export { loadWasmMath, type LoadWasmMathOptions } from "./wasm-math.js";
-export { loadTsMath, assertPure, type LoadTsMathOptions } from "./ts-math.js";
+export { loadTsMath, assertPure, type LoadTsMathOptions, type Replayable } from "./ts-math.js";
 export { createMathPool, type MathPool, type MathPoolOptions } from "./math-pool.js";
 export { startAdmin } from "./admin.js";
 export { log } from "./log.js";

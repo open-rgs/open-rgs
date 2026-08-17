@@ -37,6 +37,19 @@ import type { MathHost, MathModule, MathFactory } from "@open-rgs/contract";
 import { log } from "./log.js";
 import { resolveRng } from "./lua-math.js";
 
+/** A math whose every entry-point call is reconstructable from one recorded
+ *  number. Returned by {@link loadTsMath} under `rngMode: "seed-expand"`. */
+export interface Replayable {
+  /** Seed the most recent entry-point call ran on. Record it alongside the
+   *  round and the round replays exactly. Integer below 2^53, so it survives
+   *  JSON and an audit log without special handling. */
+  readonly lastSeed: number;
+  /** Re-run an entry point on an explicit seed instead of drawing a fresh one.
+   *  Given the same seed and the same carry, the outcome is identical - that is
+   *  the whole replay guarantee. */
+  withSeed<T>(seed: number, fn: () => T): T;
+}
+
 export interface LoadTsMathOptions {
   /** Outcome RNG, exposed to the factory as `host.rng_next`. Same policy as
    *  loadLuaMath: defaults to the secure system CSPRNG (cryptoRng);
@@ -50,6 +63,114 @@ export interface LoadTsMathOptions {
   /** Skip the purity check. Intended for the conformance suite's own negative
    *  fixtures - NEVER for production math. Logs a warning when set. */
   unsafeSkipPurityCheck?: boolean;
+  /** How randomness reaches the math.
+   *
+   *  `"per-draw"` (default): every `host.rng_next()` calls the injected `rng`
+   *  directly. With a CSPRNG that is unpredictable - and UNREPLAYABLE, because
+   *  a CSPRNG has no seed to write down.
+   *
+   *  `"seed-expand"`: draw ONE seed per entry-point call from `rng`, then
+   *  expand it deterministically for the draws within that call. The math sees
+   *  the same uniform stream; the difference is that the whole call now
+   *  collapses to a single recordable number, so `withSeed(seed, ...)`
+   *  reproduces it exactly.
+   *
+   *  Note this is a REPLAY feature here, not a performance one. In the Lua tier
+   *  seed-expand exists mainly to dodge per-draw JS<->WASM crossings; in-process
+   *  TS has no boundary to dodge, so the only thing it buys is reproducibility -
+   *  which is the reason to want it.
+   *
+   *  CERT NOTE: under `"seed-expand"` the expansion enters the
+   *  outcome-determination path and must be evaluated as part of the RNG.
+   *  Default stays `"per-draw"`. */
+  rngMode?: "per-draw" | "seed-expand";
+}
+
+/** splitmix32 - used only to spread one seed into generator state. */
+function splitmix32(seed: number): () => number {
+  let a = seed | 0;
+  return () => {
+    a = (a + 0x9e3779b9) | 0;
+    let t = a ^ (a >>> 16);
+    t = Math.imul(t, 0x21f0aaad);
+    t = t ^ (t >>> 15);
+    t = Math.imul(t, 0x735a2d97);
+    return (t ^ (t >>> 15)) >>> 0;
+  };
+}
+
+/** sfc32 - small, fast, passes PractRand. Deterministic from its state, which
+ *  is the entire point: the state comes from one seed, so the stream does too. */
+function sfc32(a: number, b: number, c: number, d: number): () => number {
+  return () => {
+    a |= 0; b |= 0; c |= 0; d |= 0;
+    const t = (((a + b) | 0) + d) | 0;
+    d = (d + 1) | 0;
+    a = b ^ (b >>> 9);
+    b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11);
+    c = (c + t) | 0;
+    return t >>> 0;
+  };
+}
+
+/** Expand a seed into a uniform stream over [0, 1) with full 53-bit
+ *  resolution. Two 32-bit draws per float: a 32-bit float would cap the number
+ *  of distinct boards a draw-heavy spin can produce, which is a real limit on a
+ *  big grid rather than a theoretical one. */
+function streamFromSeed(seed: number): () => number {
+  const sm = splitmix32(seed ^ 0x9e3779b9);
+  const gen = sfc32(sm(), sm(), sm(), sm());
+  for (let i = 0; i < 12; i++) gen(); // discard, so nearby seeds diverge
+  return () => {
+    const hi = gen() >>> 5;   // 27 bits
+    const lo = gen() >>> 6;   // 26 bits
+    return (hi * 67108864 + lo) / 9007199254740992; // / 2^53
+  };
+}
+
+/** Wrap every entry point so each call reseeds independently, exactly as the
+ *  Lua tier documents. Reseeding per call (rather than once per load) is what
+ *  makes a single round replayable in isolation - you need not replay the whole
+ *  session to reach it. */
+function createSeedExpand(drawSeed: () => number): {
+  rng_next: () => number;
+  wrap: (m: MathModule) => MathModule & Replayable;
+} {
+  let stream: () => number = () => {
+    throw new Error("loadTsMath: math drew randomness outside an entry-point call");
+  };
+  let lastSeed = 0;
+  let forced: number | undefined;
+
+  const rng_next = () => stream();
+
+  const begin = () => {
+    const seed = forced ?? drawSeed();
+    lastSeed = seed;
+    stream = streamFromSeed(seed);
+  };
+
+  const wrap = (m: MathModule): MathModule & Replayable => {
+    const seeded = <A extends unknown[], R>(fn: ((...a: A) => R) | undefined) =>
+      fn === undefined ? undefined : (...args: A): R => { begin(); return fn(...args); };
+
+    const out = Object.create(m) as MathModule & Replayable & Record<string, unknown>;
+    for (const key of ["play", "open", "step", "close", "autoclose"] as const) {
+      const fn = (m as unknown as Record<string, unknown>)[key];
+      if (typeof fn === "function") out[key] = seeded((fn as (...a: unknown[]) => unknown).bind(m));
+    }
+    // isTerminal is a pure predicate over state - it must NOT reseed, or asking
+    // whether a round is finished would consume a seed and shift the stream.
+    Object.defineProperty(out, "lastSeed", { get: () => lastSeed, enumerable: true });
+    out["withSeed"] = <T>(seed: number, fn: () => T): T => {
+      forced = seed;
+      try { return fn(); } finally { forced = undefined; }
+    };
+    return out as MathModule & Replayable;
+  };
+
+  return { rng_next, wrap };
 }
 
 /** Identifiers a math module must not reference, and why. Grouped so the error
@@ -141,8 +262,18 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
   }
 
   const rng = resolveRng(path, opts, "loadTsMath");
+
+  // Under seed-expand the math draws from a stream expanded from one seed per
+  // entry-point call, so the call collapses to a recordable number. 2^53 seeds,
+  // not 2^32: a 32-bit seed would cap how many distinct boards a draw-heavy
+  // spin can produce, which is a real ceiling on a big grid.
+  const seedExpand = opts.rngMode === "seed-expand";
+  const expand = seedExpand
+    ? createSeedExpand(() => Math.floor(rng() * 9007199254740992))
+    : undefined;
+
   const host: MathHost = {
-    rng_next: rng,
+    rng_next: expand ? expand.rng_next : rng,
     log_debug: opts.onDebug ?? (() => {}),
   };
 
@@ -170,8 +301,11 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
   }
 
   // Same provenance stamp the Lua and WASM loaders apply: the audit log can
-  // prove which source computed a given outcome.
-  return Object.assign(math, {
+  // prove which source computed a given outcome. Together with `lastSeed` and
+  // the round's carry, that is everything needed to reconstruct a round:
+  // WHICH math (contentHash), from WHAT state (carry), on WHICH stream (seed).
+  const stamped = Object.assign(math, {
     contentHash: createHash("sha256").update(src).digest("hex"),
   });
+  return expand ? expand.wrap(stamped) : stamped;
 }
