@@ -13,7 +13,10 @@
 //
 //   2. PURITY. `assertPure` below rejects a module that reaches for ambient
 //      randomness, the clock, I/O, or an implementation-defined float op,
-//      BEFORE the module is imported and evaluated.
+//      BEFORE the module is imported and evaluated. It runs over the whole
+//      math - the entry file and every local file it imports - because a math
+//      split across files is the ordinary way to write one, and a gate that
+//      reads only the entry catches nothing that lives one import away.
 //
 // WHAT THE PURITY CHECK IS AND IS NOT. It is a guardrail against ACCIDENTS -
 // overwhelmingly, a math author (increasingly a language model) reaching for
@@ -32,6 +35,8 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { dirname, resolve as resolvePath, relative as relativePath, isAbsolute } from "node:path";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { MathHost, MathModule, MathFactory } from "@open-rgs/contract";
 import { log } from "./log.js";
 import { resolveRng } from "./rng.js";
@@ -39,14 +44,22 @@ import { resolveRng } from "./rng.js";
 /** A math whose every entry-point call is reconstructable from one recorded
  *  number. Returned by {@link loadTsMath} under `rngMode: "seed-expand"`. */
 export interface Replayable {
-  /** Seed the most recent entry-point call ran on. Record it alongside the
-   *  round and the round replays exactly. Integer below 2^53, so it survives
-   *  JSON and an audit log without special handling. */
+  /** Seed the most recently STARTED entry-point call ran on.
+   *
+   *  Correct when calls do not overlap - a synchronous math, which is the
+   *  common case. When two rounds are in flight at once this reads whichever
+   *  started last, so a caller that records seeds under concurrency should use
+   *  {@link runSeeded}, which hands back the seed belonging to ITS call. */
   readonly lastSeed: number;
   /** Re-run an entry point on an explicit seed instead of drawing a fresh one.
    *  Given the same seed and the same carry, the outcome is identical - that is
-   *  the whole replay guarantee. */
+   *  the whole replay guarantee. The seed applies to this call only; a
+   *  concurrent round is unaffected. */
   withSeed<T>(seed: number, fn: () => T): T;
+  /** Draw a seed, run `fn` on it, and return BOTH - so the recorded seed is
+   *  unambiguously the one that call ran on, no matter what else is in flight.
+   *  `fn` may be async; the stream follows it across awaits. */
+  runSeeded<T>(fn: () => T | Promise<T>): { seed: number; result: T | Promise<T> };
 }
 
 export interface LoadTsMathOptions {
@@ -127,30 +140,57 @@ function streamFromSeed(seed: number): () => number {
   };
 }
 
-/** Wrap every entry point so each call reseeds independently. Reseeding per call (rather than once per load) is what
- *  makes a single round replayable in isolation - you need not replay the whole
- *  session to reach it. */
+/** Wrap every entry point so each call runs on its OWN stream, seeded from its
+ *  own draw. Per call, not per load: a round replays in isolation, without
+ *  replaying the session that led to it.
+ *
+ *  CONCURRENCY. The stream, the recorded seed and the forced-seed override used
+ *  to be three variables shared by every call into the math. Any math that
+ *  awaits - and the orchestrator awaits every call - let a second player's
+ *  round reseed the stream halfway through the first, so both rounds drew from
+ *  a spliced stream, `lastSeed` held whichever call began most recently, and
+ *  replaying that seed reproduced neither round. Per-session serialization does
+ *  not help, because the collision is across sessions.
+ *
+ *  So the stream lives in the call, held by an async-local store that follows
+ *  the call across its awaits. `lastSeed` remains for the synchronous, one-call-
+ *  at-a-time case that read it before; the seed is also returned per call
+ *  through {@link Replayable.runSeeded}, which is the form that stays correct
+ *  under concurrency. */
 function createSeedExpand(drawSeed: () => number): {
   rng_next: () => number;
   wrap: (m: MathModule) => MathModule & Replayable;
 } {
-  let stream: () => number = () => {
-    throw new Error("loadTsMath: math drew randomness outside an entry-point call");
-  };
+  interface CallState { stream: () => number; seed: number }
+  // The stream belongs to the CALL and follows it across awaits.
+  const current = new AsyncLocalStorage<CallState>();
+  // A seed pinned by withSeed, visible to the next entry point entered inside
+  // it - and only inside it, so a concurrent round still draws its own.
+  const forced = new AsyncLocalStorage<number | undefined>();
   let lastSeed = 0;
-  let forced: number | undefined;
 
-  const rng_next = () => stream();
+  const rng_next = (): number => {
+    const state = current.getStore();
+    if (!state) {
+      throw new Error(
+        "loadTsMath: math drew randomness outside an entry-point call. Under " +
+        "rngMode 'seed-expand' every draw must happen inside play/open/step/" +
+        "close/autoclose, so the draw belongs to a round that can be replayed.",
+      );
+    }
+    return state.stream();
+  };
 
-  const begin = () => {
-    const seed = forced ?? drawSeed();
+  const runOn = <T>(seed: number, fn: () => T): T => {
     lastSeed = seed;
-    stream = streamFromSeed(seed);
+    // Clear the pin as we enter: it applies to THIS entry point, not to
+    // whatever it calls in turn.
+    return forced.run(undefined, () => current.run({ stream: streamFromSeed(seed), seed }, fn));
   };
 
   const wrap = (m: MathModule): MathModule & Replayable => {
     const seeded = <A extends unknown[], R>(fn: ((...a: A) => R) | undefined) =>
-      fn === undefined ? undefined : (...args: A): R => { begin(); return fn(...args); };
+      fn === undefined ? undefined : (...args: A): R => runOn(forced.getStore() ?? drawSeed(), () => fn(...args));
 
     const out = Object.create(m) as MathModule & Replayable & Record<string, unknown>;
     for (const key of ["play", "open", "step", "close", "autoclose"] as const) {
@@ -160,9 +200,10 @@ function createSeedExpand(drawSeed: () => number): {
     // isTerminal is a pure predicate over state - it must NOT reseed, or asking
     // whether a round is finished would consume a seed and shift the stream.
     Object.defineProperty(out, "lastSeed", { get: () => lastSeed, enumerable: true });
-    out["withSeed"] = <T>(seed: number, fn: () => T): T => {
-      forced = seed;
-      try { return fn(); } finally { forced = undefined; }
+    out["withSeed"] = <T>(seed: number, fn: () => T): T => forced.run(seed, fn);
+    out["runSeeded"] = <T>(fn: () => T | Promise<T>): { seed: number; result: T | Promise<T> } => {
+      const seed = drawSeed();
+      return { seed, result: forced.run(seed, fn) };
     };
     return out as MathModule & Replayable;
   };
@@ -232,6 +273,119 @@ export function assertPure(src: string, path: string): void {
   );
 }
 
+
+// --- the math's own files ---------------------------------------------------
+//
+// A math is rarely one file. It used to be treated as one anyway: the loader
+// read the entry, scanned that string for purity, hashed that string as the
+// math's identity, and imported it. Everything the entry imported was
+// invisible. So a helper module could call `Math.random()` and pass the gate,
+// and rewriting a payout table in that helper produced the SAME contentHash -
+// which is the value the audit log carries as proof of which math computed an
+// outcome.
+//
+// So the loader walks the graph first. Only LOCAL specifiers are followed
+// (`./x`, `../y`): a package import is a dependency, out of the author's file
+// tree and pinned by the lockfile, and following it would scan the whole
+// node_modules closure to no purpose.
+
+/** Graph hash per entry path, so a second load can tell the author their edit
+ *  is not being picked up (see loadTsMath). */
+const LOADED_GRAPHS = new Map<string, string>();
+
+/** Extensions tried for an extensionless or `.js`-written specifier - the
+ *  TypeScript convention of importing `./x.js` for `./x.ts` included. */
+const RESOLVE_ORDER = [".ts", ".tsx", ".mts", ".js", ".mjs", ".jsx"] as const;
+
+/** Static import/export specifiers. Dynamic `import()` is rejected by the
+ *  purity gate, so it cannot appear in a file that passes. */
+const SPECIFIER_RE = /(?:^|[\s;}])(?:import|export)\s+(?:[^'"()]*?\sfrom\s+)?["']([^"']+)["']/g;
+
+async function readIfFile(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Resolve one local specifier against the importing file. Returns the path and
+ *  its source, or undefined when nothing on disk matches (a type-only import of
+ *  a `.d.ts`, say - nothing to scan, nothing to hash). */
+async function resolveLocal(fromFile: string, spec: string): Promise<{ path: string; src: string } | undefined> {
+  const base = resolvePath(dirname(fromFile), spec);
+  const candidates: string[] = [base];
+  const dot = base.lastIndexOf(".");
+  const slash = base.lastIndexOf("/");
+  const hasExt = dot > slash;
+  if (hasExt) {
+    // `./x.js` in TypeScript source usually means `./x.ts` on disk.
+    const stem = base.slice(0, dot);
+    for (const ext of RESOLVE_ORDER) candidates.push(stem + ext);
+  } else {
+    for (const ext of RESOLVE_ORDER) candidates.push(base + ext);
+    for (const ext of RESOLVE_ORDER) candidates.push(`${base}/index${ext}`);
+  }
+  for (const c of candidates) {
+    const src = await readIfFile(c);
+    if (src !== undefined) return { path: c, src };
+  }
+  return undefined;
+}
+
+/** Every local file the math is made of, entry first, each visited once. */
+export async function collectMathSources(entry: string): Promise<Array<{ path: string; src: string }>> {
+  const entrySrc = await readFile(entry, "utf8");
+  const out: Array<{ path: string; src: string }> = [{ path: resolvePath(entry), src: entrySrc }];
+  const seen = new Set<string>([resolvePath(entry)]);
+  const queue: Array<{ path: string; src: string }> = [{ path: resolvePath(entry), src: entrySrc }];
+
+  while (queue.length > 0) {
+    const file = queue.shift()!;
+    // Read specifiers from the code, not from comments or string literals.
+    const code = stripCommentsAndStrings(file.src);
+    // stripCommentsAndStrings blanks quoted text, so specifiers are read from
+    // the raw source; comments are the only false-positive risk and an import
+    // inside a comment resolves to nothing anyway.
+    SPECIFIER_RE.lastIndex = 0;
+    void code;
+    let m: RegExpExecArray | null;
+    while ((m = SPECIFIER_RE.exec(file.src)) !== null) {
+      const spec = m[1]!;
+      if (!spec.startsWith("./") && !spec.startsWith("../")) continue; // package import
+      const found = await resolveLocal(file.path, spec);
+      if (!found || seen.has(found.path)) continue;
+      seen.add(found.path);
+      out.push(found);
+      queue.push(found);
+    }
+  }
+  return out;
+}
+
+/** Content hash over the WHOLE math, not just its entry file. Paths are made
+ *  relative to the entry's directory and sorted, so the same math hashes the
+ *  same on a developer's laptop and in a container. */
+export function hashMathSources(entry: string, files: ReadonlyArray<{ path: string; src: string }>): string {
+  const root = dirname(resolvePath(entry));
+  const h = createHash("sha256");
+  const rows = files
+    .map((f) => {
+      const rel = relativePath(root, f.path);
+      // A file outside the entry's tree keeps an absolute-ish marker rather
+      // than a "../.." that would differ per checkout depth.
+      return { key: isAbsolute(rel) || rel.startsWith("..") ? `external:${f.path.split("/").slice(-2).join("/")}` : rel, src: f.src };
+    })
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  for (const r of rows) {
+    h.update(r.key);
+    h.update("\0");
+    h.update(r.src);
+    h.update("\0");
+  }
+  return h.digest("hex");
+}
+
 /**
  * Load a TS/JS math module.
  *
@@ -246,7 +400,10 @@ export function assertPure(src: string, path: string): void {
  * ```
  */
 export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Promise<MathModule> {
-  const src = await readFile(path, "utf8");
+  // Every local file the math is built from - the entry plus everything it
+  // imports, transitively. The gate and the hash both cover all of it.
+  const files = await collectMathSources(path);
+  const src = files[0]!.src;
 
   if (opts.unsafeSkipPurityCheck) {
     log.warn("loadTsMath: purity check SKIPPED - this math may reach ambient randomness, the clock, or I/O", {
@@ -255,7 +412,7 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
       "math.path": path,
     });
   } else {
-    assertPure(src, path);
+    for (const f of files) assertPure(f.src, f.path);
   }
 
   const rng = resolveRng(path, opts, "loadTsMath");
@@ -274,9 +431,30 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
     log_debug: opts.onDebug ?? (() => {}),
   };
 
-  // Cache-bust so a second load of
-  // the same path picks up edited source rather than the module cache.
-  const url = `${pathToFileURL(path).href}?v=${createHash("sha256").update(src).digest("hex").slice(0, 16)}`;
+  // Identity of the whole math: the provenance stamp below, and the cache-bust
+  // for the entry module.
+  //
+  // WHAT THE CACHE-BUST CAN AND CANNOT DO. The query re-imports the ENTRY.
+  // Its imports are cached under their own URLs, which nothing here rewrites,
+  // so a second load in the same process picks up an edited entry and keeps the
+  // already-imported helpers. The hash below sees the edit even when the module
+  // graph does not, so we can at least say so instead of silently running the
+  // old code. Reloading edited math for real means a fresh process.
+  const contentHash = hashMathSources(path, files);
+  const seenHash = LOADED_GRAPHS.get(resolvePath(path));
+  if (seenHash !== undefined && seenHash !== contentHash) {
+    log.warn("loadTsMath: math source changed since this process last loaded it  - " +
+      "imported files are already in the module cache and will NOT be re-imported. " +
+      "Restart the process to run the edited math.", {
+      "event.category": "process",
+      "event.action": "ts_math_stale_reload",
+      "math.path": path,
+      "math.content_hash.previous": seenHash.slice(0, 16),
+      "math.content_hash.current": contentHash.slice(0, 16),
+    });
+  }
+  LOADED_GRAPHS.set(resolvePath(path), contentHash);
+  const url = `${pathToFileURL(path).href}?v=${contentHash.slice(0, 16)}`;
   const mod = (await import(url)) as { default?: unknown };
 
   const factory = mod.default;
@@ -300,9 +478,8 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
   // Same provenance stamp the WASM loader applies: the audit log can
   // prove which source computed a given outcome. Together with `lastSeed` and
   // the round's carry, that is everything needed to reconstruct a round:
-  // WHICH math (contentHash), from WHAT state (carry), on WHICH stream (seed).
-  const stamped = Object.assign(math, {
-    contentHash: createHash("sha256").update(src).digest("hex"),
-  });
+  // WHICH math (contentHash, over every file it is made of), from WHAT state
+  // (carry), on WHICH stream (seed).
+  const stamped = Object.assign(math, { contentHash });
   return expand ? expand.wrap(stamped) : stamped;
 }
