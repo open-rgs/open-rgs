@@ -1,0 +1,19 @@
+{
+  "name": "open-rgs-libs",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/open-rgs/libs.git" },
+  "workspaces": ["packages/*", "games/*"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p packages/grid",
+    "test": "bun test",
+    "changeset": "changeset",
+    "release": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3"
+  }
+}
