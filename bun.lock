@@ -40,6 +40,14 @@
         "@open-rgs/weights": "0.1.0",
       },
     },
+    "packages/big-symbols": {
+      "name": "@open-rgs/big-symbols",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
     "packages/cascade": {
       "name": "@open-rgs/cascade",
       "version": "0.1.0",
@@ -74,6 +82,18 @@
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/multiways": {
+      "name": "@open-rgs/multiways",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+      "devDependencies": {
+        "@open-rgs/pay-ways": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
       },
     },
     "packages/pay-anywhere": {
@@ -182,6 +202,8 @@
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
+    "@open-rgs/big-symbols": ["@open-rgs/big-symbols@workspace:packages/big-symbols"],
+
     "@open-rgs/cascade": ["@open-rgs/cascade@workspace:packages/cascade"],
 
     "@open-rgs/demo-holdwin": ["@open-rgs/demo-holdwin@workspace:games/demo-holdwin"],
@@ -195,6 +217,8 @@
     "@open-rgs/holdwin": ["@open-rgs/holdwin@workspace:packages/holdwin"],
 
     "@open-rgs/markov": ["@open-rgs/markov@workspace:packages/markov"],
+
+    "@open-rgs/multiways": ["@open-rgs/multiways@workspace:packages/multiways"],
 
     "@open-rgs/pay-anywhere": ["@open-rgs/pay-anywhere@workspace:packages/pay-anywhere"],
 
