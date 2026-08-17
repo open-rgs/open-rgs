@@ -22,6 +22,15 @@
       "name": "@open-rgs/grid",
       "version": "0.1.0",
     },
+    "packages/holdwin": {
+      "name": "@open-rgs/holdwin",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
     "packages/markov": {
       "name": "@open-rgs/markov",
       "version": "0.1.0",
@@ -103,6 +112,8 @@
     "@open-rgs/fill": ["@open-rgs/fill@workspace:packages/fill"],
 
     "@open-rgs/grid": ["@open-rgs/grid@workspace:packages/grid"],
+
+    "@open-rgs/holdwin": ["@open-rgs/holdwin@workspace:packages/holdwin"],
 
     "@open-rgs/markov": ["@open-rgs/markov@workspace:packages/markov"],
 

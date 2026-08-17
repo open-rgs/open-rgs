@@ -12,7 +12,7 @@
     "games/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights && tsc --noEmit -p packages/selectors && tsc --noEmit -p packages/fill && tsc --noEmit -p packages/markov",
+    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights && tsc --noEmit -p packages/selectors && tsc --noEmit -p packages/fill && tsc --noEmit -p packages/markov && tsc --noEmit -p packages/recipes && tsc --noEmit -p packages/holdwin",
     "test": "bun test",
     "changeset": "changeset",
     "release": "changeset publish"
