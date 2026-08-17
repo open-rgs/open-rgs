@@ -142,3 +142,49 @@ export function totalMultiplier<S>(wins: readonly Win<S>[]): number {
   for (const w of wins) n += w.multiplier;
   return n;
 }
+
+/**
+ * Expand size BANDS into the exact-count entries a paytable holds.
+ *
+ * Cluster games pay by range - "5 to 8 symbols pay 1x, 9 to 11 pay 5x, 12 or
+ * more pay 20x" - while a paytable stores exact counts so there is never any
+ * interpolation to reason about. This bridges the two:
+ *
+ *     bands({ A: [[5, 1], [9, 5], [12, 20]] }, 30)
+ *     -> { A: { 5:1, 6:1, 7:1, 8:1, 9:5, 10:5, 11:5, 12:20, ... 30:20 } }
+ *
+ * `maxCount` is normally the grid size, since that is the largest cluster the
+ * board can physically hold. Writing the bands out by hand works too - this is
+ * ergonomics, not a different model.
+ */
+export function bands(
+  spec: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>,
+  maxCount: number,
+): PaytableSpec {
+  if (!Number.isInteger(maxCount) || maxCount <= 0) {
+    throw new Error(`bands: maxCount must be a positive integer, got ${maxCount}`);
+  }
+  const out: Record<string, Record<number, number>> = {};
+  for (const [symbol, list] of Object.entries(spec)) {
+    if (list.length === 0) throw new Error(`bands: '${symbol}' has no bands`);
+    const sorted = [...list].sort((a, b) => a[0] - b[0]);
+    for (const [from] of sorted) {
+      if (!Number.isInteger(from) || from <= 0) {
+        throw new Error(`bands: '${symbol}' has a non-positive band start (${from})`);
+      }
+      if (from > maxCount) {
+        // A band that can never be reached is an authoring slip - usually a
+        // paytable copied from a bigger grid - and would silently pay nothing.
+        throw new Error(`bands: '${symbol}' band starts at ${from}, above maxCount ${maxCount}`);
+      }
+    }
+    const inner: Record<number, number> = {};
+    for (let i = 0; i < sorted.length; i++) {
+      const [from, payout] = sorted[i]!;
+      const to = i + 1 < sorted.length ? sorted[i + 1]![0] - 1 : maxCount;
+      for (let n = from; n <= to; n++) inner[n] = payout;
+    }
+    out[symbol] = inner;
+  }
+  return out;
+}

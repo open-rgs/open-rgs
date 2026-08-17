@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { fromColumns, rect } from "@open-rgs/grid";
-import { paytable, totalMultiplier, type Roles } from "@open-rgs/paytable";
+import { bands, paytable, totalMultiplier, type Roles } from "@open-rgs/paytable";
 import { evalLine, evalLines, rowLines } from "../src/index.js";
 
 const PAY = paytable({
@@ -291,5 +291,45 @@ describe("paytable itself", () => {
     expect(PAY.best("HIGH")).toBe(200);
     expect(PAY.pay("HIGH", 9)).toBe(0);
     expect(PAY.symbols).toContain("WILD");
+  });
+});
+
+describe("bands", () => {
+  test("expands ranges into exact counts", () => {
+    const spec = bands({ A: [[5, 1], [9, 5], [12, 20]] }, 15);
+    expect(spec["A"]![5]).toBe(1);
+    expect(spec["A"]![8]).toBe(1);
+    expect(spec["A"]![9]).toBe(5);
+    expect(spec["A"]![11]).toBe(5);
+    expect(spec["A"]![12]).toBe(20);
+    expect(spec["A"]![15]).toBe(20);
+    expect(spec["A"]![4]).toBeUndefined();
+    expect(spec["A"]![16]).toBeUndefined();
+  });
+
+  test("sorts bands given out of order", () => {
+    const spec = bands({ A: [[9, 5], [5, 1]] }, 10);
+    expect(spec["A"]![5]).toBe(1);
+    expect(spec["A"]![9]).toBe(5);
+  });
+
+  test("rejects a band that can never be reached", () => {
+    // Usually a paytable copied from a bigger grid; it would silently pay 0.
+    expect(() => bands({ A: [[5, 1], [40, 9]] }, 30)).toThrow(/above maxCount/);
+  });
+
+  test("rejects nonsense input", () => {
+    expect(() => bands({ A: [] }, 10)).toThrow(/no bands/);
+    expect(() => bands({ A: [[0, 1]] }, 10)).toThrow(/non-positive band start/);
+    expect(() => bands({ A: [[5, 1]] }, 0)).toThrow(/positive integer/);
+  });
+
+  test("the result builds a working paytable", () => {
+    const p = paytable(bands({ A: [[5, 2], [10, 9]] }, 12));
+    expect(p.pay("A", 7)).toBe(2);
+    expect(p.pay("A", 11)).toBe(9);
+    expect(p.pay("A", 4)).toBe(0);
+    expect(p.minCount("A")).toBe(5);
+    expect(p.maxCount("A")).toBe(12);
   });
 });

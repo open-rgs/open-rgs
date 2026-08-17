@@ -25,6 +25,28 @@
         "@open-rgs/weights": "0.1.0",
       },
     },
+    "games/demo-tumble": {
+      "name": "@open-rgs/demo-tumble",
+      "version": "0.0.0",
+      "dependencies": {
+        "@open-rgs/cascade": "0.1.0",
+        "@open-rgs/fill": "0.1.0",
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/pay-anywhere": "0.1.0",
+        "@open-rgs/pay-cluster": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+        "@open-rgs/recipes": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
+    "packages/cascade": {
+      "name": "@open-rgs/cascade",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+      },
+    },
     "packages/fill": {
       "name": "@open-rgs/fill",
       "version": "0.1.0",
@@ -160,7 +182,11 @@
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
+    "@open-rgs/cascade": ["@open-rgs/cascade@workspace:packages/cascade"],
+
     "@open-rgs/demo-holdwin": ["@open-rgs/demo-holdwin@workspace:games/demo-holdwin"],
+
+    "@open-rgs/demo-tumble": ["@open-rgs/demo-tumble@workspace:games/demo-tumble"],
 
     "@open-rgs/fill": ["@open-rgs/fill@workspace:packages/fill"],
 
