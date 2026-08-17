@@ -3,10 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/open-rgs/libs.git" },
-  "workspaces": ["packages/*", "games/*"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/libs.git"
+  },
+  "workspaces": [
+    "packages/*",
+    "games/*"
+  ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights",
+    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights && tsc --noEmit -p packages/selectors && tsc --noEmit -p packages/fill && tsc --noEmit -p packages/markov && tsc --noEmit -p packages/recipes",
     "test": "bun test",
     "changeset": "changeset",
     "release": "changeset publish"
