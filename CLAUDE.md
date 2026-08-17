@@ -32,6 +32,7 @@ open-rgs/
 |   +-- core/                  @open-rgs/core  - orchestrator + runtime
 |   +-- log/                   @open-rgs/log  - structured logger
 |   +-- platform-mock/         @open-rgs/platform-mock  - in-memory dev wallet
+|   +-- adapter-artube/        @open-rgs/adapter-artube  - Artube wallet adapter
 |   +-- adapter-kit/           @open-rgs/adapter-kit  - helpers for adapter authors
 |   +-- adapter-test-kit/      @open-rgs/adapter-test-kit  - conformance suite
 |   +-- client/                @open-rgs/client  - tiny WS client
@@ -42,7 +43,7 @@ open-rgs/
 
 ## What's shipped
 
-- All eight `@open-rgs/*` packages
+- All nine `@open-rgs/*` packages
 - `apps/site`  - public docs site (Astro static SSG)
 - Specs `00-10` + `12` + ADRs
 - `deploy/`  - reference Docker + k8s templates
@@ -77,6 +78,10 @@ list. Short version:
 - Autoclose is NEVER timer-driven inside RGS  - always external trigger.
 - Public packages have neutral examples  - never name a specific
   provider's wire shape, brand, or product id in code or spec.
+  ONE EXCEPTION: a published platform adapter is provider-specific by
+  definition (`packages/adapter-artube`). Keep the rule for core, contract,
+  the specs and the docs site; an adapter names its own wallet and nothing
+  else does.
 
 ## Out of scope for open-rgs
 

@@ -137,10 +137,11 @@ not break it  - in **[specs/00-guarantees.md](specs/00-guarantees.md)**.
 | Package | Purpose |
 |---|---|
 | `@open-rgs/contract` | types only, zero deps |
-| `@open-rgs/core` | orchestrator, TypeScript + WASM math runtimes, math worker pool, secure RNG, binary-msgpack transport, admin, metrics |
+| `@open-rgs/core` | orchestrator, TypeScript + WASM math runtimes, math worker pool, secure RNG, binary-msgpack and REST transports, admin, metrics |
 | `@open-rgs/log` | structured logger (JSON / Server-core / Console formats) |
 | `@open-rgs/platform-mock` | in-memory dev wallet with promo + autoclose helpers |
 | `@open-rgs/adapter-kit` | WS / HTTP RPC helpers + currency conversion for adapter authors |
+| `@open-rgs/adapter-artube` | Artube wallet adapter: WebSocket, reconnect, heartbeat, RPC deadlines |
 | `@open-rgs/adapter-test-kit` | conformance suite for any PlatformAdapter implementation |
 | `@open-rgs/client` | tiny TS WebSocket client (Bun / Node / browser) |
 | `@open-rgs/simulator` | per-mode RTP / hit-rate / mark simulator + reports; fast WASM & native-Zig batch tiers |
@@ -162,7 +163,8 @@ Recipes with working code: <https://open-rgs.dev/build>
 Plug points (each is one interface):
 
 - **Wallet adapter** -> implement `PlatformAdapter` (talks to your operator's wallet)
-- **Transport** -> implement `ClientTransport` (the default `binaryTransport` is binary-msgpack + WS)
+- **Transport** -> implement `ClientTransport`. Two ship: `binaryTransport` (binary-msgpack over WebSocket, the default) and `restTransport` (plain HTTP and JSON, for tooling and clients that cannot hold a socket open)
+- **Deferred close** -> wrap a simple math with `withDeferredClose` so the client finishes the round explicitly, and an abandoned round can be replayed and closed later
 - **Math** -> `loadTsMath` (default), `loadTsMath`, or `loadWasmMath`; all three return the same `MathModule`
 - **Slot libraries** -> `@open-rgs/grid`, `pay-lines`, `cascade`, `holdwin` and friends, imported like any package
 - **Compiled math** -> ship a WASM kernel (`loadWasmMath`) authored in Zig/Rust; run it fail-closed under a worker pool (`createMathPool`)

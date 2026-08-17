@@ -14,7 +14,7 @@
     "examples/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/contract && tsc --noEmit -p packages/log && tsc --noEmit -p packages/core && tsc --noEmit -p packages/platform-mock && tsc --noEmit -p packages/simulator && tsc --noEmit -p packages/adapter-kit && tsc --noEmit -p packages/adapter-test-kit && tsc --noEmit -p packages/client",
+    "typecheck": "tsc --noEmit -p packages/contract && tsc --noEmit -p packages/log && tsc --noEmit -p packages/core && tsc --noEmit -p packages/platform-mock && tsc --noEmit -p packages/simulator && tsc --noEmit -p packages/adapter-kit && tsc --noEmit -p packages/adapter-test-kit && tsc --noEmit -p packages/client && tsc --noEmit -p packages/adapter-artube",
     "test": "bun test",
     "test:core": "bun test packages/core",
     "test:sim": "bun test packages/simulator",

@@ -1,0 +1,29 @@
+{
+  "name": "@open-rgs/adapter-artube",
+  "version": "0.5.0",
+  "description": "Artube PlatformAdapter for open-rgs: WebSocket wallet integration with reconnect, heartbeat, RPC timeouts and idempotency.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/adapter-artube"
+  },
+  "homepage": "https://github.com/open-rgs/open-rgs",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "publishConfig": { "access": "public", "provenance": true },
+  "files": ["src", "README.md"],
+  "keywords": ["open-rgs", "rgs", "platform-adapter", "wallet", "websocket"],
+  "dependencies": {
+    "@open-rgs/contract": "1.2.0",
+    "@open-rgs/log": "1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@open-rgs/adapter-test-kit": "1.1.0",
+    "@types/ws": "^8.5.13"
+  },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" }
+}
