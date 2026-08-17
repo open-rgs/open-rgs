@@ -17,12 +17,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
     <h2 data-section="§ 1">Minimum boot</h2>
 
-    <pre><code>{`import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
+    <pre><code>{`import { createServer, binaryTransport, loadTsMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 import pkg from "../package.json" with { type: "json" };
 
-const math = await loadLuaMath("./maths/spin.lua");
+const math = await loadTsMath("./maths/spin.ts");
 
 const manifest = defineGame({
   id:               "hello-spin",

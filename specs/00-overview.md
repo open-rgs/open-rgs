@@ -30,7 +30,7 @@ This project owns the third. The first two plug in.
 
 ## Audience
 
-- **Math designers** writing `.lua` (or `.wasm`) game files.
+- **Math designers** writing `.ts` (or `.wasm`) game files.
 - **Studios** assembling games from one or more math files into a
   deployable server.
 - **Wallet integrators** writing one `PlatformAdapter` per operator.
@@ -44,7 +44,7 @@ This project owns the third. The first two plug in.
 - A round-lifecycle orchestrator (simple + complex rounds).
 - Pluggable platform adapters via `PlatformAdapter`.
 - Pluggable client transports via `ClientTransport`.
-- Snap-in math modules via `MathModule`, default runtime Lua-on-wasmoon.
+- Snap-in math modules via `MathModule`, default runtime TypeScript-on-the TypeScript loader.
 - A reference binary-MessagePack WS transport.
 - Free-round promo handling driven by wallet events.
 - External-triggered autoclose (no in-process timers).
@@ -88,7 +88,7 @@ See `docs/architecture.drawio` for the colour-coded diagrams (six tabs).
   game-outcome log (see audit-log.ts) that streams to an operator-provided
   durable sink and is tamper-evident and reconstructable for which math
   produced each outcome. RGS operational logs remain separate.
-- We do not couple the math contract to any particular language. Lua is
+- We do not couple the math contract to any particular language. TypeScript is
   the default loader because the embedding cost is near-zero; Zig->WASM,
   Rust->WASM, AssemblyScript and TypeScript-in-process are all valid
   alternatives implementing the same `MathModule` shape.

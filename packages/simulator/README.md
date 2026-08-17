@@ -60,11 +60,11 @@ Write a `simulate.ts` next to your game's `index.ts`:
 
 ```ts
 import { simulate, mdReportSet, mulberry32 } from "@open-rgs/simulator";
-import { loadLuaMath } from "@open-rgs/core";
+import { loadTsMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 
 // Seed the MATH's rng so spins are reproducible.
-const math = await loadLuaMath("./maths/spin.lua", {
+const math = await loadTsMath("./maths/spin.ts", {
   rng: mulberry32(42),
 });
 
@@ -83,7 +83,7 @@ Run it: `bun src/simulate.ts > report.md`.
 
 ## Fast batch simulation (WASM + native Zig)
 
-`simulate()` above runs the math one spin at a time (the Lua path). When the
+`simulate()` above runs the math one spin at a time. When the
 math is a **WASM kernel** that exports `sim_batch`, the whole spin loop runs
 *inside* the kernel - 100M+ spins incur no per-spin `JS<->WASM` boundary, just
 one crossing per chunk. It uses a seeded in-VM PRNG and the same `decide`
@@ -178,16 +178,16 @@ math hello-spin@0.2.0 (simple)
 
 The simulator's own `seed` option only drives its **complex-round step
 strategy** ("random" / "first"). To make the *math's* spins
-reproducible, seed the math at `loadLuaMath` time:
+reproducible, seed the math at `loadTsMath` time:
 
 ```ts
 import { mulberry32 } from "@open-rgs/simulator/rng";
-const math = await loadLuaMath("./maths/spin.lua", { rng: mulberry32(42) });
+const math = await loadTsMath("./maths/spin.ts", { rng: mulberry32(42) });
 ```
 
 > ⚠️ **Simulation/dev only.** `mulberry32` is a 32-bit, fully-predictable
-> PRNG  - never route it into a production `loadLuaMath({ rng })`. It is
-> tagged so `loadLuaMath` throws if it sees it under `NODE_ENV=production`.
+> PRNG  - never route it into a production `loadTsMath({ rng })`. It is
+> tagged so `loadTsMath` throws if it sees it under `NODE_ENV=production`.
 > Production outcome determination requires a certified CSPRNG (Spec 03).
 
 The same `mulberry32` is exported from both `@open-rgs/simulator` and

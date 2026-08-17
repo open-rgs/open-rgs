@@ -1,7 +1,7 @@
-// In-process MarkCollector implementation used by loadLuaMath when
+// In-process MarkCollector implementation used by the math loaders when
 // marks are opted in. The orchestrator never instantiates this  - only
 // the simulator (or other introspection harnesses) does, by passing
-// `{ marks: true }` to loadLuaMath.
+// `{ marks: true }` to a loader.
 //
 // A no-op collector is also exported so math files can call host.mark.*
 // during normal server runs without conditionally guarding every call.

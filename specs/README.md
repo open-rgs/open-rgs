@@ -22,7 +22,7 @@ before implementation.** When a spec and the code disagree, the spec wins
 | 00 | [Overview](./00-overview.md)  - what we're building, who for | draft | core |
 | 01 | [Public Contracts](./01-public-contracts.md)  - MathModule, PlatformAdapter, ClientTransport, GameManifest | draft | core |
 | 02 | [Orchestrator](./02-orchestrator.md)  - round flows, sessions, promo, autoclose | draft | core |
-| 03 | [Math Runtime](./03-math-runtime.md)  - Lua via wasmoon, Zig->WASM, RNG seam | draft | runtime |
+| 03 | [Math Runtime](./03-math-runtime.md)  - TypeScript via the TypeScript loader, Zig->WASM, RNG seam | draft | runtime |
 | 04 | [Wire Protocol](./04-wire-protocol.md)  - binary-msgpack frames, error codes | draft | transport |
 | 05 | [Wallet Protocol](./05-platform-protocol.md)  - canonical operations, error vocab | draft | wallet |
 | 06 | [Performance](./06-performance.md)  - Bun + Zig, latency budgets, throughput | draft | perf |
@@ -88,6 +88,6 @@ Things we know we don't know. Decisions deferred with reasons.
   spec-affecting; removing one is a breaking change.
 - **Performance budgets** are stated in microseconds for hot paths and
   milliseconds for end-to-end. Numbers are measured, not aspirational.
-- **"Math" always means a single math module** (a `.lua`, `.wasm`, or
+- **"Math" always means a single math module** (a `.ts`, `.wasm`, or
   `.ts` file implementing the contract). A "game" is the manifest that
   composes maths into modes.

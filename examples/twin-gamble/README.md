@@ -1,7 +1,7 @@
-# twin-gamble — one complex-round game, in Lua *and* Zig
+# twin-gamble — one complex-round game, in TypeScript *and* Zig
 
 A minimal **complex round** — a multi-step `open → step* → close` state machine —
-written twice, in Lua (`maths/gamble.lua`) and Zig/WASM (`maths/gamble.zig`), with
+written twice, in TypeScript (`maths/gamble.ts`) and Zig/WASM (`maths/gamble.zig`), with
 a test that drives full lifecycles through both and proves they're **1:1**.
 
 If [twin-slot](../twin-slot) shows the simple case, this shows how a *stateful,
@@ -37,16 +37,16 @@ multiplier ≥ 0 — you only ever risk the *won* amount, never a second wager.
 
 Both `step()`s **ignore the action payload**: the only step is `"gamble"` and the
 engine already validated `action.type`, while collecting is a separate
-`closeRound`. That's what keeps the Lua and Zig kernels trivially identical — no
+`closeRound`. That's what keeps the TypeScript and Zig kernels trivially identical — no
 msgpack action-decoding in Zig. The opaque `state` *encoding* differs per runtime
-(Lua: a `"gambles,done,win"` string; Zig: an 8-byte blob the host base64s) — only
+(TypeScript: a `"gambles,done,win"` string; Zig: an 8-byte blob the host base64s) — only
 the **outcomes** must match, and they do, step for step.
 
 ## Files
 
 | File | What |
 |---|---|
-| `maths/gamble.lua` | the round in Lua — the readable reference |
+| `maths/gamble.ts` | the round in TypeScript — the readable reference |
 | `maths/gamble.zig` | the same round in Zig (+ an in-WASM `sim_gamble` self-play) |
 | `maths/gamble.wasm` | committed build of `gamble.zig` (CI uses it; no zig needed) |
 | `src/round.ts` | runnable demo: one round through both, step by step |

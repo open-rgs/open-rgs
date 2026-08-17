@@ -30,7 +30,7 @@ optional infrastructure each operator wires per their stack.
 Math files live in a `maths/` directory at the repo root, one folder
 per math. Each folder contains either:
 
-- `play.lua` (or `play.wasm`, or `play.ts`)  - the math source/artifact.
+- `play.ts` (or `play.wasm`)  - the math source or artifact.
 - `README.md`  - design notes, RTP target, certification status.
 - Optional: `parameters.json`  - declared knobs for the optimizer.
 - Optional: `certification/`  - measured-RTP reports, math-lab
@@ -40,9 +40,9 @@ The manifest references each file by relative path:
 
 ```ts
 modes: {
-  "default":    { math: "./maths/base/play.lua",       stakeMultiplier: 1 },
-  "buy-fs":     { math: "./maths/buy-fs/play.lua",     stakeMultiplier: 80 },
-  "free-spins": { math: "./maths/free-spins/play.lua", stakeMultiplier: 0,
+  "default":    { math: "./maths/base/play.ts",       stakeMultiplier: 1 },
+  "buy-fs":     { math: "./maths/buy-fs/play.ts",     stakeMultiplier: 80 },
+  "free-spins": { math: "./maths/free-spins/play.ts", stakeMultiplier: 0,
                   internal: true },
 }
 ```
@@ -71,7 +71,7 @@ own README. The orchestrator reads none of them itself.
 ## Reference Dockerfile
 
 Two-stage build, bun-runtime base. Production runs `bun src/index.ts`
-directly  - no bundling step (wasmoon's `glue.wasm` loads from
+directly  - no bundling step (the TypeScript loader's `glue.wasm` loads from
 `node_modules/`).
 
 ```dockerfile
@@ -262,7 +262,7 @@ Two patterns:
    repo. Referenced by relative path. Co-versioned with the manifest.
 2. **As a private npm package** (`@studio/math-base-91`). Same math
    shipped to multiple game variants. Manifest imports the package and
-   reads `pkg.entryPath` to find the `.lua` / `.wasm` file.
+   reads `pkg.entryPath` to find the `.ts` / `.wasm` file.
 
 For MIT-published example games (`lucky-digits`, `gamble-cherry`),
 math is in-tree.

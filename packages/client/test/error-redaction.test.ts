@@ -1,4 +1,4 @@
-// M11  - internal error detail (a Lua runtime error with a file path, an
+// M11  - internal error detail (a math runtime error with a file path, an
 // upstream wallet body) must not reach the client. The transport returns a
 // generic message + the correlation id; the detail is logged server-side.
 
@@ -9,7 +9,7 @@ import { defineGame, type SimpleMath, type GameManifest } from "@open-rgs/contra
 import { RgsClient, RgsServerError } from "../src/index.js";
 
 const PORT = 18195;
-const SECRET_DETAIL = "[lua:/srv/secret/spin.lua]:42: boom internal stack detail";
+const SECRET_DETAIL = "[math:/srv/secret/spin.ts]:42: boom internal stack detail";
 
 const throwingMath: SimpleMath = {
   kind: "simple", name: "boom", version: "1", rtp: 1,
@@ -43,7 +43,7 @@ describe("client never sees internal error detail (M11)", () => {
     expect(se.code).toBe("INTERNAL_ERROR");
     // The leaky detail must NOT be in the client-facing message.
     expect(se.message).not.toContain("secret");
-    expect(se.message).not.toContain("spin.lua");
+    expect(se.message).not.toContain("spin.ts");
     expect(se.message).not.toContain("stack");
     // It IS a generic, correlation-tagged message.
     expect(se.message.toLowerCase()).toContain("internal error");

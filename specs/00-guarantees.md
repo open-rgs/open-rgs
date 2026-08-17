@@ -76,7 +76,7 @@ injected randomness: `(prev_carry, rng, params) -> multiplier + ops + carry`.
 No bet, no balance, no currency, no clock, no I/O.
 
 - **Enforced by:** `SpinContext` carries only `{ mode, params }`  - never a
-  bet or balance (`specs/01-public-contracts.md`). The Lua runtime is
+  bet or balance (`specs/01-public-contracts.md`). The TypeScript runtime is
   sandboxed: `os`, `io`, `debug`, `package`, `load*` are nil'd, and randomness
   is routed through the injected `host.rng_next` (`specs/03-math-runtime.md`).
 - **Prevents:** an entire class of exploit *structurally*  - a math file
@@ -117,7 +117,7 @@ moving money on a bad value.
   -> clamp to 0), `assertFundedWin`, the math watchdog (`MATH_TIMEOUT`), and
   RNG fail-closed under `NODE_ENV=production`
   (`specs/02-orchestrator.md`, `specs/03-math-runtime.md`). The watchdog is
-  per math runtime: only the Lua loader has a true execution watchdog (an in-VM
+  per math runtime: only the TypeScript loader has a true execution watchdog (an in-VM
   `debug.sethook` count hook that preempts even a tight loop on any platform).
   WASM has none - `createMathPool` fails the *round* closed on a budget overrun
   (no bad payout, no hung connection), but killing a tight-loop runaway thread

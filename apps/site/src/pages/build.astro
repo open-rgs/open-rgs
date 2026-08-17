@@ -10,7 +10,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <h1>You can build...</h1>
 
     <p class="lede">
-      Each game shape is one Lua file with a different return shape.
+      Each game shape is one TypeScript file with a different return shape.
       The boot file, transport, adapter, and admin stay the same.
     </p>
 
@@ -22,7 +22,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       anything where the outcome is decided by a single roll.
     </p>
 
-    <pre><code>{`-- maths/spin.lua
+    <pre><code>{`-- maths/spin.ts
 return {
   kind = "simple", name = "spin", version = "0.1.0", rtp = 0.95,
   play = function(prev, ctx)
@@ -37,8 +37,8 @@ return {
 }`}</code></pre>
 
     <p class="mute">
-      Reel-based slots? Add the <code>@open-rgs/ext-reels</code>
-      extension for strip / payline / book-of helpers.
+      Reel-based slots? The <a href="/extension">slot libraries</a> cover
+      grids, weighted reels, four pay evaluators, cascades and hold &amp; win.
       Deeper: <a href="/math">simple math reference</a>.
     </p>
 

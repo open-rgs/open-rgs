@@ -7,7 +7,7 @@ tells you what's done, what's decided, and what's pending.
 ## What this project is
 
 **open-rgs**  - an MIT-licensed Remote Game Server. Bun-native
-orchestrator + snap-in Lua maths + pluggable platform adapters +
+orchestrator + snap-in TypeScript maths + pluggable platform adapters +
 binary-msgpack transport. The runtime layer between casino game math
 and operator wallets.
 

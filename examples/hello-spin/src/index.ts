@@ -1,5 +1,5 @@
 // Minimal open-rgs game. Boots an RGS with the in-memory MockPlatform
-// (no external wallet needed), serves a single Lua math on a binary-
+// (no external wallet needed), serves a single TypeScript math on a binary-
 // msgpack WebSocket. Hit ws://localhost:8080/wss with @open-rgs/client.
 //
 // Read this file top-to-bottom for a 60-second tour of the surface.

@@ -5,17 +5,17 @@
 // hours of spins at this project's throughput targets, after which the
 // stream repeats), is fully determined by its seed, and is trivially
 // predictable from a handful of outputs. Routing it into a production
-// `loadLuaMath({ rng })` would make real-money outcomes predictable.
+// `loadTsMath({ rng })` would make real-money outcomes predictable.
 // Production REQUIRES a certified CSPRNG (see Spec 03 / audit C5). To make
 // that hard to get wrong, the returned function is tagged
-// `__insecureSimulatorRng` and `loadLuaMath` refuses it under
+// `__insecureSimulatorRng` and `loadTsMath` refuses it under
 // NODE_ENV=production.
 
 /** A seeded PRNG function, tagged as simulator-only so the math loader can
  *  reject it in production. */
 export interface SeededRng {
   (): number;
-  /** Marks this as a non-cryptographic simulator PRNG. loadLuaMath throws
+  /** Marks this as a non-cryptographic simulator PRNG. loadTsMath throws
    *  if it sees this in production (unless allowInsecureRng). */
   readonly __insecureSimulatorRng?: true;
 }

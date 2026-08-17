@@ -5,7 +5,7 @@ import Mermaid from "../components/Mermaid.astro";
 
 <BaseLayout
   title="Complex rounds (Mines, Chicken Road, crash)  - open-rgs"
-  description="Write open / step / close Lua math for instant games with mid-round player input: Mines, Chicken Road, gamble, hold-and-spin, crash. Full Mines reference."
+  description="Write open / step / close TypeScript math for instant games with mid-round player input: Mines, Chicken Road, gamble, hold-and-spin, crash. Full Mines reference."
 >
   <main>
     <h1>Math . complex</h1>
@@ -23,7 +23,7 @@ sequenceDiagram
   autonumber
   actor Client
   participant RGS
-  participant Math as math.lua
+  participant Math as math.ts
   participant Wallet
 
   Note over Client,Wallet: openRound  - money moves
@@ -96,7 +96,7 @@ sequenceDiagram
       commitment.)
     </p>
 
-    <pre><code>{`-- maths/mines.lua
+    <pre><code>{`// maths/mines.ts
 local cjson = require("cjson")
 
 local LADDER = {                 -- multipliers[mines_count][picks_safe]

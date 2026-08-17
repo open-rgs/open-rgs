@@ -16,7 +16,7 @@ import { log } from "./log.js";
  *
  *  It is a CSPRNG, NOT necessarily a *certified/auditable* RNG (no seed-commit
  *  or consumed-value log). Jurisdictions that mandate a certified source should
- *  inject their approved RNG via `loadLuaMath({ rng })`. */
+ *  inject their approved RNG via `loadTsMath({ rng })`. */
 export function cryptoRng(): number {
   const u = new Uint32Array(2);
   webcrypto.getRandomValues(u);
@@ -35,7 +35,7 @@ export function cryptoRng(): number {
 export function resolveRng(
   path: string,
   opts: { rng?: () => number; allowInsecureRng?: boolean } | undefined,
-  who = "loadLuaMath",
+  who = "loadTsMath",
 ): () => number {
   const isProduction = process.env["NODE_ENV"] === "production";
   if (opts?.rng) {

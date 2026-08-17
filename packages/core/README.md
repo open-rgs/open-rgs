@@ -17,14 +17,14 @@ bun add @open-rgs/core @open-rgs/contract @open-rgs/platform-mock
 ## Boot
 
 ```ts
-import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
+import { createServer, binaryTransport, loadTsMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 
 await createServer({
   manifest: defineGame({
     id: "hello", declaredRtp: 0.95, defaultMode: "default",
-    modes: { default: { math: await loadLuaMath("./maths/spin.lua"), stakeMultiplier: 1 } },
+    modes: { default: { math: await loadTsMath("./maths/spin.ts"), stakeMultiplier: 1 } },
   }),
   platform:  new MockPlatform({ startingBalance: 100_000 }),
   transport: binaryTransport({ port: 80 }),
@@ -38,8 +38,8 @@ one of three source forms - same contract, swappable by a manifest entry:
 
 | Loader | Source | Use case |
 |--------|--------|----------|
-| `loadLuaMath(path, opts?)` | `.lua` via wasmoon (Lua 5.4 -> WASM) | Default. Cheap to write, hot-reloadable. Per-call watchdog (`debug.sethook`). |
-| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~14x faster than Lua (measured - `examples/twin-slot/src/bench.ts`). Simple or complex. |
+| `loadTsMath(path, opts?)` | `.ts` / `.js` module, purity-gated | default |
+| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Sandboxed, bit-deterministic floats, hashable artifact for certification. Simple or complex. |
 | `createMathPool(opts)` | the same `.wasm` kernel, in a Worker pool | Off the I/O thread; **fails the round** closed on a per-call timeout. Worker-kill is best-effort/platform-dependent (see below). |
 
 ### Compiled (WASM / Zig) math
@@ -90,8 +90,7 @@ Guarantee 5). It is **not a portable no-DoS sandbox**, though: whether
 leak. Treat WASM kernels as **trusted and bounded** regardless; a hard
 cross-platform no-DoS kill needs process isolation (SIGKILL), not implemented.
 The pool's win over bare `loadWasmMath` is off-thread concurrency + round-level
-failure. v1 is simple (single `play`) math. (Only the Lua loader's in-VM
-watchdog preempts a tight loop on any platform.)
+failure. v1 is simple (single `play`) math. 
 
 **Complex rounds.** A kernel with `kind=1` and `open` / `step` / `is_terminal` /
 `close` (+ optional `autoclose`) exports loads as complex math. Core threads the
@@ -122,10 +121,10 @@ Outcome randomness is injected by the host; the math never ships its own PRNG.
   simulation only; it is tagged and **refused** in production.
 
 ```ts
-import { loadLuaMath, cryptoRng } from "@open-rgs/core";
+import { loadTsMath, cryptoRng } from "@open-rgs/core";
 
 // Production: choose the RNG explicitly.
-const math = await loadLuaMath("./maths/spin.lua", { rng: cryptoRng });
+const math = await loadTsMath("./maths/spin.ts", { rng: cryptoRng });
 ```
 
 ## Also exported

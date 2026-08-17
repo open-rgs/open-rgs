@@ -10,7 +10,7 @@ A game repo with:
 
 - `package.json` declaring `@open-rgs/core`, your wallet adapter, and
   any peer deps.
-- `maths/<math-id>/play.lua` files.
+- `maths/<math-id>/play.ts` files.
 - `src/index.ts` wiring `createServer({ manifest, platform, transport })`.
 
 See `examples/` in this repo for fully-worked references.

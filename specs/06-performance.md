@@ -15,11 +15,9 @@ trips to the wallet and to the client.
 |-------|-----|-----|----------|
 | WS frame in + msgpack decode | 5 uss | 20 uss | 100 uss |
 | Session lookup + mode resolve + bet compute | 1 uss | 5 uss | 50 uss |
-| Math call (Lua via wasmoon) | 50 uss | 150 uss | 1 ms |
 | Math call (Zig->WASM) | 5 uss | 20 uss | 100 uss |
 | Math call (TS in-process) | 0.02 uss | 5 uss | 50 uss |
 | msgpack encode + WS frame out | 5 uss | 20 uss | 100 uss |
-| **Total server compute (Lua)** | **~60 uss** | **~200 uss** | **1.5 ms** |
 | **Total server compute (Zig->WASM)** | **~15 uss** | **~50 uss** | **300 uss** |
 
 End-to-end latency observed by the player is dominated by the wallet
@@ -31,7 +29,7 @@ error.
 tier above clears the serving budget with room to spare; picking one on
 serving latency would be optimising 0.2% of a round. The tier that matters is
 the one a math author iterates on: measured on identical math
-(`examples/twin-slot/src/bench.ts`), Lua runs 60k spins/s, the Zig/WASM kernel
+(`examples/twin-slot/src/bench.ts`), the Zig/WASM kernel runs
 850k, and in-process TS **78M** - so a 1M-spin tuning run is 17 seconds, 1.2
 seconds, or 13 milliseconds depending only on which tier the math was written
 in. That, not p99 serving latency, is the number that decides how a game gets
@@ -44,7 +42,6 @@ Zen4):
 
 | Workload | Target | Stretch |
 |----------|--------|---------|
-| Simple spins / sec / core (Lua) | 5,000 | 20,000 |
 | Simple spins / sec / core (Zig WASM) | 30,000 | 100,000 |
 | Simple spins / sec / core (TS in-process) | 10,000,000 | 50,000,000 |
 | Concurrent WS connections / process | 10,000 | 50,000 |
@@ -92,7 +89,7 @@ native tier for offline certification of your own math only.
   optimizes it well). No transcode overhead.
 - **No Node.js loader tax**  - Bun starts modules in milliseconds,
   imports `.ts` directly, no transpile step.
-- **`bun:ffi`** for native interop when needed (e.g., LuaJIT, custom RNG).
+- **`bun:ffi`** for native interop when needed (e.g., custom RNG).
 
 ### Patterns we use
 
@@ -100,14 +97,13 @@ native tier for offline certification of your own math only.
   it with a pending-RPC `Map<corrId, promise>`. No connection-per-session.
 - **In-memory `Map<sid, LocalSession>`** as the session store. O(1)
   lookup. No DB on the hot path.
-- **Sync math calls** via Bun's WASM bridge. Wasmoon's `lua.call()`
-  returns synchronously for sync Lua functions; we don't wrap it in
+- **Sync math calls** via Bun's WASM bridge. A kernel call
+  returns synchronously; we don't wrap it in
   unnecessary `await`s.
 - **No per-request allocation** in the orchestrator's mode-resolve and
   bet-compute paths. Object literals returned to the transport are the
   only allocations.
-- **Pre-warmed Lua VMs**  - every math file gets one VM at boot, reused
-  for every call. No per-spin VM creation.
+- **Pre-loaded math modules**  - every math file is loaded once at boot.
 
 ### Patterns we avoid
 
@@ -131,7 +127,7 @@ native tier for offline certification of your own math only.
 | `performance.now()` | High-res timing for diagnostics |
 | `bun --watch` | Dev hot-reload |
 | `bun:test` | Unit tests (planned) |
-| `bun:ffi` | Native interop (planned, e.g., LuaJIT path) |
+| `bun:ffi` | Native interop (planned) |
 
 ### Bun versions we target
 
@@ -148,8 +144,8 @@ native tier for offline certification of your own math only.
 In rough order of likelihood:
 
 1. **Production-grade math kernels going to certification.** Same
-   contract as a Lua math, compiled to WASM, hashable artifact for
-   regulators. The math designer writes Zig instead of Lua.
+   contract as a TypeScript math, compiled to WASM, hashable artifact for
+   regulators. The math designer writes Zig instead of TypeScript.
 2. **Simulator binary for billion-spin runs.** A standalone Zig CLI
    that loads the same WASM artifact and runs millions of spins per
    second. Used by `@open-rgs/cli`.
@@ -165,7 +161,7 @@ In rough order of likelihood:
   invariants  - all checkable at build time. The compiler refuses to
   emit a binary that fails the invariants.
 - **No GC pauses.** A math kernel runs the same ~5 uss every call,
-  every time, forever. Lua-on-WASM is fast but has occasional GC
+  every time, forever. A garbage-collected runtime has occasional GC
   spikes; Zig has none.
 - **No JIT warmup.** First call is as fast as the millionth. Matters
   for cold-start scenarios and for predictability.
@@ -174,7 +170,7 @@ In rough order of likelihood:
   behaviour byte-for-byte.
 - **Tiny output.** A typical math kernel WASM is 50-200 KB. Easy to
   ship, easy to hash, easy to audit.
-- **Honest interop.** Zig's C ABI is clean. A Lua math can call into a
+- **Honest interop.** Zig's C ABI is clean. A TypeScript math can call into a
   Zig-built helper if needed, with no marshalling fuss.
 
 ### Zig math kernel: minimum shape
@@ -234,7 +230,7 @@ in simulation; Zig catches it in CI.
 
 ### Bun <-> Zig WASM bridge
 
-- Build artifact: `play.wasm` placed alongside the Lua maths.
+- Build artifact: `play.wasm` placed alongside the TypeScript maths.
 - Manifest entry references it: `math: "./maths/zig-slot/play.wasm"`.
 - Loader (`@open-rgs/core` `loadWasmMath`): instantiates with imports
   `host.rng_next`, `host.log_debug`. Calls exports via the typed wrapper.
@@ -246,7 +242,7 @@ in simulation; Zig catches it in CI.
   iteration speed matter more than the marginal speedup.
 - The platform adapter. I/O-bound; FFI overhead doesn't help.
 - The transport layer. Same.
-- Demo / prototype maths. Lua is faster to write and debug. Port to Zig
+- Demo / prototype maths. TypeScript is faster to write and debug. Port to Zig
   when the math goes to certification.
 
 ## RNG performance
@@ -259,7 +255,6 @@ that calls `rng_next` 50 times per spin). Budget:
 | `Math.random` | ~10 ns |
 | Seeded xoshiro256** (TS) | ~15 ns |
 | Certified .NET sidecar (HTTP, buffered) | ~50 ns amortized |
-| LuaJIT `math.random` (FFI) | ~5 ns |
 
 The buffered certified sidecar pre-fetches batches of 100 ints and
 serves them synchronously from a JS array. Refill happens in the
@@ -278,20 +273,20 @@ background when the buffer drops below threshold. A spin that consumes
 ## Acceptance criteria
 
 - A simple-round spin against the mock wallet completes server-side in
-  <= 200 uss at p99 on a modern x86 core, using the Lua reference math.
+  <= 200 uss at p99 on a modern x86 core, using the TypeScript reference math.
 - Throughput on a 16-core machine >= 80,000 simple spins/sec for a
-  trivial Lua math, >= 400,000 spins/sec for a Zig->WASM math.
+  trivial TypeScript math, >= 400,000 spins/sec for a Zig->WASM math.
 - A complex-round step (no wallet call) completes in <= 80 uss at p99
-  with Lua, <= 30 uss with Zig WASM.
+  with TypeScript, <= 30 uss with Zig WASM.
 - WS connection capacity >= 10,000 concurrent per process at idle.
 - Cold start (process up to first SPIN response) <= 500 ms.
 
 ## Open questions
 
-- Is wasmoon's per-call FFI overhead the actual bottleneck? Bench it
+- Is per-call FFI overhead the actual bottleneck? Bench it
   once we have the harness. **Pending data.**
-- Is LuaJIT-via-`bun:ffi` worth the deployment complexity? Probably
-  yes for math houses that want Lua + native speed without compiling
+- Is a native FFI loader worth the deployment complexity? Probably
+  yes for math houses that want native speed without compiling
   to WASM. **Pending evaluation.**
 - Should we bundle a Zig toolchain in the deploy template, or expect
   builders to bring their own? Right now we expect built `.wasm`

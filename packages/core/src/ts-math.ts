@@ -1,12 +1,11 @@
 // TS math loader. Loads a TypeScript/JavaScript math module and adapts it to a
-// MathModule - the orchestrator can't tell it from a Lua or WASM math.
+// MathModule - the orchestrator can't tell it from a WASM math.
 //
 // Why a loader at all, when a TS math is "just an import"? Two guarantees the
 // other tiers get for free and a bare `import()` does not:
 //
-//   1. THE RNG SEAM. Lua math draws through the `host` global; a WASM kernel
-//      imports `host.rng_next`. Neither can reach an ambient generator. A TS
-//      module can - `Math.random()` is one identifier away, it looks correct,
+//   1. THE RNG SEAM. A WASM kernel imports `host.rng_next` and cannot reach
+//      an ambient generator. A TypeScript module can - `Math.random()` is one identifier away, it looks correct,
 //      it passes every test you would think to write, and it silently destroys
 //      seed reproducibility. So a TS math does NOT default-export a math
 //      object; it default-exports a FACTORY taking the host (contract
@@ -52,7 +51,7 @@ export interface Replayable {
 
 export interface LoadTsMathOptions {
   /** Outcome RNG, exposed to the factory as `host.rng_next`. Same policy as
-   *  loadLuaMath: defaults to the secure system CSPRNG (cryptoRng);
+   *  loadTsMath: defaults to the secure system CSPRNG (cryptoRng);
    *  production fails closed without an explicit choice. */
   rng?: () => number;
   /** Permit booting without an injected rng under NODE_ENV=production (uses the
@@ -75,10 +74,9 @@ export interface LoadTsMathOptions {
    *  collapses to a single recordable number, so `withSeed(seed, ...)`
    *  reproduces it exactly.
    *
-   *  Note this is a REPLAY feature here, not a performance one. In the Lua tier
-   *  seed-expand exists mainly to dodge per-draw JS<->WASM crossings; in-process
-   *  TS has no boundary to dodge, so the only thing it buys is reproducibility -
-   *  which is the reason to want it.
+   *  This is a REPLAY feature, not a performance one: in-process TypeScript has
+   *  no boundary to dodge, so the only thing it buys is reproducibility - which
+   *  is the reason to want it.
    *
    *  CERT NOTE: under `"seed-expand"` the expansion enters the
    *  outcome-determination path and must be evaluated as part of the RNG.
@@ -129,8 +127,7 @@ function streamFromSeed(seed: number): () => number {
   };
 }
 
-/** Wrap every entry point so each call reseeds independently, exactly as the
- *  Lua tier documents. Reseeding per call (rather than once per load) is what
+/** Wrap every entry point so each call reseeds independently. Reseeding per call (rather than once per load) is what
  *  makes a single round replayable in isolation - you need not replay the whole
  *  session to reach it. */
 function createSeedExpand(drawSeed: () => number): {
@@ -277,7 +274,7 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
     log_debug: opts.onDebug ?? (() => {}),
   };
 
-  // Cache-bust so `reload()` semantics match the Lua loader: a second load of
+  // Cache-bust so a second load of
   // the same path picks up edited source rather than the module cache.
   const url = `${pathToFileURL(path).href}?v=${createHash("sha256").update(src).digest("hex").slice(0, 16)}`;
   const mod = (await import(url)) as { default?: unknown };
@@ -300,7 +297,7 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
     );
   }
 
-  // Same provenance stamp the Lua and WASM loaders apply: the audit log can
+  // Same provenance stamp the WASM loader applies: the audit log can
   // prove which source computed a given outcome. Together with `lastSeed` and
   // the round's carry, that is everything needed to reconstruct a round:
   // WHICH math (contentHash), from WHAT state (carry), on WHICH stream (seed).

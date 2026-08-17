@@ -8,7 +8,7 @@ interface Props {
 
 const {
   title = "open-rgs",
-  description = "MIT-licensed Remote Game Server. Bun-native orchestrator, snap-in Lua maths, pluggable wallets, binary-msgpack transport.",
+  description = "MIT-licensed Remote Game Server. Bun-native orchestrator, snap-in TypeScript maths, pluggable wallets, binary-msgpack transport.",
   ogType = "article",
 } = Astro.props;
 
@@ -24,7 +24,7 @@ const jsonLd = isLanding
       "description": description,
       "url":      canonical,
       "codeRepository": "https://github.com/open-rgs/open-rgs",
-      "programmingLanguage": ["TypeScript", "Lua"],
+      "programmingLanguage": ["TypeScript", "Zig"],
       "license":  "https://opensource.org/licenses/MIT",
       "runtimePlatform": "Bun",
       "applicationCategory": "DeveloperTool",

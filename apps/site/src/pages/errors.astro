@@ -60,7 +60,7 @@ async settleSimple(req) {
       Throw <code>RGSError</code> from adapter methods to surface a
       specific code; the orchestrator forwards it to the client as-is.
       Plain <code>Error</code>s become <code>INTERNAL_ERROR</code>.
-      From Lua math, raise <code>error("INVALID_ACTION: ...")</code>  -
+      From TypeScript math, raise <code>error("INVALID_ACTION: ...")</code>  -
       messages starting with a known code map to that code; everything
       else becomes <code>*_FAILED</code> for the active call.
     </p>

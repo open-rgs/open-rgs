@@ -23,7 +23,7 @@ export interface RgsMetrics {
   sessionsActive: Gauge;
   /** Open WebSocket connections. */
   wsConnections: Gauge;
-  /** Lua math execution duration, per call (play / open / step / close). */
+  /** Math execution duration, per call (play / open / step / close). */
   mathDuration: Histogram;      // {kind, mode, phase}
   /** Constant 1 carrying this instance's identity as labels  - the
    *  node_exporter build_info pattern. Dashboards join on instance_id;
@@ -95,7 +95,7 @@ export function createRgsMetrics(): RgsMetrics {
     ),
     mathDuration: registry.histogram(
       "rgs_math_execution_duration_seconds",
-      "Lua math execution duration, per call phase.",
+      "Math execution duration, per call phase.",
       undefined,
       ["kind", "mode", "phase"],
     ),

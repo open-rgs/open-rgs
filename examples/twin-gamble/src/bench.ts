@@ -24,7 +24,7 @@ function bench(fn: () => unknown, n: number, reps = 7): number {
   return (best / n) * 1e3; // us per round
 }
 
-// open + 3 gambles + close. open/step/close are synchronous here (wasmoon's
+// open + 3 gambles + close. open/step/close are synchronous here (the
 // bridge and the WASM call both return sync), so we cast rather than await -
 // awaiting a non-promise would add a microtask per call and skew the numbers.
 const roundOf = (m: ComplexMath) => (): void => {

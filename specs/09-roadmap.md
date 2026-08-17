@@ -6,7 +6,7 @@ Last reality-checked against the code: 2026-06-10.
 ## Done (shipped in repo)
 
 - `@open-rgs/contract`  - types-only public package, MIT.
-- `@open-rgs/core`  - orchestrator, session, promo, Lua loader, binary
+- `@open-rgs/core`  - orchestrator, session, promo, TypeScript loader, binary
   transport, admin endpoints, autoclose (external-triggered),
   resume-on-reconnect.
 - `@open-rgs/platform-mock`  - in-memory dev/test wallet with promo and
@@ -130,7 +130,7 @@ J  - public-surface freeze v0.5: pending
 - Live ops / cohort A/B testing in manifest.
 - `@open-rgs/transport-json-ws`  - useful but not urgent.
 - `@open-rgs/transport-rest`  - useful but not urgent.
-- LuaJIT FFI loader path  - wait for benchmarks to justify the
+- Native FFI loader path  - wait for benchmarks to justify the
   deployment complexity.
 - Distributed simulator runs  - wait for billion-spin demand.
 - Helm chart  - wait for operator pull.

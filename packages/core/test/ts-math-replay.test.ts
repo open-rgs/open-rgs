@@ -1,7 +1,7 @@
 // Replay: math is a pure function of (seed, carry), so a recorded round
 // reconstructs exactly.
 //
-// The contract already claimed this for the Lua tier - "a call is fully
+// The contract already claimed this - "a call is fully
 // reconstructable from its seed" - but nothing surfaced the seed, so the
 // property was unusable. These tests assert the whole chain: the seed is
 // exposed, replaying on it reproduces the outcome byte for byte, carry is part

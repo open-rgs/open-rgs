@@ -2,11 +2,11 @@
 // host.mark.* lifecycle, and produces a SimulationReport for each mode
 // (with deviation entries when the math declares an `expected` block).
 //
-// Determinism note: the math's RNG is wired at loadLuaMath time, not
+// Determinism note: the math's RNG is wired at loadTsMath time, not
 // here. To get reproducible reports across runs, seed the math:
 //
 //   import { mulberry32 } from "@open-rgs/simulator/rng";
-//   const math = await loadLuaMath("./maths/spin.lua", { rng: mulberry32(42) });
+//   const math = await loadTsMath("./maths/spin.ts", { rng: mulberry32(42) });
 //
 // The simulator's `seed` option only seeds the complex-round step strategy.
 

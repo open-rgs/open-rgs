@@ -61,7 +61,7 @@ type MathModule = SimpleMath | ComplexMath;
   win amount. It receives an opaque `prev` carry blob and a `SpinContext`
   (mode + optional cheat). It returns a *dimensionless* multiplier.
 - **RNG injection**: math does not own its RNG. The host provides
-  `host.rng_next()` (Lua) or an equivalent import (WASM). Same source
+  `host.rng_next()` (TypeScript) or an equivalent import (WASM). Same source
   file produces same outputs given same inputs.
 - **No I/O**: math has no filesystem, network, clock, or environment
   access. Pure-ish: `(prev, ctx, rng_seq) -> outcome`.

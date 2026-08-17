@@ -13,12 +13,10 @@ the same contract is enforced regardless.
 | Form | Loader | Use case |
 |------|--------|----------|
 | `.ts` / `.js` | `loadTsMath` (ES-module import + purity gate) | **Default.** Fastest tier by a wide margin, no boundary tax, best tooling. |
-| `.lua` | `wasmoon` (Lua compiled to WASM, embedded in Bun) | Sandboxed by construction, hot-reloadable. Choose when math is untrusted or the author wants Lua. |
 | `.wasm` | `WebAssembly.instantiate` | Production-grade math, certification-friendly artifact. Source typically Zig or Rust. |
 | (subprocess) | spawn + length-prefixed msgpack stdio | Escape hatch for languages that don't WASM well. Slowest, most flexible. |
 
-`@open-rgs/core` ships a TS loader (`loadTsMath`), a Lua loader
-(`loadLuaMath`) and a WASM loader (`loadWasmMath`, both simple and
+`@open-rgs/core` ships a TypeScript loader (`loadTsMath`) and a WASM loader (`loadWasmMath`, both simple and
 complex math). All return a `Promise<MathModule>` that the manifest's
 `math:` field accepts.
 
@@ -27,16 +25,12 @@ computing the same game - run `bun examples/twin-slot/src/bench.ts`):
 
 | Tier | per `play()` | spins / sec / core |
 |------|-------------:|-------------------:|
-| Lua (wasmoon, watchdog on) | 16,643 ns | 60,084 |
 | Zig -> WASM | 1,176 ns | 850,016 |
 | **TS (in-process)** | **13 ns** | **77,978,628** |
 
-TS is ~1,300x the Lua tier and ~92x the WASM kernel. The gap is not the
-language - it is the boundary. wasmoon marshals a fresh Lua table across the
-JS<->Lua bridge on every call and a WASM kernel round-trips MessagePack through
-linear memory; an in-process TS math has no boundary to cross at all. (This is
-also why `lua-math.ts` implements its PRNG *inside* the Lua VM: a crossing per
-draw costs more than the arithmetic. A TS math has no such tax.)
+TypeScript is ~92x the WASM kernel. The gap is not the language, it is the
+boundary: a WASM kernel round-trips MessagePack through linear memory, and an
+in-process TypeScript math crosses nothing at all.
 
 That difference is irrelevant to serving - server compute is rounding error
 against the wallet RPC (spec 06) - and decisive for **simulation**, where a
@@ -47,7 +41,7 @@ The WASM tier remains the right choice for math you do not control: it is
 sandboxed by construction, bit-deterministic in its float ops, and ships as a
 hashable artifact for certification.
 
-**WASM watchdog caveat:** unlike the Lua loader, a running WASM call cannot be
+**WASM watchdog caveat:** a running WASM call cannot be
 interrupted from JS, so `loadWasmMath` currently has **no per-call timeout** - a
 runaway kernel blocks the event loop (a DoS). Treat WASM kernels as trusted and
 bounded; `loadWasmMath` logs a warning at load to keep this visible.
@@ -58,33 +52,31 @@ portable no-DoS sandbox**, though: whether `worker.terminate()` can kill a tight
 synchronous runaway is platform-dependent (it did on Linux, did not on Bun+macOS
 in our testing), so a runaway thread may leak. Treat **all** WASM kernels as
 trusted/bounded; a hard cross-platform no-DoS kill needs process isolation
-(SIGKILL), not implemented. (Only the Lua loader's in-VM `debug.sethook` watchdog
-preempts a tight loop on any platform.)
+(SIGKILL), not implemented. 
 
 ## RNG seam
 
 Math NEVER ships its own PRNG. The host provides one:
 
-- **Lua**: `host.rng_next()` returns a float in `[0, 1)`.
 - **WASM**: import `host.rng_next` declared as `(): f64`.
 - **TS**: a `random: () => number` argument injected at construction.
 
 The host implementation can be **injected at boot** via
-`loadLuaMath(path, { rng })`. The default is a secure CSPRNG  - **never
+`loadTsMath(path, { rng })`. The default is a secure CSPRNG  - **never
 `Math.random`**:
 
 - Default: `cryptoRng`, the system CSPRNG via WebCrypto (`getRandomValues`
   -> BoringSSL/OpenSSL, the same source Bun's `crypto` uses). Exported from
   `@open-rgs/core`. Secure and unpredictable, but a CSPRNG  - not necessarily
   a *certified/auditable* RNG (no seed-commit or consumed-value log).
-- Production: must choose the source **consciously**. `loadLuaMath` fails
+- Production: must choose the source **consciously**. `loadTsMath` fails
   closed (throws) under `NODE_ENV=production` when no `rng` is injected  -
   even though a secure default exists  - so the operator picks deliberately.
   Pass `{ rng: cryptoRng }` to use the system CSPRNG, or inject a
   jurisdiction-certified (auditable) source. `Math.random` (non-crypto,
   unseedable, GLI-19/GLI-11 disallowed) is never used.
 - Dev / examples: when no `rng` is injected outside production,
-  `loadLuaMath` uses `cryptoRng` with a one-line warning. An offline tooling
+  `loadTsMath` uses `cryptoRng` with a one-line warning. An offline tooling
   job can also opt out of the prod fail-closed with `{ allowInsecureRng: true }`.
 - Testing / simulation: a seeded PRNG (e.g. `mulberry32` from
   `@open-rgs/simulator`) for reproducible RTP runs (refused in production
@@ -103,72 +95,6 @@ joins the outcome-determination path and must be evaluated as part of the RNG
 (re-certify before real-money use); the consumed sequence stays deterministic
 and reconstructable from each call's seed.
 
-## Lua runtime details
-
-Loader: `wasmoon` v1.x. Lua 5.4 compiled to WASM, runs in Bun via the
-WebAssembly engine. Per-math VM is created at boot and reused for every
-call to that math.
-
-Host imports exposed:
-
-```lua
-host.rng_next()          -- -> number in [0, 1)
-host.log_debug(msg)      -- -> nil; routes to ECS logger at debug level
-```
-
-That's it. Before the math file is evaluated the loader locks down the
-global environment: `os`, `io`, `debug`, `load`, `loadstring`, `loadfile`,
-`dofile`, `package`, and `collectgarbage` are set to `nil`, and
-`math.random` / `math.randomseed` are replaced so all entropy is routed
-through `host.rng_next` (a math file cannot bypass the auditable RNG seam,
-nor read files, open sockets, or read a wall clock). The only module access
-is the overridden `require`, which resolves **only** explicitly registered
-extensions (never the host filesystem). This is the math trust boundary  -
-it is a denylist of the known-dangerous Lua 5.4 surface; an `_ENV`
-allowlist is a possible future hardening.
-
-A math file's expected shape:
-
-```lua
-local M = {
-  kind = "simple",        -- or "complex"
-  name = "...",
-  version = "...",
-  rtp = 0.95,
-}
-
-function M.play(prev, ctx) ... end                 -- simple
-
--- OR for complex:
-function M.open(prev, ctx) ... end
-function M.step(state, action) ... end
-function M.is_terminal(state) ... end
-function M.close(state) ... end
-function M.autoclose(state) ... end                -- optional
-
-return M
-```
-
-The loader:
-- Wraps the math source in a closure: `__mod = (function() <source> end)()`.
-- Validates `kind` and the required functions exist for that kind.
-- Adapts return values: 1-indexed Lua tables -> JS arrays where needed.
-- Promotes `next_mode` (snake_case in Lua) to `nextMode` (camelCase in TS).
-- Bounds execution with a per-call watchdog (`loadLuaMath` `timeoutMs`,
-  default 1000ms; `0` disables for trusted bulk simulation). wasmoon runs
-  Lua synchronously on the event loop, so a runaway math (`while true do
-  end`) would block the whole server for every player with no JS timer able
-  to interrupt it. A Lua instruction (count) hook aborts the call with
-  `MATH_TIMEOUT` once it passes the deadline. The hook applies to the thread
-  it is armed ON, and wasmoon runs each JS->Lua bridge call on its own
-  thread, so a guarded dispatcher arms the hook INSIDE the call (its first
-  act) before `pcall`-ing the math. That lets each entry point be invoked
-  through the JS function bridge - synchronous, no per-call work - rather than
-  recompiling a fresh `doString` chunk every call; module construction still
-  runs once inside a `doString`, guarded the same way. The hook, its
-  `sethook` handle, and the deadline check are captured as upvalues then
-  hidden, and the hook survives `debug = nil`, so sandboxed math cannot
-  disable it.
 
 ## WASM runtime details
 
@@ -225,7 +151,7 @@ call): the kernel sees bytes, core sees an opaque string. `open` / `step`
 return `{ state, ops, awaiting? }` (omit `awaiting` once the round is terminal);
 `close` / `autoclose` return `{ multiplier, ops, type, carry?, next_mode? }`.
 See `examples/cash-ladder` for a worked Zig kernel, and `examples/twin-slot` /
-`examples/twin-gamble` for the **same** math written in *both* Lua and Zig with a
+`examples/twin-gamble` for the **same** math written in *both* TypeScript and Zig with a
 test proving the two runtimes are 1:1 (a simple round and a complex round).
 
 Source language: **Zig is the recommended default** for new WASM math.
@@ -264,13 +190,13 @@ Loaded with `loadTsMath(path, { rng })`. Same `MathModule` shape, same
 `contentHash` provenance stamp, same RNG policy as the other loaders
 (secure CSPRNG by default, fail-closed in production).
 
-**Why a factory and not a bare object.** The factory *is* the RNG seam. Lua
-math draws through the `host` global and a WASM kernel imports `host.rng_next`;
-neither can reach an ambient generator. A TS module can - `Math.random()` is
-one identifier away, it looks correct, and it passes every test you would think
-to write while silently destroying seed reproducibility. Injection makes the
-guarantee structural instead of aspirational. `loadTsMath` rejects a bare-object
-default export for exactly this reason.
+**Why a factory and not a bare object.** The factory *is* the RNG seam. A WASM
+kernel imports `host.rng_next` and cannot reach an ambient generator. A
+TypeScript module can - `Math.random()` is one identifier away, it looks
+correct, and it passes every test you would think to write while silently
+destroying seed reproducibility. Injection makes the guarantee structural
+instead of aspirational, and `loadTsMath` rejects a bare-object default export
+for exactly this reason.
 
 ### The purity gate
 
@@ -307,7 +233,7 @@ without loading it.
 
 ## Hot reload
 
-Dev-only. The Lua loader exposes `reload(path)` which re-reads the
+Dev-only. `loadTsMath` cache-busts on the source's content hash, which re-reads the
 source, builds a new VM, and atomically swaps the in-memory math
 reference. Production builds disable the reload endpoint.
 
@@ -330,18 +256,16 @@ restart                math is reloaded fresh; carry rehydrates from session.car
 
 ## Acceptance criteria
 
-- A Lua math file with no `kind` field is rejected at load time with a
-  clear error.
-- A Lua math file that calls `os.time()`, `io.read()`, or `require()`
-  fails at runtime with a "function not available" Lua error
-  (`os`/`io`/`require` are not in the global table the loader exposes).
-- The Lua loader produces a `MathModule` for which
+- A math module with no `kind` field is rejected at load time.
+- A TypeScript math referencing `Math.random`, the clock or I/O is rejected
+  at load time by the purity gate.
+- Each loader produces a `MathModule` for which
   `await math.play(...)` resolves in <= 200 uss at p99 on the synthetic
   workload (see **Spec 06**).
-- The same Lua source produces identical outputs given identical RNG
+- The same source produces identical outputs given identical RNG
   sequences across two independent loader invocations.
 - A WASM math module conforming to the exports/imports above is
-  interchangeable with a Lua module via a manifest entry change only.
+  interchangeable with a TypeScript module via a manifest entry change only.
 
 ## Open questions
 

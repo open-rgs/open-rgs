@@ -58,8 +58,8 @@ For complex maths, the simulator can't drive itself  - it needs
 strategies (action pickers). Math files ship a `simulate.pickAction`
 function or the game ships separate strategy files in `strategies/`:
 
-```lua
--- strategies/gamble-slot/to-target.lua
+```ts
+// strategies/gamble-slot/to-target.ts
 return function(public_state, awaiting, history)
   if awaiting.type == "gamble" then
     -- keep gambling until we've doubled 3x, then collect
@@ -70,7 +70,7 @@ end
 
 ```bash
 @open-rgs/cli simulate ./gamble-slot/manifest.ts \
-    --strategy ./strategies/gamble-slot/to-target.lua \
+    --strategy ./strategies/gamble-slot/to-target.ts \
     --spins 1M
 ```
 
@@ -140,7 +140,7 @@ that hit target metrics. Math declares parameters in a sibling
 ```
 
 ```bash
-@open-rgs/cli optimize ./examples/lucky-digits/maths/base/play.lua \
+@open-rgs/cli optimize ./examples/lucky-digits/maths/base/play.ts \
     --targets rtp=0.96,volatility=medium \
     --spins-per-eval 500K --budget 200
 
@@ -165,9 +165,9 @@ regulator:
 {
   "schema": 1,
   "game": "example-game",
-  "math_file": "maths/base/play.lua",
+  "math_file": "maths/base/play.ts",
   "math_file_hash": "sha256:...",
-  "lua_runtime": "wasmoon@1.16.0",
+  "math_runtime": "loadTsMath",
   "rng": "seed:0xABCDEF",
   "spins": 100000000,
   "declared_rtp": 0.91,

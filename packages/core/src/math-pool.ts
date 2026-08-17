@@ -18,7 +18,7 @@
 // platforms. Treat WASM kernels as TRUSTED and bounded (same posture as bare
 // loadWasmMath); the pool buys off-thread concurrency + round-level failure. A
 // hard, cross-platform kill needs process isolation (SIGKILL); not implemented
-// here. (The Lua loader's in-VM debug.sethook watchdog preempts a tight loop on
+// here. (No loader preempts a tight loop on
 // any platform - that path is genuinely bounded.)
 //
 // Returns a `SimpleMath`-shaped, async math you can drop into a manifest mode;

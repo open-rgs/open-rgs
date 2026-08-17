@@ -18,7 +18,7 @@ small, opinionated, and well-instrumented.
 ### 1 . Public surface stays tiny
 
 Only `@open-rgs/contract` (types) and `@open-rgs/core` (runtime) are
-*required*. Everything else  - adapter-kit, mock-casino, CLI, Lua
+*required*. Everything else  - adapter-kit, mock-casino, CLI, TypeScript
 loader, WASM loader, transport variants, Redis session store  - lives
 as opt-in peer packages.
 
@@ -38,7 +38,7 @@ No "auth helper #1 vs #2 vs #3  - pick your favourite."
 - One canonical JWT
 - One canonical mTLS
 - One canonical session store (in-memory)
-- One canonical math loader per source form (Lua via wasmoon; WASM via
+- One canonical math loader per source form (TypeScript via the TypeScript loader; WASM via
   `loadWasmMath` for compiled/Zig kernels, optionally pooled by `createMathPool`)
 
 If someone needs exotic, they bring their own. Optionality compounds;
@@ -52,7 +52,7 @@ half-finished, rotted, removed.)
 
 ### 5 . Push concerns out of core
 
-Lua loader, WASM loader, Redis session store, Prometheus metrics  -
+TypeScript loader, WASM loader, Redis session store, Prometheus metrics  -
 all belong as peer packages with `@open-rgs/*` namespace, not bundled
 into `core`. Core stays focused on orchestration only.
 
@@ -79,7 +79,7 @@ refusing to log certain key patterns. Documented as a hard property.
 
 Each `npm install` is a maintenance liability. Rule: every dep added
 needs a comment in `package.json` saying *why* and *what it would take
-to remove*. Today we have only `@msgpack/msgpack` and `wasmoon`  -
+to remove*. Today we have only `@msgpack/msgpack` and `the TypeScript loader`  -
 both justifiable. Stay disciplined.
 
 ### 10 . ADRs for major decisions
@@ -118,7 +118,7 @@ A few things that look tempting but invite rot:
 - **Multi-game per process.** Each game = its own Bun process (a few
   MB). The complexity of in-process multi-tenancy isn't worth what
   we save in pods.
-- **Custom DSLs.** Lua is the snap-in math language. We don't invent
+- **Custom DSLs.** TypeScript is the snap-in math language. We don't invent
   our own.
 - **An RPC framework.** Whatever shape adapters take, they use plain
   HTTP + plain WS. No JSON-RPC layer, no gRPC requirement.
@@ -135,7 +135,7 @@ specific call-to-action.
 |----|----------|----------------|--------|
 | A | Idempotency: simple `{ generate?, ttlMs? }` config | done | ✓ implemented |
 | B | Math version stamping: one field name | done | ✓ implemented |
-| C | Loader extraction (lua to peer package) | yes, before 1.0 | pending |
+| C | Loader extraction (math loaders to peer packages) | yes, before 1.0 | pending |
 | D | ADR directory format | yes, seed with 6 records | seeded |
 | E | `specs/adapters/` for per-provider notes | yes | seeded |
 | F | One concurrency policy: kick-old, no knob | yes | pending impl |

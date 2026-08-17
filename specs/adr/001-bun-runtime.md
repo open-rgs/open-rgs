@@ -8,7 +8,7 @@
 We need a JavaScript/TypeScript runtime for the orchestrator. The
 realistic options at the time of decision: Node, Bun, Deno. The
 orchestrator is I/O-heavy (WebSockets to clients, RPC to the wallet)
-with hot-path compute (math invocation via wasmoon) and needs fast
+with hot-path compute (math invocation via the TypeScript loader) and needs fast
 cold-start for K8s rolling restarts.
 
 ## Decision
@@ -23,7 +23,7 @@ Use **Bun** as the canonical runtime.
   process trivially.
 - Direct `.ts` execution  - no transpile step, no `tsx`, no
   `ts-node`.
-- `bun:ffi` available for native interop (LuaJIT, certified RNG, etc.)
+- `bun:ffi` available for native interop (certified RNG, etc.)
   without writing a binding gen.
 - Built-in `bun:sqlite`, `bun:test`, `Bun.file` reduce dep surface.
 - Cold start on the order of 100ms.

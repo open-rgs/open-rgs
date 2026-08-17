@@ -3,8 +3,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="You can extend (Lua, wallet, transport, metrics)  - open-rgs"
-  description="Extension points in open-rgs: plug your own wallet adapter, transport, Lua VM helpers, metrics registry, log formatter. Every plug point is one interface."
+  title="You can extend (math, wallet, transport, metrics)  - open-rgs"
+  description="Extension points in open-rgs: plug your own wallet adapter, transport, slot libraries, metrics registry, log formatter. Every plug point is one interface."
 >
   <main>
     <h1>You can extend...</h1>
@@ -15,49 +15,25 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       covers the change you want.
     </p>
 
-    <h2 data-section="§ 1">The Lua VM (helpers, DSLs, native fast paths)</h2>
+    <h2 data-section="§ 1">Slot libraries</h2>
 
     <p>
-      A <code>LuaExtension</code> is one of three things, often
-      combined: a pure-Lua module returned by
-      <code>require("&lt;name&gt;")</code>, a table of native (TS)
-      helpers merged into that module, or a pre-evaluation source
-      transform applied to every loaded file.
+      Math is TypeScript, so a library is an ordinary package you import. There
+      is nothing to register.
     </p>
 
-    <pre><code>{`// boot file  - install an extension
-import { loadLuaMath } from "@open-rgs/core";
-import reels from "@open-rgs/ext-reels";
+    <pre><code>{`import { rect } from "@open-rgs/grid";
+import { stackyFill } from "@open-rgs/markov";
+import { evalLines, rowLines } from "@open-rgs/pay-lines";`}</code></pre>
 
-const math = await loadLuaMath("./maths/spin.lua", { extensions: [reels] });`}</code></pre>
-
-    <pre><code>{`// write your own extension
-import type { LuaExtension } from "@open-rgs/contract";
-
-export default {
-  name:    "easing",
-  version: "0.1.0",
-  lua: \`
-    local M = {}
-    function M.lerp(a, b, t) return a + (b - a) * t end
-    return M
-  \`,
-  host: () => ({
-    fast_pow: (x: number, n: number) => x ** n,   // native, hot-path
-  }),
-} satisfies LuaExtension;`}</code></pre>
-
-    <pre><code>{`-- maths/spin.lua  - math sees the extension via require
-local easing = require("easing")
-local y = easing.lerp(0, 100, host.rng_next())
-local p = easing.fast_pow(1.05, 7)`}</code></pre>
-
-    <p class="mute">
-      Reference extension:
-      <a href="https://github.com/open-rgs/ext-reels"><code>@open-rgs/ext-reels</code></a>
-       - strip generation, payline evaluation, book-of utilities.
-      Deeper: <a href="/math">math reference</a>.
+    <p>
+      Every extension point is one of three signatures, so writing your own
+      means writing a function. See <a href="/extension">the library set</a>.
     </p>
+
+    <pre><code>{`Generator<S> = (next) => Grid<S>          // makes a board
+Selector<S>  = (grid, next) => Pos[]      // picks cells
+Effect       = (grid, pos, next) => Grid  // changes a board`}</code></pre>
 
     <h2 data-section="§ 2">The wallet</h2>
 
@@ -173,7 +149,7 @@ await createServer({
 
     <p class="mute">
       Marks are inert in production  - zero cost. Run a sim:
-      <code>bunx open-rgs-sim ./maths/spin.lua --spins 1e8</code>.
+      <code>bunx open-rgs-sim ./maths/spin.ts --spins 1e8</code>.
       Reports: per-mode JSON, Markdown, HTML.
     </p>
 

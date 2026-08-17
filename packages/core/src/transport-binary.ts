@@ -298,7 +298,7 @@ async function dispatch(
     const err = e instanceof RGSError
       ? e
       : new RGSError("INTERNAL_ERROR", e instanceof Error ? e.message : String(e));
-    // Codes whose message wraps arbitrary internal detail (a Lua runtime
+    // Codes whose message wraps arbitrary internal detail (a math runtime
     // error with a file path, an upstream wallet body, a stack). Never send
     // that to the client  - log it server-side and return a generic message
     // plus the correlation id so an operator can find the log line. (M11)
@@ -339,7 +339,7 @@ function checkOpSeq(data: WsData, payload: unknown): OpSeqResult {
   return { kind: "error", message: `expected operation sequence ${expected}, got ${raw}` };
 }
 
-/** Error codes whose `message` may contain internal detail (wrapped Lua /
+/** Error codes whose `message` may contain internal detail (wrapped math /
  *  upstream errors). Their client-facing message is genericized. */
 const OPAQUE_ERROR_CODES: ReadonlySet<RGSErrorCode> = new Set<RGSErrorCode>([
   "INTERNAL_ERROR", "INIT_FAILED", "SPIN_FAILED", "OPEN_FAILED", "STEP_FAILED", "CLOSE_FAILED",

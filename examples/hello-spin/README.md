@@ -1,6 +1,6 @@
 # hello-spin
 
-Minimal open-rgs game. One Lua math, MockPlatform wallet, binary-msgpack
+Minimal open-rgs game. One TypeScript math, MockPlatform wallet, binary-msgpack
 on the wire. ~50 lines of code; boots in ~50 ms.
 
 ## Run
@@ -43,9 +43,9 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 
 - Real wallet adapter (use `MockPlatform` for dev; implement
   `PlatformAdapter` for a real platform)
-- Reel-based math (this is a single-roll RNG; use the
-  [`@open-rgs/ext-reels`](https://github.com/open-rgs/ext-reels)
-  extension for strip + payline + book-of helpers)
+- Reel-based math (this is a single-roll RNG; see the
+  [slot libraries](https://open-rgs.dev/extension) for grids, weighted
+  reels and pay evaluators)
 - Complex rounds (Mines, Chicken-Road, crash)  - see the docs at
   <https://open-rgs.dev/build>
 - Promo free-rounds, autoclose (supported by core; not
