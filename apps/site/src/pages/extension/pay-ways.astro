@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Pay-ways: Paid by the product of per-column counts."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/pay-ways</h1>
 
     <p class="lede">Paid by the product of per-column counts.</p>
@@ -24,21 +24,14 @@ import Code from "../../components/Code.astro";
 
 const wins = evalWays(grid, PAY, { roles });
 
-wins[0].ways;        // 6
-totalWays(grid);     // 1024 on a 4x5 - a consequence, not a setting`} />
-
-    <h2 data-section="&sect; 2">A gap ends the run</h2>
+wins[0].ways;
+totalWays(grid);`} />    <h2 data-section="&sect; 2">A gap ends the run</h2>
 
     <p>Counting every column the symbol appears on, gap or not, inflates both the count and the ways multiplier. Ways games are dense, so this bug is far more expensive here than on lines.</p>
 
     <Anim kind="pay-ways-gap" caption="A gap ends the run. Counting past it inflates the multiplier." />
 
-    <Code code={`// HIGH on reels 0 and 1, nothing on reel 2, HIGH again on 3 and 4.
-// The run is 2 columns, not 4 - and 2 does not pay.
-
-evalWay(grid, "HIGH", PAY, { roles });   // undefined`} />
-
-    <h2 data-section="&sect; 3">Variable heights need no change</h2>
+    <Code code={`evalWay(grid, "HIGH", PAY, { roles });`} />    <h2 data-section="&sect; 3">Variable heights need no change</h2>
 
     <p>This never reads the shape. It counts actual matches per column, so a board whose reels drew different heights this spin works unchanged.</p>
 
@@ -49,8 +42,6 @@ evalWay(grid, "HIGH", PAY, { roles });   // undefined`} />
 const H = heights({ 2: 20, 3: 25, 4: 25, 5: 15, 6: 10, 7: 5 }, 6);
 const reels = multiwaysFillWeights(H, BASE);
 
-evalWays(reels(host.rng_next), PAY, { roles });   // same call`} />
-
-
+evalWays(reels(host.rng_next), PAY, { roles });`} />
   </main>
 </BaseLayout>

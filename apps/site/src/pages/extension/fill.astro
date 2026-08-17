@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Fill: Weighted draws, one cell at a time."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/fill</h1>
 
     <p class="lede">Weighted draws, one cell at a time.</p>
@@ -24,9 +24,7 @@ import Code from "../../components/Code.astro";
 
 const reels = fillWeights(SHAPE, { LOW: 55, MID: 25, HIGH: 12, WILD: 5, SC: 3 });
 
-const board = reels(host.rng_next);`} />
-
-    <h2 data-section="&sect; 2">Per-column sets</h2>
+const board = reels(host.rng_next);`} />    <h2 data-section="&sect; 2">Per-column sets</h2>
 
     <p>The classic way to differentiate reels: a wild that can only land on the middle three. A short list is an authoring mistake that would otherwise surface as an undefined symbol mid-spin, so it throws at build time.</p>
 
@@ -35,14 +33,12 @@ const board = reels(host.rng_next);`} />
     <Code code={`import { fillWeightsPerColumn } from "@open-rgs/fill";
 
 const gated = fillWeightsPerColumn(SHAPE, [
-  { LOW: 60, HIGH: 12, WILD: 0 },   // no wild on reel 0
+  { LOW: 60, HIGH: 12, WILD: 0 },
   { LOW: 55, HIGH: 12, WILD: 5 },
   { LOW: 55, HIGH: 12, WILD: 5 },
   { LOW: 55, HIGH: 12, WILD: 5 },
-  { LOW: 60, HIGH: 12, WILD: 0 },   // nor on reel 4
-]);`} />
-
-    <h2 data-section="&sect; 3">Counting without simulating</h2>
+  { LOW: 60, HIGH: 12, WILD: 0 },
+]);`} />    <h2 data-section="&sect; 3">Counting without simulating</h2>
 
     <p>Cells are independent under these generators, so expectation is the sum of per-cell probabilities. That makes a whole class of questions arithmetic rather than a simulation run.</p>
 
@@ -50,9 +46,7 @@ const gated = fillWeightsPerColumn(SHAPE, [
 
     <Code code={`import { expectedCount, cellProbability } from "@open-rgs/fill";
 
-expectedCount(SHAPE, sets, "SC");   // 0.9 scatters per spin
-cellProbability(sets, 0, "WILD");   // 0 - reel 0 has none`} />
-
-
+expectedCount(SHAPE, sets, "SC");
+cellProbability(sets, 0, "WILD");`} />
   </main>
 </BaseLayout>

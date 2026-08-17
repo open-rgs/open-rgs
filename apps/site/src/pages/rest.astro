@@ -23,7 +23,6 @@ const defer = `import { withDeferredClose } from "@open-rgs/core";
 const spin = await loadTsMath("./maths/spin.ts", { rng: cryptoRng });
 
 modes: {
-  // One line. The mode is now a complex round finished by the client.
   default: { math: withDeferredClose(spin, { prompt: "Collect" }), stakeMultiplier: 1 },
 }`;
 

@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Hold and win: A landing resets the counter."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/holdwin</h1>
 
     <p class="lede">A landing resets the counter.</p>
@@ -24,12 +24,10 @@ import Code from "../../components/Code.astro";
 
 const CONFIG = { respins: 3, fullBoardAward: "GRAND" };
 
-if (triggers(grid, 6)) {                 // 6 coins on a 5x3
+if (triggers(grid, 6)) {
   let s = beginRespins(grid, CONFIG);
   while (!isCycleOver(s)) s = stepRespins(s, landed, CONFIG);
-}`} />
-
-    <h2 data-section="&sect; 2">Five mechanics, one shape</h2>
+}`} />    <h2 data-section="&sect; 2">Five mechanics, one shape</h2>
 
     <p>Collector, payer, multiplier, upgrader and spawner are the same mechanism with different selectors. Adding &quot;collect only from the same column&quot; is a selector, not a new engine.</p>
 
@@ -37,11 +35,9 @@ if (triggers(grid, 6)) {                 // 6 coins on a 5x3
 
     <Code code={`import { collector, payer, upgrader, cashCells, tierCells } from "@open-rgs/holdwin";
 
-collector(cashCells(), JACKPOTS);        // collect cash, leave jackpots
-upgrader(tierCells(["MINI"]));           // bump only a MINI
-payer(5, coinCells());                   // add 5 to every coin`} />
-
-    <h2 data-section="&sect; 3">Tiers resolve through one table</h2>
+collector(cashCells(), JACKPOTS);
+upgrader(tierCells(["MINI"]));
+payer(5, coinCells());`} />    <h2 data-section="&sect; 3">Tiers resolve through one table</h2>
 
     <p>A jackpot coin carries a tier, not a number, so retuning GRAND never means touching every coin. A collected coin is emptied rather than removed - it still fills the board but cannot be harvested twice.</p>
 
@@ -56,8 +52,6 @@ const COINS = mixedCoinSet(
   { MINI: 5, MINOR: 1.6, MAJOR: 0.35 },
 );
 
-settleRespins(state, CONFIG, JACKPOTS);   // includes the full-board award`} />
-
-
+settleRespins(state, CONFIG, JACKPOTS);`} />
   </main>
 </BaseLayout>

@@ -1,26 +1,46 @@
 ---
-// Syntax-coloured code block. Tiny regex tokeniser rather than a highlighter
-// dependency: these samples are short, TypeScript-only, and shipping a
-// highlighter to colour twenty lines is not a trade worth making.
+// Syntax-coloured code block.
+//
+// SINGLE PASS, and that is the whole design. An earlier version ran one regex
+// per token type over the result of the last, so the string rule matched the
+// `"c-str"` inside a span the keyword rule had just inserted and the output
+// nested spans inside their own attributes. Tokenising once, with alternation,
+// means inserted markup is never re-scanned and cannot be corrupted.
+//
+// A regex tokeniser rather than a highlighter dependency: these samples are
+// short and TypeScript-only, and shipping a highlighter to colour twenty lines
+// is not a trade worth making.
 interface Props { code: string }
 const { code } = Astro.props;
 
-const KEYWORDS = /\b(import|from|export|default|const|let|return|function|if|else|for|of|type|interface|as|new|await|async)\b/g;
+const KEYWORDS = new Set([
+  "import", "from", "export", "default", "const", "let", "return", "function",
+  "if", "else", "for", "of", "type", "interface", "as", "new", "await", "async",
+  "while", "true", "false", "null", "undefined",
+]);
+
+// One alternation, tried left to right: strings, then numbers, then a call
+// name, then a bare word. Anything unmatched falls through untouched.
+const TOKEN = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(\b\d+\.?\d*\b)|([A-Za-z_$][\w$]*)(?=\s*\()|([A-Za-z_$][\w$]*)/g;
+
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function highlight(src: string): string {
-  const esc = src
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  // Order matters: comments first, then strings, then keywords/numbers - so a
-  // keyword inside a comment is not re-coloured.
-  return esc
-    .replace(/(\/\/[^\n]*)/g, '<span class="c-com">$1</span>')
-    .replace(/(&quot;[^&\n]*&quot;|"[^"\n]*"|'[^'\n]*')/g, '<span class="c-str">$1</span>')
-    .replace(KEYWORDS, '<span class="c-key">$&</span>')
-    .replace(/\b(\d+\.?\d*)\b/g, '<span class="c-num">$1</span>')
-    .replace(/\b([a-zA-Z_$][\w$]*)(?=\()/g, '<span class="c-fn">$1</span>');
+  let out = "";
+  let last = 0;
+  for (const m of src.matchAll(TOKEN)) {
+    const [text, str, num, fn, word] = m;
+    const at = m.index;
+    out += esc(src.slice(last, at));
+    if (str) out += `<span class="c-str">${esc(str)}</span>`;
+    else if (num) out += `<span class="c-num">${esc(num)}</span>`;
+    else if (fn) out += `<span class="c-fn">${esc(fn)}</span>`;
+    else if (word && KEYWORDS.has(word)) out += `<span class="c-key">${esc(word)}</span>`;
+    else out += esc(text);
+    last = at + text.length;
+  }
+  return out + esc(src.slice(last));
 }
 ---
 
@@ -37,7 +57,6 @@ function highlight(src: string): string {
     border-radius: 0;
     margin: 0 0 1rem;
   }
-  .hl :global(.c-com) { color: #6c8189; }
   .hl :global(.c-str) { color: #c7a96b; }
   .hl :global(.c-key) { color: #6fc3b5; }
   .hl :global(.c-num) { color: #d99a7a; }

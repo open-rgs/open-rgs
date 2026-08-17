@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Scatters: The trigger rate is a parameter, not an emergent property."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/scatters</h1>
 
     <p class="lede">The trigger rate is a parameter, not an emergent property.</p>
@@ -27,10 +27,8 @@ const config = {
   count:  { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
 };
 
-oneInFor(config, 3);              // 200 - the feature fires 1 spin in 200
-probabilityOfAtLeast(config, 3);  // 0.005`} />
-
-    <h2 data-section="&sect; 2">One per reel, and which reels</h2>
+oneInFor(config, 3);
+probabilityOfAtLeast(config, 3);`} />    <h2 data-section="&sect; 2">One per reel, and which reels</h2>
 
     <p>At most one per reel is the genre norm, and it is what makes the count distribution exactly controllable. Excluded reels never receive one.</p>
 
@@ -39,13 +37,11 @@ probabilityOfAtLeast(config, 3);  // 0.005`} />
     <Code code={`const config = {
   symbol:     "SC",
   count:      { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
-  reels:      [1, 2, 3],    // never the outer reels
-  onePerReel: true,         // the default
+  reels:      [1, 2, 3],
+  onePerReel: true,
 };
 
-const board = withScatters(reels, config);`} />
-
-    <h2 data-section="&sect; 3">Protected symbols stay</h2>
+const board = withScatters(reels, config);`} />    <h2 data-section="&sect; 3">Protected symbols stay</h2>
 
     <p>A wild the player can see is about to pay must not be eaten. If protections leave too few legal cells, the spawn places what it can and reports both numbers - throwing would crash a legitimate spin, and silence would break the declared rate with nothing to notice it.</p>
 
@@ -55,12 +51,9 @@ const board = withScatters(reels, config);`} />
 
 const result = spawnOn(grid, { ...config, protects: ["WILD"] }, host.rng_next);
 
-result.wanted;    // what the distribution drew
-result.spawned;   // what the board could host
+result.wanted;
+result.spawned;
 
-// Structurally impossible configs fail at build time instead.
 assertFeasible(config, 5);`} />
-
-
   </main>
 </BaseLayout>

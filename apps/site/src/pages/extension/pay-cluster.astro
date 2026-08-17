@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Pay-cluster: A wild belongs to every cluster it touches."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/pay-cluster</h1>
 
     <p class="lede">A wild belongs to every cluster it touches.</p>
@@ -24,20 +24,13 @@ import Code from "../../components/Code.astro";
 
 const wins = evalAllClusters(grid, CLUSTER, { roles });
 
-clustersOf(grid, "HIGH", roles);   // the groups, for presentation`} />
-
-    <h2 data-section="&sect; 2">Wilds are the whole difficulty</h2>
+clustersOf(grid, "HIGH", roles);`} />    <h2 data-section="&sect; 2">Wilds are the whole difficulty</h2>
 
     <p>A wild sitting between two clusters is legitimately part of both. So the fill runs per symbol and consumes only real matches - consume the wild for the first and the second silently shrinks by one, with nothing on the board looking wrong.</p>
 
     <Anim kind="pay-cluster-wild" caption="The outlined wild is counted in the teal group and the amber one." />
 
-    <Code code={`// HIGH HIGH WILD LOW LOW
-//   clustersOf(grid, "HIGH")  ->  3 cells
-//   clustersOf(grid, "LOW")   ->  3 cells
-// The wild is in both, and is never consumed by either.`} />
-
-    <h2 data-section="&sect; 3">Never seeded from a wild</h2>
+    <Code code={``} />    <h2 data-section="&sect; 3">Never seeded from a wild</h2>
 
     <p>Growing a cluster around a symbol that is not actually present would invent wins out of a lone wild. A wild-only region pays nothing: with no real symbol to be, there is no paytable row to read.</p>
 
@@ -45,11 +38,8 @@ clustersOf(grid, "HIGH", roles);   // the groups, for presentation`} />
 
     <Code code={`import { largestCluster } from "@open-rgs/pay-cluster";
 
-largestCluster(grid, "HIGH", roles);   // biggest group size
+largestCluster(grid, "HIGH", roles);
 
-// A board of pure wilds pays nothing.
-evalAllClusters(allWilds, CLUSTER, { roles });   // []`} />
-
-
+evalAllClusters(allWilds, CLUSTER, { roles });`} />
   </main>
 </BaseLayout>

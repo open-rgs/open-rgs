@@ -22,8 +22,8 @@ LIBS = [
    "grid-ragged", "The fifth cell exists in the tall reels and is simply absent from the short ones.",
    '''import { rect, makeGrid } from "@open-rgs/grid";
 
-const SHAPE  = rect(5, 3);          // [3, 3, 3, 3, 3]
-const RAGGED = [4, 5, 5, 5, 5, 4];  // ordinary, not a special case
+const SHAPE  = rect(5, 3);
+const RAGGED = [4, 5, 5, 5, 5, 4];
 
 const board = makeGrid(RAGGED, () => "LOW");'''),
 
@@ -32,20 +32,19 @@ const board = makeGrid(RAGGED, () => "LOW");'''),
    "grid-order", "Cells are stored flat, column-major. One array per board, not one per column.",
    '''import { at, indexOf, countOf } from "@open-rgs/grid";
 
-at(board, 1, 4);        // "LOW"
-at(board, 0, 4);        // undefined - column 0 is only 4 tall
-indexOf(RAGGED, 0, 4);  // -1
+at(board, 1, 4);
+at(board, 0, 4);
+indexOf(RAGGED, 0, 4);
 
-countOf(board, "LOW");  // 28'''),
+countOf(board, "LOW");'''),
 
   ("Neighbours are asked for",
    "Cluster evaluation walks neighbours, and on a ragged board a cell can have a left neighbour and no right one. Computing that from width and height gets it wrong; asking the shape does not.",
    "grid-neighbours", "Only the neighbours that exist on this shape come back.",
    '''import { neighbours, positionsWhere } from "@open-rgs/grid";
 
-neighbours(RAGGED, { col: 1, row: 4 });   // whatever actually exists
+neighbours(RAGGED, { col: 1, row: 4 });
 
-// The workhorse behind scatter counts, collectors and cascade removal.
 positionsWhere(board, (s) => s === "SC");'''),
  ]),
 
@@ -59,17 +58,17 @@ positionsWhere(board, (s) => s === "SC");'''),
 
 const symbols = sampler({ LOW: 60, MID: 30, HIGH: 9, WILD: 1 });
 
-symbols.probabilityOf("WILD");  // 0.01
-symbols.distribution();         // the table you balance against
-symbols.pick(host.rng_next());  // draws from the injected stream'''),
+symbols.probabilityOf("WILD");
+symbols.distribution();
+symbols.pick(host.rng_next());'''),
 
   ("Zero weight means unreachable",
    "A symbol that exists in the game but cannot be drawn in this mode is a real thing - a scatter excluded from a respin set. It stays in the set, reports probability zero, and never comes out at any draw.",
    "weights-zero", "Unreachable at every value, including the very top of the range.",
    '''const respin = sampler({ COIN: 70, BLANK: 30, SC: 0 });
 
-respin.probabilityOf("SC");  // 0
-respin.pick(0.999999);       // never "SC"'''),
+respin.probabilityOf("SC");
+respin.pick(0.999999);'''),
 
   ("Refusing beats under-delivering",
    "A placement that declared three symbols has already priced three into its RTP. Handing back two would corrupt the model with nothing downstream able to notice, so it throws instead.",
@@ -78,8 +77,8 @@ respin.pick(0.999999);       // never "SC"'''),
 
 const highs = sampler({ H1: 1, H2: 1, H3: 1 });
 
-pickDistinct(highs, 3, host.rng_next);  // three different symbols
-pickDistinct(highs, 4, host.rng_next);  // throws - only 3 are drawable'''),
+pickDistinct(highs, 3, host.rng_next);
+pickDistinct(highs, 4, host.rng_next);'''),
  ]),
 
 ("selectors", "Selectors", "Which cells?",
@@ -90,27 +89,26 @@ pickDistinct(highs, 4, host.rng_next);  // throws - only 3 are drawable'''),
    "selectors-pick", "A selector names cells. Everything else does something to them.",
    '''import { all, cols, rows, holding } from "@open-rgs/selectors";
 
-cols([0, 1])(grid, host.rng_next);      // the first two reels
-holding("WILD")(grid, host.rng_next);   // every wild on the board'''),
+cols([0, 1])(grid, host.rng_next);
+holding("WILD")(grid, host.rng_next);'''),
 
   ("They compose",
    "Set operations rather than options. Adding a rule means combining selectors, not growing a config object.",
    "selectors-compose", "Union, intersect, except, not.",
    '''import { except, union, not } from "@open-rgs/selectors";
 
-// "the first two reels, but never a wild"
 const target = except(cols([0, 1]), holding("WILD"));
 
-union(cols([0]), holding("SC"));  // de-duplicated, column-major'''),
+union(cols([0]), holding("SC"));'''),
 
   ("Random draws are stable",
    "Order is column-major and stable. A selector returning set-iteration order would make a seeded replay diverge between engine versions - a bug that only surfaces in a certification rerun.",
    "selectors-random", "randomN draws without replacement and throws rather than under-delivering.",
    '''import { randomN, upTo, oneOf } from "@open-rgs/selectors";
 
-randomN(3, target);   // exactly 3, or it throws
-upTo(3, target);      // up to 3, takes what is there
-oneOf(target);        // one cell, or none'''),
+randomN(3, target);
+upTo(3, target);
+oneOf(target);'''),
  ]),
 
 ("fill", "Fill", "Frequency",
@@ -131,11 +129,11 @@ const board = reels(host.rng_next);'''),
    '''import { fillWeightsPerColumn } from "@open-rgs/fill";
 
 const gated = fillWeightsPerColumn(SHAPE, [
-  { LOW: 60, HIGH: 12, WILD: 0 },   // no wild on reel 0
+  { LOW: 60, HIGH: 12, WILD: 0 },
   { LOW: 55, HIGH: 12, WILD: 5 },
   { LOW: 55, HIGH: 12, WILD: 5 },
   { LOW: 55, HIGH: 12, WILD: 5 },
-  { LOW: 60, HIGH: 12, WILD: 0 },   // nor on reel 4
+  { LOW: 60, HIGH: 12, WILD: 0 },
 ]);'''),
 
   ("Counting without simulating",
@@ -143,8 +141,8 @@ const gated = fillWeightsPerColumn(SHAPE, [
    "fill-expected", "How many scatters per spin, computed rather than measured.",
    '''import { expectedCount, cellProbability } from "@open-rgs/fill";
 
-expectedCount(SHAPE, sets, "SC");   // 0.9 scatters per spin
-cellProbability(sets, 0, "WILD");   // 0 - reel 0 has none'''),
+expectedCount(SHAPE, sets, "SC");
+cellProbability(sets, 0, "WILD");'''),
  ]),
 
 ("markov", "Markov", "Stacking",
@@ -157,25 +155,23 @@ cellProbability(sets, 0, "WILD");   // 0 - reel 0 has none'''),
 
 const BASE = { LOW: 60, MID: 30, HIGH: 10 };
 
-const flat   = stackyFill(SHAPE, BASE, 0);     // independent draws
-const stacky = stackyFill(SHAPE, BASE, 0.8);   // long runs'''),
+const flat   = stackyFill(SHAPE, BASE, 0);
+const stacky = stackyFill(SHAPE, BASE, 0.8);'''),
 
   ("Frequency does not move",
    "Under sticky(base, s) the chain's stationary distribution is exactly base, for every s below 1. So stickiness is a pure feel knob - turn it up for stacks and your RTP does not shift.",
    "markov-stationary", "The chain settles on the base distribution, whatever the stickiness.",
    '''import { sticky, stationary } from "@open-rgs/markov";
 
-stationary(sticky(BASE, 0.9));
-// { LOW: 0.6, MID: 0.3, HIGH: 0.1 } - unchanged'''),
+stationary(sticky(BASE, 0.9));'''),
 
   ("How tall are the stacks",
    "Run length is what stickiness is actually tuned against, and guessing it from spin footage is slow. It is a geometric distribution, so it has a closed form.",
    "markov-runs", "High stickiness produces natural stacks, the one thing a strip gave you.",
    '''import { meanRunLength, transitions } from "@open-rgs/markov";
 
-meanRunLength(BASE, 0.35, "HIGH");   // average run of HIGH
+meanRunLength(BASE, 0.35, "HIGH");
 
-// Hand-written tables work too, and stationary() solves those as well.
 transitions({ A: { A: 75, B: 25 }, B: { A: 75, B: 25 } });'''),
  ]),
 
@@ -203,16 +199,16 @@ import { randomN, cols } from "@open-rgs/selectors";
 
 const tease = place(2, "SC", randomN(2, cols([0, 1])), reels);
 
-board.probabilityOf("two-scatter");   // 0.05 - reportable, defensible'''),
+board.probabilityOf("two-scatter");'''),
 
   ("Placement building blocks",
    "A recipe is written as a pipeline rather than a special case buried inside the base draw. Probabilities must sum to 1: a mixture summing to 0.98 misprices every spin by an amount nobody will notice.",
    "recipes-place", "place() writes symbols into the cells a selector picked.",
    '''import { placeAt, placeDrawn, fixed } from "@open-rgs/recipes";
 
-placeAt("WILD", cols([2]), reels);          // a full reel of wilds
-placeDrawn(3, highs, randomN(3), reels);    // three drawn high symbols
-stack("HIGH", 2, reels);                    // fill column 2'''),
+placeAt("WILD", cols([2]), reels);
+placeDrawn(3, highs, randomN(3), reels);
+stack("HIGH", 2, reels);'''),
  ]),
 
 ("paytable", "Paytable", "What things are worth",
@@ -226,15 +222,14 @@ stack("HIGH", 2, reels);                    // fill column 2'''),
 const PAY   = paytable({ HIGH: { 3: 10, 4: 50, 5: 200 } });
 const roles = { wilds: ["WILD"], scatters: ["SC"] };
 
-substitutes("WILD", "HIGH", roles);  // true
-substitutes("WILD", "SC",   roles);  // false - never a scatter'''),
+substitutes("WILD", "HIGH", roles);
+substitutes("WILD", "SC",   roles);'''),
 
   ("Bands for cluster games",
    "Cluster games pay by size range while a paytable stores exact counts, so there is never interpolation to reason about. bands() bridges the two.",
    "paytable-bands", "Size ranges expanded into the exact counts a paytable stores.",
    '''import { bands } from "@open-rgs/paytable";
 
-// 49 = the grid size, the largest cluster the board can hold.
 const CLUSTER = paytable(bands({
   HIGH: [[5, 2], [9, 6], [12, 22], [15, 90]],
 }, 49));'''),
@@ -242,11 +237,8 @@ const CLUSTER = paytable(bands({
   ("Watch the top band",
    "The top band is open-ended: it runs from its start all the way to maxCount. On a five-reel grid seven scatters is impossible, so the intuition is that it is a lottery ticket. On 49 cells it is not.",
    "paytable-topband", "The top band runs all the way to maxCount.",
-   '''// A demo game gave SC a 6% weight and a [7, 200] band on a 49-cell board.
-// That lands 2.7% of the time and paid 536% RTP on its own.
-
-PAY.maxCount("HIGH");   // where the table actually stops
-PAY.best("HIGH");       // the largest payout available'''),
+   '''PAY.maxCount("HIGH");
+PAY.best("HIGH");'''),
  ]),
 
 ("pay-lines", "Pay-lines", "Runs along a line",
@@ -258,7 +250,7 @@ PAY.best("HIGH");       // the largest payout available'''),
    '''import { evalLines, rowLines } from "@open-rgs/pay-lines";
 import { totalMultiplier } from "@open-rgs/paytable";
 
-const LINES = rowLines(5, 3);   // three straight rows
+const LINES = rowLines(5, 3);
 
 const wins = evalLines(grid, LINES, PAY, { roles });
 totalMultiplier(wins);'''),
@@ -266,23 +258,13 @@ totalMultiplier(wins);'''),
   ("A wild-opening run is ambiguous",
    "It can be read as the wild's own symbol or as whatever it substitutes for further along. The convention is to pay whichever is worth more; reading it only as the wild silently underpays the best board in the game.",
    "pay-lines-wildopen", "The reading worth more is the one that pays.",
-   '''// WILD WILD LOW LOW LOW
-//   read as 5 LOW  -> 20
-//   read as 2 WILD -> nothing
-// pays 20
-
-// WILD WILD WILD WILD LOW
-//   read as 4 WILD -> 100
-//   read as 5 LOW  -> 20
-// pays 100'''),
+   ''''''),
 
   ("Both ways compete",
    "A game paying from either end evaluates both directions and keeps the better one. Paying both would double-count a run that spans the whole grid.",
    "pay-lines-bothways", "The two directions compete rather than accumulate.",
    '''const wins = evalLines(grid, LINES, PAY, { roles, bothWays: true });
 
-// A ragged shape needs no special handling: a line naming a row the
-// column does not have simply ends there.
 evalLine(grid, [2, 2, 2, 2, 2], PAY, { roles });'''),
  ]),
 
@@ -296,16 +278,13 @@ evalLine(grid, [2, 2, 2, 2, 2], PAY, { roles });'''),
 
 const wins = evalWays(grid, PAY, { roles });
 
-wins[0].ways;        // 6
-totalWays(grid);     // 1024 on a 4x5 - a consequence, not a setting'''),
+wins[0].ways;
+totalWays(grid);'''),
 
   ("A gap ends the run",
    "Counting every column the symbol appears on, gap or not, inflates both the count and the ways multiplier. Ways games are dense, so this bug is far more expensive here than on lines.",
    "pay-ways-gap", "A gap ends the run. Counting past it inflates the multiplier.",
-   '''// HIGH on reels 0 and 1, nothing on reel 2, HIGH again on 3 and 4.
-// The run is 2 columns, not 4 - and 2 does not pay.
-
-evalWay(grid, "HIGH", PAY, { roles });   // undefined'''),
+   '''evalWay(grid, "HIGH", PAY, { roles });'''),
 
   ("Variable heights need no change",
    "This never reads the shape. It counts actual matches per column, so a board whose reels drew different heights this spin works unchanged.",
@@ -315,7 +294,7 @@ evalWay(grid, "HIGH", PAY, { roles });   // undefined'''),
 const H = heights({ 2: 20, 3: 25, 4: 25, 5: 15, 6: 10, 7: 5 }, 6);
 const reels = multiwaysFillWeights(H, BASE);
 
-evalWays(reels(host.rng_next), PAY, { roles });   // same call'''),
+evalWays(reels(host.rng_next), PAY, { roles });'''),
  ]),
 
 ("pay-anywhere", "Pay-anywhere", "Scatters",
@@ -328,22 +307,20 @@ evalWays(reels(host.rng_next), PAY, { roles });   // same call'''),
 
 const wins = evalScatters(grid, PAY, { roles });
 
-countAnywhere(grid, "SC");   // 3'''),
+countAnywhere(grid, "SC");'''),
 
   ("A wild never counts",
    "Scatter substitution would manufacture triggers, and the trigger rate you balanced would not be the one you shipped. Only literal matches count here.",
    "pay-anywhere-nowild", "A wild never counts. Substitution here would manufacture triggers.",
-   '''// SC WILD SC  is TWO scatters, not three.
-
-countAnywhere(grid, "SC");   // 2'''),
+   '''countAnywhere(grid, "SC");'''),
 
   ("Triggering is not paying",
    "Plenty of games trigger on three scatters while paying nothing for them, and plenty pay for two without triggering. The two questions stay separate.",
    "pay-anywhere-trigger", "Triggering is a separate question from paying.",
    '''import { triggersOn, shortOfTrigger } from "@open-rgs/pay-anywhere";
 
-triggersOn(grid, "SC", 3);       // does the feature start?
-shortOfTrigger(grid, "SC", 3);   // the number a tease is built around'''),
+triggersOn(grid, "SC", 3);
+shortOfTrigger(grid, "SC", 3);'''),
  ]),
 
 ("pay-cluster", "Pay-cluster", "Connected groups",
@@ -356,25 +333,21 @@ shortOfTrigger(grid, "SC", 3);   // the number a tease is built around'''),
 
 const wins = evalAllClusters(grid, CLUSTER, { roles });
 
-clustersOf(grid, "HIGH", roles);   // the groups, for presentation'''),
+clustersOf(grid, "HIGH", roles);'''),
 
   ("Wilds are the whole difficulty",
    "A wild sitting between two clusters is legitimately part of both. So the fill runs per symbol and consumes only real matches - consume the wild for the first and the second silently shrinks by one, with nothing on the board looking wrong.",
    "pay-cluster-wild", "The outlined wild is counted in the teal group and the amber one.",
-   '''// HIGH HIGH WILD LOW LOW
-//   clustersOf(grid, "HIGH")  ->  3 cells
-//   clustersOf(grid, "LOW")   ->  3 cells
-// The wild is in both, and is never consumed by either.'''),
+   ''''''),
 
   ("Never seeded from a wild",
    "Growing a cluster around a symbol that is not actually present would invent wins out of a lone wild. A wild-only region pays nothing: with no real symbol to be, there is no paytable row to read.",
    "pay-cluster-diag", "Orthogonal only. Diagonals do not connect.",
    '''import { largestCluster } from "@open-rgs/pay-cluster";
 
-largestCluster(grid, "HIGH", roles);   // biggest group size
+largestCluster(grid, "HIGH", roles);
 
-// A board of pure wilds pays nothing.
-evalAllClusters(allWilds, CLUSTER, { roles });   // []'''),
+evalAllClusters(allWilds, CLUSTER, { roles });'''),
  ]),
 
 ("cascade", "Cascade", "Tumbles",
@@ -385,7 +358,6 @@ evalAllClusters(allWilds, CLUSTER, { roles });   // []'''),
    "cascade-fall", "Winners clear, survivors fall, a fresh symbol drops in on top.",
    '''import { clear, collapse, refill, tumble } from "@open-rgs/cascade";
 
-// One move, as three steps or as one call.
 const next = tumble(grid, winningCells, (n) => symbols.pick(n()), host.rng_next);'''),
 
   ("The ladder applies per step",
@@ -398,15 +370,12 @@ const run = runCascade(start, evaluate, pick, host.rng_next, {
   maxSteps: 30,
 });
 
-run.steps[1].paid;   // baseMultiplier * stepMultiplier'''),
+run.steps[1].paid;'''),
 
   ("The loop is bounded",
    "A refill can always produce another win, so in principle a cascade never ends. Unbounded, one unlucky spin hangs the process; the cap turns that into a finite, auditable round.",
    "cascade-bounded", "The loop is capped, because a refill can always win again.",
-   '''run.truncated;   // true if the cap fired rather than the board going quiet
-
-// Seeing this in simulation means the cap is too low, or the paytable
-// sustains itself. Either is worth knowing before it ships.'''),
+   '''run.truncated;'''),
  ]),
 
 ("holdwin", "Hold and win", "Respins",
@@ -419,7 +388,7 @@ run.steps[1].paid;   // baseMultiplier * stepMultiplier'''),
 
 const CONFIG = { respins: 3, fullBoardAward: "GRAND" };
 
-if (triggers(grid, 6)) {                 // 6 coins on a 5x3
+if (triggers(grid, 6)) {
   let s = beginRespins(grid, CONFIG);
   while (!isCycleOver(s)) s = stepRespins(s, landed, CONFIG);
 }'''),
@@ -429,9 +398,9 @@ if (triggers(grid, 6)) {                 // 6 coins on a 5x3
    "holdwin-collect", "A collector absorbs the value of every coin it targets.",
    '''import { collector, payer, upgrader, cashCells, tierCells } from "@open-rgs/holdwin";
 
-collector(cashCells(), JACKPOTS);        // collect cash, leave jackpots
-upgrader(tierCells(["MINI"]));           // bump only a MINI
-payer(5, coinCells());                   // add 5 to every coin'''),
+collector(cashCells(), JACKPOTS);
+upgrader(tierCells(["MINI"]));
+payer(5, coinCells());'''),
 
   ("Tiers resolve through one table",
    "A jackpot coin carries a tier, not a number, so retuning GRAND never means touching every coin. A collected coin is emptied rather than removed - it still fills the board but cannot be harvested twice.",
@@ -445,7 +414,7 @@ const COINS = mixedCoinSet(
   { MINI: 5, MINOR: 1.6, MAJOR: 0.35 },
 );
 
-settleRespins(state, CONFIG, JACKPOTS);   // includes the full-board award'''),
+settleRespins(state, CONFIG, JACKPOTS);'''),
  ]),
 
 ("multiways", "Multiways", "Variable reel heights",
@@ -465,22 +434,16 @@ const reels = multiwaysFillWeights(H, { LOW: 55, HIGH: 12, WILD: 5 });'''),
    "multiways-product", "Ways is the product of the heights the spin drew.",
    '''import { expectedWays, minWays, maxWays } from "@open-rgs/multiways";
 
-minWays(H);       // 64
-maxWays(H);       // 117,649
-expectedWays(H);  // what an average board offers'''),
+minWays(H);
+maxWays(H);
+expectedWays(H);'''),
 
   ("Do not rescale by ways",
    "A k-column win carries a multiplier scaling as h to the k, while the board scales as h to the reel count. Only a paytable weighted entirely on full-length runs tracks board ways; everything shorter scales slower, and short runs hold most of the expected value.",
    "pay-ways-cols", "pay-ways needs no change: it multiplies match counts, never heights.",
    '''import { expectedWaysPayout } from "@open-rgs/multiways";
 
-// Exact, in closed form - no simulation.
-expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));
-
-// Measured, 5 reels, height 2 -> 4 (a 32x rise in board ways):
-//   pays only 2-of-a-kind    2.25x
-//   pays only 5-of-a-kind   32.00x
-//   a normal paytable       23.31x'''),
+expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));'''),
  ]),
 
 ("big-symbols", "Big symbols", "Blocks",
@@ -491,27 +454,23 @@ expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));
    "big-counts", "A 2x2 wild really does act as four wilds.",
    '''import { placeBig } from "@open-rgs/big-symbols";
 
-const g = placeBig(grid, { pos: { col: 1, row: 1 }, width: 2, height: 2 }, "WILD");
-
-// A ways evaluator sees 2 matches in each of 2 columns and multiplies
-// correctly. It does not know this package exists.'''),
+const g = placeBig(grid, { pos: { col: 1, row: 1 }, width: 2, height: 2 }, "WILD");'''),
 
   ("Fit is not obvious",
    "A 2x2 needs two adjacent columns that are both tall enough at those rows. On a multiways board where one reel drew a height of two, a block that fits everywhere else does not fit there.",
    "big-fit", "A block needs every column it covers to be tall enough.",
    '''import { fits, placements } from "@open-rgs/big-symbols";
 
-fits(RAGGED, { col: 1, row: 2 }, 2, 2);   // false - the neighbour is short
-placements(RAGGED, 2, 2);                 // only the legal corners'''),
+fits(RAGGED, { col: 1, row: 2 }, 2, 2);
+placements(RAGGED, 2, 2);'''),
 
   ("Refuse rather than clip",
    "A clipped 2x2 is a 2x1 pretending to be one: it pays less than the game promised, and by then it is just symbols, so nothing downstream can tell. Random placement returns the board unchanged when nothing fits, because a feature that cannot place is an outcome to price rather than a crash.",
    "grid-ragged", "On a ragged board a block that fits elsewhere may not fit here.",
    '''import { placeRandomBig, blocksOf } from "@open-rgs/big-symbols";
 
-placeRandomBig(grid, "WILD", 3, 3, host.rng_next);   // unchanged if it cannot fit
+placeRandomBig(grid, "WILD", 3, 3, host.rng_next);
 
-// Presentation only - the maths never needs it.
 blocksOf(g, "WILD", [[2, 2], [3, 3]]);'''),
  ]),
 
@@ -528,8 +487,8 @@ const config = {
   count:  { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
 };
 
-oneInFor(config, 3);              // 200 - the feature fires 1 spin in 200
-probabilityOfAtLeast(config, 3);  // 0.005'''),
+oneInFor(config, 3);
+probabilityOfAtLeast(config, 3);'''),
 
   ("One per reel, and which reels",
    "At most one per reel is the genre norm, and it is what makes the count distribution exactly controllable. Excluded reels never receive one.",
@@ -537,8 +496,8 @@ probabilityOfAtLeast(config, 3);  // 0.005'''),
    '''const config = {
   symbol:     "SC",
   count:      { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
-  reels:      [1, 2, 3],    // never the outer reels
-  onePerReel: true,         // the default
+  reels:      [1, 2, 3],
+  onePerReel: true,
 };
 
 const board = withScatters(reels, config);'''),
@@ -550,10 +509,9 @@ const board = withScatters(reels, config);'''),
 
 const result = spawnOn(grid, { ...config, protects: ["WILD"] }, host.rng_next);
 
-result.wanted;    // what the distribution drew
-result.spawned;   // what the board could host
+result.wanted;
+result.spawned;
 
-// Structurally impossible configs fail at build time instead.
 assertFeasible(config, 5);'''),
  ]),
 ]
@@ -569,15 +527,14 @@ import Code from "../../components/Code.astro";
   description="{name}: {lede}"
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/{slug}</h1>
 
     <p class="lede">{lede}</p>
 
 {body}
   </main>
-</BaseLayout>
-'''
+</BaseLayout>'''
 
 SECTION = '''    <h2 data-section="&sect; {n}">{heading}</h2>
 
@@ -585,9 +542,7 @@ SECTION = '''    <h2 data-section="&sect; {n}">{heading}</h2>
 
     <Anim kind="{kind}" caption="{caption}" />
 
-    <Code code={{`{code}`}} />
-
-'''
+    <Code code={{`{code}`}} />'''
 
 for slug, name, tag, lede, sections in LIBS:
     body = "".join(

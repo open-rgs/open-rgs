@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Selectors: One primitive serving placement and hold-and-win targeting."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/selectors</h1>
 
     <p class="lede">One primitive serving placement and hold-and-win targeting.</p>
@@ -22,10 +22,8 @@ import Code from "../../components/Code.astro";
 
     <Code code={`import { all, cols, rows, holding } from "@open-rgs/selectors";
 
-cols([0, 1])(grid, host.rng_next);      // the first two reels
-holding("WILD")(grid, host.rng_next);   // every wild on the board`} />
-
-    <h2 data-section="&sect; 2">They compose</h2>
+cols([0, 1])(grid, host.rng_next);
+holding("WILD")(grid, host.rng_next);`} />    <h2 data-section="&sect; 2">They compose</h2>
 
     <p>Set operations rather than options. Adding a rule means combining selectors, not growing a config object.</p>
 
@@ -33,12 +31,9 @@ holding("WILD")(grid, host.rng_next);   // every wild on the board`} />
 
     <Code code={`import { except, union, not } from "@open-rgs/selectors";
 
-// "the first two reels, but never a wild"
 const target = except(cols([0, 1]), holding("WILD"));
 
-union(cols([0]), holding("SC"));  // de-duplicated, column-major`} />
-
-    <h2 data-section="&sect; 3">Random draws are stable</h2>
+union(cols([0]), holding("SC"));`} />    <h2 data-section="&sect; 3">Random draws are stable</h2>
 
     <p>Order is column-major and stable. A selector returning set-iteration order would make a seeded replay diverge between engine versions - a bug that only surfaces in a certification rerun.</p>
 
@@ -46,10 +41,8 @@ union(cols([0]), holding("SC"));  // de-duplicated, column-major`} />
 
     <Code code={`import { randomN, upTo, oneOf } from "@open-rgs/selectors";
 
-randomN(3, target);   // exactly 3, or it throws
-upTo(3, target);      // up to 3, takes what is there
-oneOf(target);        // one cell, or none`} />
-
-
+randomN(3, target);
+upTo(3, target);
+oneOf(target);`} />
   </main>
 </BaseLayout>

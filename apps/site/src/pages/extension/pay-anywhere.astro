@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Pay-anywhere: Total count, position irrelevant."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/pay-anywhere</h1>
 
     <p class="lede">Total count, position irrelevant.</p>
@@ -24,19 +24,13 @@ import Code from "../../components/Code.astro";
 
 const wins = evalScatters(grid, PAY, { roles });
 
-countAnywhere(grid, "SC");   // 3`} />
-
-    <h2 data-section="&sect; 2">A wild never counts</h2>
+countAnywhere(grid, "SC");`} />    <h2 data-section="&sect; 2">A wild never counts</h2>
 
     <p>Scatter substitution would manufacture triggers, and the trigger rate you balanced would not be the one you shipped. Only literal matches count here.</p>
 
     <Anim kind="pay-anywhere-nowild" caption="A wild never counts. Substitution here would manufacture triggers." />
 
-    <Code code={`// SC WILD SC  is TWO scatters, not three.
-
-countAnywhere(grid, "SC");   // 2`} />
-
-    <h2 data-section="&sect; 3">Triggering is not paying</h2>
+    <Code code={`countAnywhere(grid, "SC");`} />    <h2 data-section="&sect; 3">Triggering is not paying</h2>
 
     <p>Plenty of games trigger on three scatters while paying nothing for them, and plenty pay for two without triggering. The two questions stay separate.</p>
 
@@ -44,9 +38,7 @@ countAnywhere(grid, "SC");   // 2`} />
 
     <Code code={`import { triggersOn, shortOfTrigger } from "@open-rgs/pay-anywhere";
 
-triggersOn(grid, "SC", 3);       // does the feature start?
-shortOfTrigger(grid, "SC", 3);   // the number a tease is built around`} />
-
-
+triggersOn(grid, "SC", 3);
+shortOfTrigger(grid, "SC", 3);`} />
   </main>
 </BaseLayout>

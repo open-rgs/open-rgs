@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Cascade: Clear, fall, refill, repeat."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/cascade</h1>
 
     <p class="lede">Clear, fall, refill, repeat.</p>
@@ -22,10 +22,7 @@ import Code from "../../components/Code.astro";
 
     <Code code={`import { clear, collapse, refill, tumble } from "@open-rgs/cascade";
 
-// One move, as three steps or as one call.
-const next = tumble(grid, winningCells, (n) => symbols.pick(n()), host.rng_next);`} />
-
-    <h2 data-section="&sect; 2">The ladder applies per step</h2>
+const next = tumble(grid, winningCells, (n) => symbols.pick(n()), host.rng_next);`} />    <h2 data-section="&sect; 2">The ladder applies per step</h2>
 
     <p>It multiplies that step's own win, never the running total. Applying it to the total compounds across steps and inflates RTP badly.</p>
 
@@ -38,19 +35,12 @@ const run = runCascade(start, evaluate, pick, host.rng_next, {
   maxSteps: 30,
 });
 
-run.steps[1].paid;   // baseMultiplier * stepMultiplier`} />
-
-    <h2 data-section="&sect; 3">The loop is bounded</h2>
+run.steps[1].paid;`} />    <h2 data-section="&sect; 3">The loop is bounded</h2>
 
     <p>A refill can always produce another win, so in principle a cascade never ends. Unbounded, one unlucky spin hangs the process; the cap turns that into a finite, auditable round.</p>
 
     <Anim kind="cascade-bounded" caption="The loop is capped, because a refill can always win again." />
 
-    <Code code={`run.truncated;   // true if the cap fired rather than the board going quiet
-
-// Seeing this in simulation means the cap is too low, or the paytable
-// sustains itself. Either is worth knowing before it ships.`} />
-
-
+    <Code code={`run.truncated;`} />
   </main>
 </BaseLayout>

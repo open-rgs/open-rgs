@@ -116,7 +116,7 @@ const n = (k: number) => Array.from({ length: k });
     )}
     {kind === "paytable-wild" && (
       <div class="row">
-        <i class="wild"></i><span class="op">&rarr;</span><i class="a blink"></i><i class="b blink d1"></i><i class="c blink d2"></i>
+        <i class="wild"></i><span class="op">any of</span><i class="a blink"></i><i class="b blink d1"></i><i class="c blink d2"></i>
       </div>
     )}
     {kind === "paytable-topband" && (
@@ -135,7 +135,7 @@ const n = (k: number) => Array.from({ length: k });
     {kind === "pay-lines-bothways" && (
       <div class="row">
         <i></i><i></i><i class="run"></i><i class="run d1"></i><i class="run d2"></i>
-        <span class="op arrowl">&larr;</span>
+        <span class="op arrowl">from the right</span>
       </div>
     )}
 
@@ -236,26 +236,28 @@ const n = (k: number) => Array.from({ length: k });
     {kind === "multiways-heights" && (
       <div class="row gap">
         <div class="mw">
-          <div class="mwf f1">
-            <div class="mwc">{n(2).map(() => <i class="a"></i>)}</div>
-            <div class="mwc">{n(3).map(() => <i class="a"></i>)}</div>
-            <div class="mwc">{n(4).map(() => <i class="a"></i>)}</div>
-          </div>
-          <div class="mwf f2">
-            <div class="mwc">{n(5).map(() => <i class="a"></i>)}</div>
-            <div class="mwc">{n(2).map(() => <i class="a"></i>)}</div>
-            <div class="mwc">{n(6).map(() => <i class="a"></i>)}</div>
-          </div>
-          <div class="mwf f3">
-            <div class="mwc">{n(3).map(() => <i class="a"></i>)}</div>
-            <div class="mwc">{n(7).map(() => <i class="a"></i>)}</div>
-            <div class="mwc">{n(3).map(() => <i class="a"></i>)}</div>
-          </div>
+            <div class="mwf mwq1"><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq2"><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(6).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq3"><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(7).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq4"><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq5"><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(7).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq6"><div class="mwc">{n(6).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq7"><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq8"><div class="mwc">{n(7).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq9"><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(6).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq10"><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div></div>
         </div>
         <div class="mwn">
-          <span class="num f1">24 ways</span>
-          <span class="num f2">60 ways</span>
-          <span class="num f3">63 ways</span>
+          <span class="num mwq1">24 ways</span>
+          <span class="num mwq2">60 ways</span>
+          <span class="num mwq3">63 ways</span>
+          <span class="num mwq4">64 ways</span>
+          <span class="num mwq5">28 ways</span>
+          <span class="num mwq6">36 ways</span>
+          <span class="num mwq7">75 ways</span>
+          <span class="num mwq8">42 ways</span>
+          <span class="num mwq9">48 ways</span>
+          <span class="num mwq10">50 ways</span>
         </div>
       </div>
     )}
@@ -400,21 +402,35 @@ const n = (k: number) => Array.from({ length: k });
 
   /* Multiways: reels always fill the SAME height however many symbols they
      hold, so the board reads as one board reconfiguring rather than columns
-     growing and shrinking. Three fixed frames cross-fade; the ways count
-     fades with them. */
+     growing and shrinking. Ten configurations cycle in sequence; the ways
+     count changes with them.
+
+     The frame classes are mwq1..mwq10 rather than f1..f10 on purpose - an
+     earlier version used f1/f2/f3, which already carry the hold-and-win
+     fill delays defined later in this file. The later rule won, every frame
+     got a delay under half a second, and all ten appeared at once. */
   .mw { position: relative; width: 78px; height: 84px; }
   .mwf {
     position: absolute; inset: 0; display: flex; gap: 3px;
-    opacity: 0; animation: frameShow 6s infinite;
+    opacity: 0; animation: frameShow 12s infinite;
   }
   .mwc { display: flex; flex-direction: column; gap: 2px; flex: 1 1 0; height: 100%; }
   .mwc i { flex: 1 1 0; width: auto; height: auto; min-height: 0; }
-  .mwn { position: relative; width: 66px; height: 1.1rem; }
-  .mwn .num { position: absolute; left: 0; top: 0; opacity: 0; animation: frameShow 6s infinite; }
-  .f1 { animation-delay: 0s }
-  .f2 { animation-delay: 2s }
-  .f3 { animation-delay: 4s }
-  @keyframes frameShow { 0%{opacity:0} 4%,29%{opacity:1} 33%,100%{opacity:0} }
+  .mwn { position: relative; width: 74px; height: 1.1rem; }
+  .mwn .num { position: absolute; left: 0; top: 0; opacity: 0; animation: frameShow 12s infinite; }
+  .mwq1 { animation-delay: 0.0s }
+  .mwq2 { animation-delay: 1.2s }
+  .mwq3 { animation-delay: 2.4s }
+  .mwq4 { animation-delay: 3.6s }
+  .mwq5 { animation-delay: 4.8s }
+  .mwq6 { animation-delay: 6.0s }
+  .mwq7 { animation-delay: 7.2s }
+  .mwq8 { animation-delay: 8.4s }
+  .mwq9 { animation-delay: 9.6s }
+  .mwq10 { animation-delay: 10.8s }
+  /* 1.2s per configuration across a 12s loop: visible for one slot, faded
+     for the other nine. */
+  @keyframes frameShow { 0%{opacity:0} 2%,8%{opacity:1} 10%,100%{opacity:0} } 4%,29%{opacity:1} 33%,100%{opacity:0} }
 
   @keyframes scPulse { 0%,100%{background:#8A5A15;border-color:#8A5A15} 50%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
   .sc { animation: scPulse 2.6s infinite; }

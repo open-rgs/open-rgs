@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Big symbols: One symbol across a block of cells."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/big-symbols</h1>
 
     <p class="lede">One symbol across a block of cells.</p>
@@ -22,12 +22,7 @@ import Code from "../../components/Code.astro";
 
     <Code code={`import { placeBig } from "@open-rgs/big-symbols";
 
-const g = placeBig(grid, { pos: { col: 1, row: 1 }, width: 2, height: 2 }, "WILD");
-
-// A ways evaluator sees 2 matches in each of 2 columns and multiplies
-// correctly. It does not know this package exists.`} />
-
-    <h2 data-section="&sect; 2">Fit is not obvious</h2>
+const g = placeBig(grid, { pos: { col: 1, row: 1 }, width: 2, height: 2 }, "WILD");`} />    <h2 data-section="&sect; 2">Fit is not obvious</h2>
 
     <p>A 2x2 needs two adjacent columns that are both tall enough at those rows. On a multiways board where one reel drew a height of two, a block that fits everywhere else does not fit there.</p>
 
@@ -35,10 +30,8 @@ const g = placeBig(grid, { pos: { col: 1, row: 1 }, width: 2, height: 2 }, "WILD
 
     <Code code={`import { fits, placements } from "@open-rgs/big-symbols";
 
-fits(RAGGED, { col: 1, row: 2 }, 2, 2);   // false - the neighbour is short
-placements(RAGGED, 2, 2);                 // only the legal corners`} />
-
-    <h2 data-section="&sect; 3">Refuse rather than clip</h2>
+fits(RAGGED, { col: 1, row: 2 }, 2, 2);
+placements(RAGGED, 2, 2);`} />    <h2 data-section="&sect; 3">Refuse rather than clip</h2>
 
     <p>A clipped 2x2 is a 2x1 pretending to be one: it pays less than the game promised, and by then it is just symbols, so nothing downstream can tell. Random placement returns the board unchanged when nothing fits, because a feature that cannot place is an outcome to price rather than a crash.</p>
 
@@ -46,11 +39,8 @@ placements(RAGGED, 2, 2);                 // only the legal corners`} />
 
     <Code code={`import { placeRandomBig, blocksOf } from "@open-rgs/big-symbols";
 
-placeRandomBig(grid, "WILD", 3, 3, host.rng_next);   // unchanged if it cannot fit
+placeRandomBig(grid, "WILD", 3, 3, host.rng_next);
 
-// Presentation only - the maths never needs it.
 blocksOf(g, "WILD", [[2, 2], [3, 3]]);`} />
-
-
   </main>
 </BaseLayout>

@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Multiways: Each reel draws its own height, every spin."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/multiways</h1>
 
     <p class="lede">Each reel draws its own height, every spin.</p>
@@ -24,9 +24,7 @@ import Code from "../../components/Code.astro";
 
 const H = heights({ 2: 20, 3: 25, 4: 25, 5: 15, 6: 10, 7: 5 }, 6);
 
-const reels = multiwaysFillWeights(H, { LOW: 55, HIGH: 12, WILD: 5 });`} />
-
-    <h2 data-section="&sect; 2">The marketing number</h2>
+const reels = multiwaysFillWeights(H, { LOW: 55, HIGH: 12, WILD: 5 });`} />    <h2 data-section="&sect; 2">The marketing number</h2>
 
     <p>Reel heights are drawn independently, so the expected board ways is the product of the per-reel expectations. Correlate the reels and that stops being true.</p>
 
@@ -34,11 +32,9 @@ const reels = multiwaysFillWeights(H, { LOW: 55, HIGH: 12, WILD: 5 });`} />
 
     <Code code={`import { expectedWays, minWays, maxWays } from "@open-rgs/multiways";
 
-minWays(H);       // 64
-maxWays(H);       // 117,649
-expectedWays(H);  // what an average board offers`} />
-
-    <h2 data-section="&sect; 3">Do not rescale by ways</h2>
+minWays(H);
+maxWays(H);
+expectedWays(H);`} />    <h2 data-section="&sect; 3">Do not rescale by ways</h2>
 
     <p>A k-column win carries a multiplier scaling as h to the k, while the board scales as h to the reel count. Only a paytable weighted entirely on full-length runs tracks board ways; everything shorter scales slower, and short runs hold most of the expected value.</p>
 
@@ -46,14 +42,6 @@ expectedWays(H);  // what an average board offers`} />
 
     <Code code={`import { expectedWaysPayout } from "@open-rgs/multiways";
 
-// Exact, in closed form - no simulation.
-expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));
-
-// Measured, 5 reels, height 2 -> 4 (a 32x rise in board ways):
-//   pays only 2-of-a-kind    2.25x
-//   pays only 5-of-a-kind   32.00x
-//   a normal paytable       23.31x`} />
-
-
+expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));`} />
   </main>
 </BaseLayout>

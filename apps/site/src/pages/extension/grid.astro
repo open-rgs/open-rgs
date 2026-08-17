@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Grid: Shape is a height per column, not width by height."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/grid</h1>
 
     <p class="lede">Shape is a height per column, not width by height.</p>
@@ -22,12 +22,10 @@ import Code from "../../components/Code.astro";
 
     <Code code={`import { rect, makeGrid } from "@open-rgs/grid";
 
-const SHAPE  = rect(5, 3);          // [3, 3, 3, 3, 3]
-const RAGGED = [4, 5, 5, 5, 5, 4];  // ordinary, not a special case
+const SHAPE  = rect(5, 3);
+const RAGGED = [4, 5, 5, 5, 5, 4];
 
-const board = makeGrid(RAGGED, () => "LOW");`} />
-
-    <h2 data-section="&sect; 2">Off the grid reports, never throws</h2>
+const board = makeGrid(RAGGED, () => "LOW");`} />    <h2 data-section="&sect; 2">Off the grid reports, never throws</h2>
 
     <p>On a ragged board an out-of-range row is normal, not exceptional - a payline crossing a short reel simply has no cell there. So reads report their absence instead of raising.</p>
 
@@ -35,13 +33,11 @@ const board = makeGrid(RAGGED, () => "LOW");`} />
 
     <Code code={`import { at, indexOf, countOf } from "@open-rgs/grid";
 
-at(board, 1, 4);        // "LOW"
-at(board, 0, 4);        // undefined - column 0 is only 4 tall
-indexOf(RAGGED, 0, 4);  // -1
+at(board, 1, 4);
+at(board, 0, 4);
+indexOf(RAGGED, 0, 4);
 
-countOf(board, "LOW");  // 28`} />
-
-    <h2 data-section="&sect; 3">Neighbours are asked for</h2>
+countOf(board, "LOW");`} />    <h2 data-section="&sect; 3">Neighbours are asked for</h2>
 
     <p>Cluster evaluation walks neighbours, and on a ragged board a cell can have a left neighbour and no right one. Computing that from width and height gets it wrong; asking the shape does not.</p>
 
@@ -49,11 +45,8 @@ countOf(board, "LOW");  // 28`} />
 
     <Code code={`import { neighbours, positionsWhere } from "@open-rgs/grid";
 
-neighbours(RAGGED, { col: 1, row: 4 });   // whatever actually exists
+neighbours(RAGGED, { col: 1, row: 4 });
 
-// The workhorse behind scatter counts, collectors and cascade removal.
 positionsWhere(board, (s) => s === "SC");`} />
-
-
   </main>
 </BaseLayout>

@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Pay-lines: Longest run, paid once."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/pay-lines</h1>
 
     <p class="lede">Longest run, paid once.</p>
@@ -23,28 +23,16 @@ import Code from "../../components/Code.astro";
     <Code code={`import { evalLines, rowLines } from "@open-rgs/pay-lines";
 import { totalMultiplier } from "@open-rgs/paytable";
 
-const LINES = rowLines(5, 3);   // three straight rows
+const LINES = rowLines(5, 3);
 
 const wins = evalLines(grid, LINES, PAY, { roles });
-totalMultiplier(wins);`} />
-
-    <h2 data-section="&sect; 2">A wild-opening run is ambiguous</h2>
+totalMultiplier(wins);`} />    <h2 data-section="&sect; 2">A wild-opening run is ambiguous</h2>
 
     <p>It can be read as the wild's own symbol or as whatever it substitutes for further along. The convention is to pay whichever is worth more; reading it only as the wild silently underpays the best board in the game.</p>
 
     <Anim kind="pay-lines-wildopen" caption="The reading worth more is the one that pays." />
 
-    <Code code={`// WILD WILD LOW LOW LOW
-//   read as 5 LOW  -> 20
-//   read as 2 WILD -> nothing
-// pays 20
-
-// WILD WILD WILD WILD LOW
-//   read as 4 WILD -> 100
-//   read as 5 LOW  -> 20
-// pays 100`} />
-
-    <h2 data-section="&sect; 3">Both ways compete</h2>
+    <Code code={``} />    <h2 data-section="&sect; 3">Both ways compete</h2>
 
     <p>A game paying from either end evaluates both directions and keeps the better one. Paying both would double-count a run that spans the whole grid.</p>
 
@@ -52,10 +40,6 @@ totalMultiplier(wins);`} />
 
     <Code code={`const wins = evalLines(grid, LINES, PAY, { roles, bothWays: true });
 
-// A ragged shape needs no special handling: a line naming a row the
-// column does not have simply ends there.
 evalLine(grid, [2, 2, 2, 2, 2], PAY, { roles });`} />
-
-
   </main>
 </BaseLayout>

@@ -9,7 +9,7 @@ import Code from "../../components/Code.astro";
   description="Recipes: Every board comes from exactly one declared recipe."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>@open-rgs/recipes</h1>
 
     <p class="lede">Every board comes from exactly one declared recipe.</p>
@@ -28,9 +28,7 @@ const board = recipes([
   { name: "high-stack",  p: 0.01, draw: stacked },
 ]);
 
-const { grid, recipe } = board(host.rng_next);`} />
-
-    <h2 data-section="&sect; 2">A tease is a real draw</h2>
+const { grid, recipe } = board(host.rng_next);`} />    <h2 data-section="&sect; 2">A tease is a real draw</h2>
 
     <p>The tease board goes through the pay evaluator honestly. You bias which boards appear, at a rate you wrote down, and never fake an outcome - which is also what keeps near-miss behaviour on the right side of the rules.</p>
 
@@ -41,9 +39,7 @@ import { randomN, cols } from "@open-rgs/selectors";
 
 const tease = place(2, "SC", randomN(2, cols([0, 1])), reels);
 
-board.probabilityOf("two-scatter");   // 0.05 - reportable, defensible`} />
-
-    <h2 data-section="&sect; 3">Placement building blocks</h2>
+board.probabilityOf("two-scatter");`} />    <h2 data-section="&sect; 3">Placement building blocks</h2>
 
     <p>A recipe is written as a pipeline rather than a special case buried inside the base draw. Probabilities must sum to 1: a mixture summing to 0.98 misprices every spin by an amount nobody will notice.</p>
 
@@ -51,10 +47,8 @@ board.probabilityOf("two-scatter");   // 0.05 - reportable, defensible`} />
 
     <Code code={`import { placeAt, placeDrawn, fixed } from "@open-rgs/recipes";
 
-placeAt("WILD", cols([2]), reels);          // a full reel of wilds
-placeDrawn(3, highs, randomN(3), reels);    // three drawn high symbols
-stack("HIGH", 2, reels);                    // fill column 2`} />
-
-
+placeAt("WILD", cols([2]), reels);
+placeDrawn(3, highs, randomN(3), reels);
+stack("HIGH", 2, reels);`} />
   </main>
 </BaseLayout>

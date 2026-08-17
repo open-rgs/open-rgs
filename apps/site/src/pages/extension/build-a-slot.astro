@@ -5,14 +5,12 @@ import Code from "../../components/Code.astro";
 
 const step1 = `import { rect } from "@open-rgs/grid";
 
-// Shape is a height per column. Rectangular is the case where they match.
 const SHAPE = rect(5, 3);`;
 
 const step2 = `import { stackyFill } from "@open-rgs/markov";
 
-// SC weight is ZERO - the scatter cannot appear naturally. It gets spawned.
 const BASE  = { LOW: 47, MID: 24, HI: 12, PREM: 7, WILD: 6, SC: 0 };
-const reels = stackyFill(SHAPE, BASE, 0.35);   // 0.35 = stackiness`;
+const reels = stackyFill(SHAPE, BASE, 0.35);`;
 
 const step3 = `import { withScatters, oneInFor } from "@open-rgs/scatters";
 
@@ -23,7 +21,7 @@ const scatters = {
   protects: ["WILD"],
 };
 
-oneInFor(scatters, 3);   // 200 - the feature fires 1 spin in 200, by declaration`;
+oneInFor(scatters, 3);`;
 
 const step4 = `import { recipes, place } from "@open-rgs/recipes";
 import { randomN, cols } from "@open-rgs/selectors";
@@ -107,7 +105,7 @@ await createServer({
   description="Assemble a complete slot from the @open-rgs/* libraries: shape, reels, scatters, recipes, paytable, feature, and the server that runs it."
 >
   <main>
-    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <p class="dim"><a href="/extension">All extensions</a></p>
     <h1>Build a slot</h1>
 
     <p class="lede">
