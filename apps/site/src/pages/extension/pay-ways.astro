@@ -35,7 +35,7 @@ totalWays(grid);`} />    <h2 data-section="&sect; 2">A gap ends the run</h2>
 
     <p>This never reads the shape. It counts actual matches per column, so a board whose reels drew different heights this spin works unchanged.</p>
 
-    <Anim kind="pay-ways-heights" caption="On a multiways board the heights vary per spin, and this needs no change." />
+    <Anim kind="pay-ways-heights" caption="Same evaluator, five board shapes. It counts matching cells per column, so the ways count follows the matches and not the heights." />
 
     <Code code={`import { heights, multiwaysFillWeights } from "@open-rgs/multiways";
 

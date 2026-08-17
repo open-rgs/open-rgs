@@ -156,10 +156,21 @@ const n = (k: number) => Array.from({ length: k });
       </div>
     )}
     {kind === "pay-ways-heights" && (
-      <div class="row">
-        <div class="colr grow g1"><i class="a"></i><i class="a"></i></div>
-        <div class="colr grow g2"><i class="a"></i><i class="a"></i><i class="a"></i></div>
-        <div class="colr grow g3c"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></div>
+      <div class="row gap">
+        <div class="mw">
+            <div class="mwf pwq1"><div class="mwc"><i class="a"></i><i class="a"></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i></i></div></div>
+            <div class="mwf pwq2"><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="mwf pwq3"><div class="mwc"><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i></div></div>
+            <div class="mwf pwq4"><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i></div></div>
+            <div class="mwf pwq5"><div class="mwc"><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+        </div>
+        <div class="mwn">
+          <span class="num pwq1">12 ways</span>
+          <span class="num pwq2">6 ways</span>
+          <span class="num pwq3">8 ways</span>
+          <span class="num pwq4">16 ways</span>
+          <span class="num pwq5">6 ways</span>
+        </div>
       </div>
     )}
 
@@ -474,10 +485,6 @@ const n = (k: number) => Array.from({ length: k });
   .hit { animation: waysPulse 2.4s infinite; }
   .gapx i { opacity: .2 }
 
-  @keyframes growCol { 0%,100%{transform:scaleY(.55);transform-origin:top} 50%{transform:scaleY(1);transform-origin:top} }
-  .grow { animation: growCol 3.4s infinite; }
-  .g2 { animation-delay:.25s } .g3c { animation-delay:.5s }
-
   /* Multiways: reels always fill the SAME height however many symbols they
      hold, so the board reads as one board reconfiguring rather than columns
      growing and shrinking. Ten configurations cycle in sequence; the ways
@@ -496,19 +503,44 @@ const n = (k: number) => Array.from({ length: k });
   .mwc i { flex: 1 1 0; width: auto; height: auto; min-height: 0; }
   .mwn { position: relative; width: 74px; height: 1.1rem; }
   .mwn .num { position: absolute; left: 0; top: 0; opacity: 0; animation: frameShow 12s infinite; }
-  .mwq1 { animation-delay: 0.0s }
-  .mwq2 { animation-delay: 1.2s }
-  .mwq3 { animation-delay: 2.4s }
-  .mwq4 { animation-delay: 3.6s }
-  .mwq5 { animation-delay: 4.8s }
-  .mwq6 { animation-delay: 6.0s }
-  .mwq7 { animation-delay: 7.2s }
-  .mwq8 { animation-delay: 8.4s }
-  .mwq9 { animation-delay: 9.6s }
-  .mwq10 { animation-delay: 10.8s }
+  /* Both selectors per frame: `.mwn .num` sets the `animation` shorthand and
+     outranks a bare `.mwqN`, which zeroed every readout's delay and left all
+     ten ways counts firing at once against a board that had moved on. */
+  .mw .mwq1, .mwn .mwq1 { animation-delay: 0.0s }
+  .mw .mwq2, .mwn .mwq2 { animation-delay: 1.2s }
+  .mw .mwq3, .mwn .mwq3 { animation-delay: 2.4s }
+  .mw .mwq4, .mwn .mwq4 { animation-delay: 3.6s }
+  .mw .mwq5, .mwn .mwq5 { animation-delay: 4.8s }
+  .mw .mwq6, .mwn .mwq6 { animation-delay: 6.0s }
+  .mw .mwq7, .mwn .mwq7 { animation-delay: 7.2s }
+  .mw .mwq8, .mwn .mwq8 { animation-delay: 8.4s }
+  .mw .mwq9, .mwn .mwq9 { animation-delay: 9.6s }
+  .mw .mwq10, .mwn .mwq10 { animation-delay: 10.8s }
   /* 1.2s per configuration across a 12s loop: visible for one slot, faded
      for the other nine. */
-  @keyframes frameShow { 0%{opacity:0} 2%,8%{opacity:1} 10%,100%{opacity:0} } 4%,29%{opacity:1} 33%,100%{opacity:0} }
+  @keyframes frameShow { 0%{opacity:0} 2%,8%{opacity:1} 10%,100%{opacity:0} }
+
+  /* pay-ways uses the same reconfiguring board, with five frames over 6s
+     rather than ten over 12s. Its own frame classes for the reason spelled
+     out above: a shared name picks up whichever delay is defined last. */
+  /* Longhands, not the `animation` shorthand: this selector outranks the
+     .pwqN delay rules below, and the shorthand would reset their delay to 0
+     and stack all five frames on top of each other. */
+  .mwf.pwq1, .mwf.pwq2, .mwf.pwq3, .mwf.pwq4, .mwf.pwq5,
+  .mwn .num.pwq1, .mwn .num.pwq2, .mwn .num.pwq3, .mwn .num.pwq4, .mwn .num.pwq5 {
+    animation-name: frameShow5;
+    animation-duration: 6s;
+    animation-iteration-count: infinite;
+  }
+  /* Both selectors per frame: `.mwn .num` carries the multiways shorthand,
+     which zeroes the delay of anything it outranks, and the readouts have to
+     step in lockstep with the boards. */
+  .mw .pwq1, .mwn .pwq1 { animation-delay: 0.0s }
+  .mw .pwq2, .mwn .pwq2 { animation-delay: 1.2s }
+  .mw .pwq3, .mwn .pwq3 { animation-delay: 2.4s }
+  .mw .pwq4, .mwn .pwq4 { animation-delay: 3.6s }
+  .mw .pwq5, .mwn .pwq5 { animation-delay: 4.8s }
+  @keyframes frameShow5 { 0%{opacity:0} 4%,16%{opacity:1} 20%,100%{opacity:0} }
 
   @keyframes scPulse { 0%,100%{background:#8A5A15;border-color:#8A5A15} 50%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
   .sc { animation: scPulse 2.6s infinite; }
