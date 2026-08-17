@@ -39,6 +39,11 @@ import { settleAmount } from "./money.js";
 import { deriveIdempotencyKey } from "./idempotency.js";
 import type { AuditLog, AuditInput } from "./audit-log.js";
 import { log } from "./log.js";
+import { isAwaitingEndRound } from "./deferred-close.js";
+
+/** Canonical player-facing text for a round the client left open. Exported so
+ *  every transport and client says the same thing. */
+export const UNFINISHED_ROUND_MESSAGE = "Unfinished round \u2014 watching replay";
 import type { RgsMetrics } from "./metrics-rgs.js";
 import type { IdempotencyConfig, ConcurrencyPolicy } from "@open-rgs/contract";
 
@@ -537,6 +542,13 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         actionLog: s.openRound.actionLog,
         ...(s.openRound.awaiting ? { awaiting: s.openRound.awaiting } : {}),
         openedAt: s.openRound.openedAt,
+        // A round awaiting the end-round action is open only because the
+        // client never finished it - the outcome was decided when it opened.
+        // Flagging that here means a client shows the right thing without
+        // knowing which modes defer their close.
+        ...(isAwaitingEndRound(s.openRound.awaiting?.type)
+          ? { replay: { unfinished: true as const, message: UNFINISHED_ROUND_MESSAGE } }
+          : {}),
       };
       resp.resume = r;
     }

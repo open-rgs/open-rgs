@@ -448,6 +448,19 @@ export interface OpenRoundResume {
   awaiting?: AwaitingHint;
   /** Wall-clock time (ms epoch) the round opened  - UX hint. */
   openedAt?: number;
+  /** Present when the round is open only because the client never finished it,
+   *  rather than because the math is waiting on a decision. The client is
+   *  looking at a replay of a spin that already happened: the outcome is fixed
+   *  and `ops` renders it, and the only thing left is to close the round.
+   *
+   *  Set by the orchestrator when the round awaits the end-round action (see
+   *  `withDeferredClose`), so a client need not know which modes use it. */
+  replay?: {
+    /** Always true when present  - the field exists to be checked, not read. */
+    unfinished: true;
+    /** Canonical player-facing message, so every client says the same thing. */
+    message: string;
+  };
 }
 
 export interface SettleSimple {

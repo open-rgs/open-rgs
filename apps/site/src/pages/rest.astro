@@ -1,0 +1,131 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Code from "../components/Code.astro";
+
+const boot = `import { createServer, restTransport, loadTsMath, cryptoRng } from "@open-rgs/core";
+
+await createServer({
+  manifest,
+  platform,
+  transport: restTransport({ port: 8080 }),
+});`;
+
+const flow = `POST /session       { "sid": "..." }
+POST /spin          { "sid": "...", "betIndex": 0 }
+POST /round/open    { "sid": "...", "mode": "deferred", "betIndex": 0 }
+POST /round/step    { "sid": "...", "action": { "type": "gamble" } }
+POST /round/end     { "sid": "..." }
+POST /promo/accept  { "sid": "...", "accept": true }
+GET  /healthz`;
+
+const defer = `import { withDeferredClose } from "@open-rgs/core";
+
+const spin = await loadTsMath("./maths/spin.ts", { rng: cryptoRng });
+
+modes: {
+  // One line. The mode is now a complex round finished by the client.
+  default: { math: withDeferredClose(spin, { prompt: "Collect" }), stakeMultiplier: 1 },
+}`;
+
+const resume = `{
+  "balance": 98000,
+  "resume": {
+    "roundId": "...",
+    "ops": [ { "kind": "spin", "mult": 2 } ],
+    "awaiting": { "type": "endRound", "prompt": "Collect" },
+    "replay": {
+      "unfinished": true,
+      "message": "Unfinished round — watching replay"
+    }
+  }
+}`;
+---
+
+<BaseLayout
+  title="REST transport and deferred close  - open-rgs"
+  description="Run open-rgs over plain HTTP and JSON, and let a client finish a round explicitly so an abandoned spin can be replayed and closed later."
+>
+  <main>
+    <h1>REST and deferred close</h1>
+
+    <p class="lede">
+      The same orchestrator over plain HTTP, plus a toggle that lets a client
+      finish a round on its own schedule.
+    </p>
+
+    <h2 data-section="&sect; 1">REST transport</h2>
+
+    <p>
+      <code>binaryTransport</code> stays the default: a slot is a long-lived
+      session with many small messages, and a WebSocket carrying msgpack fits
+      that. REST is for the cases where it does not - a back-office tool, a
+      smoke test, a curl in a runbook, or a client behind something that will
+      not proxy WebSockets.
+    </p>
+
+    <Code code={boot} />
+    <Code code={flow} />
+
+    <p class="warn">
+      <strong>REST cannot push.</strong> A wallet balance change, or the
+      supersede frame that makes <code>concurrencyPolicy: "kick-old"</code>
+      work, has nowhere to go. <code>closeConnection</code> is deliberately not
+      implemented, so the policy degrades to <code>"allow"</code> and
+      <code>createServer</code> warns at boot rather than doing nothing quietly.
+      Each response carries the current balance instead.
+    </p>
+
+    <p>
+      There is also no connection to bind a session to, so the <code>sid</code>
+      in the body is the only credential. That is the same token the operator's
+      launch URL carries, but REST leans on it harder than the WebSocket
+      transport does - do not put this transport somewhere the sid is casually
+      visible.
+    </p>
+
+    <h2 data-section="&sect; 2">Deferred close</h2>
+
+    <p>
+      A simple round opens and closes in one call: <code>spin</code> computes
+      the outcome, settles the money, and the round is over before the response
+      is written. If the player closes the tab mid-presentation there is nothing
+      to come back to - the balance moved, with no way to see why.
+    </p>
+
+    <Code code={defer} />
+
+    <p>
+      <strong>This turns the game into a complex round</strong>, and it is worth
+      being plain about that rather than presenting it as a third round shape.
+      <code>open</code> runs the simple math and parks the outcome;
+      <code>close</code> pays it. The money moves twice, exactly like any other
+      complex round. The adapter's job is to make that conversion a one-line
+      toggle instead of a rewrite.
+    </p>
+
+    <p>
+      Two consequences you now own. An open round holds an outstanding debit, so
+      a player who never returns leaves it open until something closes it -
+      which is what <code>autoclose</code> is for, and it matters more with this
+      toggle on. And <code>spin</code> is refused while a round is open, so a
+      stuck round blocks play until it settles.
+    </p>
+
+    <h2 data-section="&sect; 3">Coming back to it</h2>
+
+    <p>
+      Re-initialising a session with an unfinished round resumes it. The outcome
+      was fixed when the round opened, so <code>ops</code> replays the spin that
+      already happened and the only thing left is to close it. The orchestrator
+      flags that, so a client need not know which modes defer their close.
+    </p>
+
+    <Code code={resume} />
+
+    <p>
+      A late close pays exactly what the open decided. A player who never came
+      back is not penalised, and one who came back late is not rewarded -
+      <code>autoclose</code> settles at the same value for the same reason.
+    </p>
+  </main>
+</BaseLayout>

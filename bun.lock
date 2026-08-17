@@ -81,6 +81,9 @@
         "@open-rgs/contract": "1.2.0",
         "@open-rgs/log": "1.0.0",
       },
+      "devDependencies": {
+        "@open-rgs/platform-mock": "1.2.1",
+      },
     },
     "packages/log": {
       "name": "@open-rgs/log",
@@ -90,7 +93,7 @@
       "name": "@open-rgs/platform-mock",
       "version": "1.2.1",
       "dependencies": {
-        "@open-rgs/contract": "1.1.0",
+        "@open-rgs/contract": "1.2.0",
       },
     },
     "packages/simulator": {

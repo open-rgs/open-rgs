@@ -1,7 +1,7 @@
 // @open-rgs/core public surface
 
 export { createServer, type ServerConfig, type ServerHandle } from "./server.js";
-export { createOrchestrator, defaultIdempotencyKey } from "./orchestrator.js";
+export { createOrchestrator, defaultIdempotencyKey, UNFINISHED_ROUND_MESSAGE } from "./orchestrator.js";
 export { settleAmount, roundHalfEven } from "./money.js";
 export { deriveIdempotencyKey, uuidV4 } from "./idempotency.js";
 export {
@@ -9,6 +9,11 @@ export {
   type AuditLog, type AuditSink, type AuditEvent, type AuditInput, type RoundOutcomeStatus,
 } from "./audit-log.js";
 export { binaryTransport } from "./transport-binary.js";
+export { restTransport, type RestTransportOptions } from "./transport-rest.js";
+export {
+  withDeferredClose, isAwaitingEndRound, END_ROUND_ACTION,
+  type DeferredCloseOptions,
+} from "./deferred-close.js";
 export { cryptoRng, resolveRng } from "./rng.js";
 export { loadWasmMath, type LoadWasmMathOptions } from "./wasm-math.js";
 export { loadTsMath, assertPure, type LoadTsMathOptions, type Replayable } from "./ts-math.js";
