@@ -185,6 +185,27 @@ export interface MarkSnapshot {
 
 // --- Math contract ----------------------------------------------------------
 
+/** The host surface a math module draws through. Identical in all three
+ *  runtimes: Lua sees it as the `host` global, a WASM kernel imports it from
+ *  the "host" module, and a TS math receives it as the argument to its
+ *  default-exported factory ({@link MathFactory}).
+ *
+ *  This is the RNG seam. Math has no other source of randomness - a TS math
+ *  reaching for `Math.random()` bypasses the auditable generator, breaks seed
+ *  reproducibility, and voids any RTP measured from a replay. The TS loader
+ *  rejects such a module at load time rather than trusting it not to. */
+export interface MathHost {
+  /** Uniform float in [0, 1). The ONLY randomness available to math. */
+  rng_next(): number;
+  /** Dev-time trace. No-op unless the loader was given a debug sink. */
+  log_debug(message: string): void;
+}
+
+/** What a TS math module default-exports: a factory taking the host and
+ *  returning the math. The indirection is what gives TS math the same
+ *  injected-RNG guarantee the Lua and WASM tiers already have. */
+export type MathFactory = (host: MathHost) => MathModule;
+
 /** Pure simple-round math: prev -> outcome. Currency-blind, RNG-injected.
  *
  *  Math returns a multiplier and ops. Core multiplies multiplier x bet to

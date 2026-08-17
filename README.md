@@ -1,9 +1,9 @@
 # open-rgs
 
 A small, MIT-licensed Remote Game Server. Bun-native orchestrator,
-snap-in maths (Lua, or compiled WASM kernels in Zig/Rust), pluggable
-wallet adapters, binary-msgpack on the wire. One Bun file boots a
-working server.
+snap-in maths (TypeScript, Lua, or compiled WASM kernels in Zig/Rust),
+pluggable wallet adapters, binary-msgpack on the wire. One Bun file boots
+a working server.
 
 Built for slots, instant games, Mines, Chicken-Road, crash, and any
 other casino round shape.
@@ -19,7 +19,7 @@ bun add @open-rgs/core @open-rgs/contract @open-rgs/platform-mock
 ## Hello, spin
 
 ```ts
-import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
+import { createServer, binaryTransport, loadTsMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 
@@ -29,7 +29,7 @@ await createServer({
     declaredRtp: 0.95,
     defaultMode: "default",
     modes: {
-      default: { math: await loadLuaMath("./maths/spin.lua"), stakeMultiplier: 1 },
+      default: { math: await loadTsMath("./maths/spin.ts"), stakeMultiplier: 1 },
     },
   }),
   platform:  new MockPlatform({ startingBalance: 100_000 }),
@@ -37,22 +37,48 @@ await createServer({
 });
 ```
 
-A minimal Lua math (`maths/spin.lua`):
+A minimal math (`maths/spin.ts`). Note it exports a **factory** taking the
+host - that is the RNG seam, and it is why math can never reach an ambient
+generator:
 
-```lua
-return {
-  kind = "simple", name = "spin", version = "0.1.0", rtp = 0.95,
-  play = function(prev, ctx)
-    local r = host.rng_next()
-    local m = (r < 0.30 and 0.5) or (r < 0.40 and 2) or (r < 0.41 and 50) or 0
+```ts
+import type { MathHost, SimpleMath } from "@open-rgs/contract";
+
+export default (host: MathHost): SimpleMath => ({
+  kind: "simple", name: "spin", version: "0.1.0", rtp: 0.95,
+  play: () => {
+    const r = host.rng_next();
+    const m = r < 0.30 ? 0.5 : r < 0.40 ? 2 : r < 0.41 ? 50 : 0;
     return {
-      multiplier = m,
-      ops        = { { kind = "result", multiplier = m } },
-      type       = m > 0 and "win" or "loss",
-    }
-  end,
-}
+      multiplier: m,
+      ops: [{ kind: "result", multiplier: m }],
+      type: m > 0 ? "win" : "loss",
+    };
+  },
+});
 ```
+
+### Which math tier?
+
+All three return the same `MathModule` and the orchestrator cannot tell them
+apart. Measured on identical math (`bun examples/twin-slot/src/bench.ts`, one
+game written three ways):
+
+| Tier | spins / sec / core | Reach for it when |
+|------|-------------------:|-------------------|
+| **TS** (`loadTsMath`) | **78,000,000** | Default. Fastest to iterate, best tooling, purity-gated. |
+| Zig/WASM (`loadWasmMath`) | 850,000 | Math you do not control - sandboxed, bit-deterministic floats, hashable artifact. |
+| Lua (`loadLuaMath`) | 60,000 | Sandboxed and hot-reloadable, and your author prefers Lua. |
+
+The spread is the boundary, not the language: Lua marshals a table across the
+JS<->Lua bridge every call, WASM round-trips MessagePack through linear memory,
+and in-process TS crosses nothing. It makes no difference to serving - compute
+is rounding error against the wallet RPC - and all the difference to a tuning
+run, where a 1M-spin sweep is 17 seconds on Lua and 13 milliseconds on TS.
+
+TS math is checked for purity at load: no `Math.random`, no clock, no I/O, no
+implementation-defined float ops. See
+[spec 03](./specs/03-math-runtime.md#the-purity-gate).
 
 ## Architecture (60-second tour)
 
@@ -137,6 +163,7 @@ Plug points (each is one interface):
 
 - **Wallet adapter** -> implement `PlatformAdapter` (talks to your operator's wallet)
 - **Transport** -> implement `ClientTransport` (the default `binaryTransport` is binary-msgpack + WS)
+- **Math** -> `loadTsMath` (default), `loadLuaMath`, or `loadWasmMath`; all three return the same `MathModule`
 - **Lua VM extensions** -> `LuaExtension` for helpers (reels, paylines, distributions)
 - **Compiled math** -> ship a WASM kernel (`loadWasmMath`) authored in Zig/Rust; run it fail-closed under a worker pool (`createMathPool`)
 - **Metrics / logs** -> bring your own registry / formatter

@@ -17,7 +17,7 @@ trips to the wallet and to the client.
 | Session lookup + mode resolve + bet compute | 1 uss | 5 uss | 50 uss |
 | Math call (Lua via wasmoon) | 50 uss | 150 uss | 1 ms |
 | Math call (Zig->WASM) | 5 uss | 20 uss | 100 uss |
-| Math call (TS in-process) | 1 uss | 5 uss | 50 uss |
+| Math call (TS in-process) | 0.02 uss | 5 uss | 50 uss |
 | msgpack encode + WS frame out | 5 uss | 20 uss | 100 uss |
 | **Total server compute (Lua)** | **~60 uss** | **~200 uss** | **1.5 ms** |
 | **Total server compute (Zig->WASM)** | **~15 uss** | **~50 uss** | **300 uss** |
@@ -26,6 +26,16 @@ End-to-end latency observed by the player is dominated by the wallet
 RPC (typically 5-50 ms one-way to WebSocket-based providers) and the
 client's WebSocket distance (5-100 ms). Server compute is rounding
 error.
+
+**This is why the math tier is chosen for SIMULATION, not for serving.** Every
+tier above clears the serving budget with room to spare; picking one on
+serving latency would be optimising 0.2% of a round. The tier that matters is
+the one a math author iterates on: measured on identical math
+(`examples/twin-slot/src/bench.ts`), Lua runs 60k spins/s, the Zig/WASM kernel
+850k, and in-process TS **78M** - so a 1M-spin tuning run is 17 seconds, 1.2
+seconds, or 13 milliseconds depending only on which tier the math was written
+in. That, not p99 serving latency, is the number that decides how a game gets
+built.
 
 ## Throughput budget
 
@@ -36,6 +46,7 @@ Zen4):
 |----------|--------|---------|
 | Simple spins / sec / core (Lua) | 5,000 | 20,000 |
 | Simple spins / sec / core (Zig WASM) | 30,000 | 100,000 |
+| Simple spins / sec / core (TS in-process) | 10,000,000 | 50,000,000 |
 | Concurrent WS connections / process | 10,000 | 50,000 |
 | Mid-round step calls / sec / core (in-process) | 100,000 | 500,000 |
 

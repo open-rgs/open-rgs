@@ -12,19 +12,40 @@ the same contract is enforced regardless.
 
 | Form | Loader | Use case |
 |------|--------|----------|
-| `.lua` | `wasmoon` (Lua compiled to WASM, embedded in Bun) | Default. Cheap to write, hot-reloadable, near-zero embedding cost. |
-| `.ts` / `.js` | direct ES-module import | Prototyping inside the orchestrator's runtime. No FFI overhead. |
+| `.ts` / `.js` | `loadTsMath` (ES-module import + purity gate) | **Default.** Fastest tier by a wide margin, no boundary tax, best tooling. |
+| `.lua` | `wasmoon` (Lua compiled to WASM, embedded in Bun) | Sandboxed by construction, hot-reloadable. Choose when math is untrusted or the author wants Lua. |
 | `.wasm` | `WebAssembly.instantiate` | Production-grade math, certification-friendly artifact. Source typically Zig or Rust. |
 | (subprocess) | spawn + length-prefixed msgpack stdio | Escape hatch for languages that don't WASM well. Slowest, most flexible. |
 
-`@open-rgs/core` ships a Lua loader (`loadLuaMath`) and a WASM loader
-(`loadWasmMath`, both simple and complex math). A TS loader
-(`loadTsMath`) is a planned peer. All loaders return a
-`Promise<MathModule>` that the manifest's `math:` field accepts. A WASM
-kernel runs ~14x faster than the equivalent Lua math (measured on
-*identical* math - see `examples/twin-slot` / `examples/twin-gamble` and their
-`src/bench.ts`) with no per-draw boundary tax, stays sandboxed by
-construction, and ships as a hashable artifact for certification.
+`@open-rgs/core` ships a TS loader (`loadTsMath`), a Lua loader
+(`loadLuaMath`) and a WASM loader (`loadWasmMath`, both simple and
+complex math). All return a `Promise<MathModule>` that the manifest's
+`math:` field accepts.
+
+**Measured on identical math** (`examples/twin-slot`, all three runtimes
+computing the same game - run `bun examples/twin-slot/src/bench.ts`):
+
+| Tier | per `play()` | spins / sec / core |
+|------|-------------:|-------------------:|
+| Lua (wasmoon, watchdog on) | 16,643 ns | 60,084 |
+| Zig -> WASM | 1,176 ns | 850,016 |
+| **TS (in-process)** | **13 ns** | **77,978,628** |
+
+TS is ~1,300x the Lua tier and ~92x the WASM kernel. The gap is not the
+language - it is the boundary. wasmoon marshals a fresh Lua table across the
+JS<->Lua bridge on every call and a WASM kernel round-trips MessagePack through
+linear memory; an in-process TS math has no boundary to cross at all. (This is
+also why `lua-math.ts` implements its PRNG *inside* the Lua VM: a crossing per
+draw costs more than the arithmetic. A TS math has no such tax.)
+
+That difference is irrelevant to serving - server compute is rounding error
+against the wallet RPC (spec 06) - and decisive for **simulation**, where a
+tune loop runs millions of spins. It is what makes a same-second RTP iteration
+loop possible for a math author.
+
+The WASM tier remains the right choice for math you do not control: it is
+sandboxed by construction, bit-deterministic in its float ops, and ships as a
+hashable artifact for certification.
 
 **WASM watchdog caveat:** unlike the Lua loader, a running WASM call cannot be
 interrupted from JS, so `loadWasmMath` currently has **no per-call timeout** - a
@@ -224,16 +245,65 @@ as trusted/bounded; the pool is also simple-only today.
 
 ## TS runtime details
 
-A TS math module is a normal ES module with a default export
-implementing `MathModule`. Loaded by `import()`:
+A TS math module default-exports a **factory** taking the host, not a bare
+math object:
 
 ```ts
-const mod = await import("./my-math.ts");
-const math: MathModule = mod.default;
+import type { MathHost, SimpleMath } from "@open-rgs/contract";
+
+export default (host: MathHost): SimpleMath => ({
+  kind: "simple", name: "my-slot", version: "1.0.0", rtp: 0.96,
+  play: () => {
+    const r = host.rng_next();          // the ONLY source of randomness
+    return { multiplier: r < 0.02 ? 20 : 0, ops: [], type: "x" };
+  },
+});
 ```
 
-No FFI overhead. Same `MathModule` shape. Use case: rapid prototyping,
-testing the orchestrator without spinning up Lua.
+Loaded with `loadTsMath(path, { rng })`. Same `MathModule` shape, same
+`contentHash` provenance stamp, same RNG policy as the other loaders
+(secure CSPRNG by default, fail-closed in production).
+
+**Why a factory and not a bare object.** The factory *is* the RNG seam. Lua
+math draws through the `host` global and a WASM kernel imports `host.rng_next`;
+neither can reach an ambient generator. A TS module can - `Math.random()` is
+one identifier away, it looks correct, and it passes every test you would think
+to write while silently destroying seed reproducibility. Injection makes the
+guarantee structural instead of aspirational. `loadTsMath` rejects a bare-object
+default export for exactly this reason.
+
+### The purity gate
+
+`loadTsMath` scans the source **before importing it** and refuses a module that
+references:
+
+| Denied | Why |
+|--------|-----|
+| `Math.random`, `crypto`, `getRandomValues` | ambient randomness - outcomes must replay from a seed |
+| `Date`, `performance.now`, `hrtime` | the clock - math is a pure function of (seed, state) |
+| `fetch`, `process`, `require`, dynamic `import` | I/O - no network, no filesystem, no environment |
+| `globalThis`, `eval`, `Function(` | dynamic escape hatches |
+| `Math.sin/cos/tan/exp/log/pow/...` | implementation-defined floats - a certified RTP would not reproduce across engine builds |
+
+Correctly-rounded operations (`floor`, `ceil`, `round`, `trunc`, `abs`, `min`,
+`max`, `sign`, `sqrt`, `fround`) are specified exactly and stay allowed. If a
+game genuinely needs a transcendental, it belongs in the WASM tier, whose float
+ops are bit-deterministic by design.
+
+Comments and quoted strings are stripped before the scan, so prose about
+`Math.random` does not trip it; template-literal holes are *not* stripped, so
+`${Math.random()}` still does.
+
+**What this is and is not.** It is a guardrail against accidents - overwhelmingly,
+an author (increasingly a language model) reaching for `Math.random()` because
+that is the obvious thing to write. It is **not a sandbox**: a determined author
+evades a source scan trivially, and once imported the module runs with the host's
+full authority. Math you do not control belongs in the WASM tier. This tier
+assumes math is authored by the party operating the server, which is the
+documented deployment model (spec 00).
+
+`assertPure(src, path)` is exported separately so CI can gate a math file
+without loading it.
 
 ## Hot reload
 
