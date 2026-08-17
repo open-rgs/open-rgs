@@ -100,9 +100,12 @@ export function promoFromApi(p: PromoFreeRounds): LocalPromo {
   return local;
 }
 
-export function put(s: LocalSession): void {
+/** Cache a session. Returns the ids evicted to make room (empty in the normal
+ *  case) so the caller can drop whatever else it keyed by those ids  - the
+ *  request cache, in the orchestrator's case. */
+export function put(s: LocalSession): string[] {
   sessions.set(s.sessionId, s);
-  if (sessions.size > MAX_CACHED_SESSIONS) evictIdleOverflow();
+  return sessions.size > MAX_CACHED_SESSIONS ? evictIdleOverflow() : [];
 }
 export function get(id: string): LocalSession | undefined { return sessions.get(id); }
 export function remove(id: string): void { sessions.delete(id); }
@@ -110,7 +113,7 @@ export function all(): readonly LocalSession[] { return [...sessions.values()]; 
 export function size(): number { return sessions.size; }
 
 /** Evict the oldest IDLE (no open round) sessions down to a low-water mark.
- *  Returns the number evicted.
+ *  Returns the ids evicted.
  *
  *  This runs on the INIT hot path whenever the cache sits at capacity, so it
  *  must not snapshot or sort the whole map. A Map iterates in insertion
@@ -119,14 +122,14 @@ export function size(): number { return sessions.size; }
  *  copy-filter-sort produced, but in O(evicted) with no transient array.
  *  Deleting the current entry mid-iteration is well-defined for Map and does
  *  not disturb the walk. */
-function evictIdleOverflow(): number {
+function evictIdleOverflow(): string[] {
   const lowWater = Math.floor(MAX_CACHED_SESSIONS * 0.9);
-  let removed = 0;
+  const removed: string[] = [];
   for (const s of sessions.values()) {
     if (sessions.size <= lowWater) break;
     if (s.openRound) continue; // never evict a debited, in-flight round
     sessions.delete(s.sessionId);
-    removed++;
+    removed.push(s.sessionId);
   }
   return removed;
 }

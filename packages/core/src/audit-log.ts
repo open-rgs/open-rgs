@@ -47,7 +47,11 @@ export type RoundOutcomeStatus =
   | "rejected";
 
 export interface AuditEvent {
-  /** Monotonic per-log sequence (1-based). */
+  /** Which chain this event belongs to. Sequence numbers and `prevHash` links
+   *  are only meaningful WITHIN one chain: a restart or a second instance
+   *  starts a new one. A collector partitions by this before verifying. */
+  chainId?: string;
+  /** Monotonic per-chain sequence (1-based). */
   seq: number;
   /** Epoch ms when recorded. */
   ts: number;
@@ -78,7 +82,7 @@ export interface AuditEvent {
   hash: string;
 }
 
-export type AuditInput = Omit<AuditEvent, "seq" | "ts" | "prevHash" | "hash">;
+export type AuditInput = Omit<AuditEvent, "chainId" | "seq" | "ts" | "prevHash" | "hash">;
 
 /** Where audit events are durably written. `append` must not throw into the
  *  caller  - a durable sink buffers/retries internally. */
@@ -102,20 +106,47 @@ function hashEvent(prevHash: string, e: Omit<AuditEvent, "hash">): string {
     // here so an event written without an explicit status hashes identically to
     // one stamped "settled"  - back-compat for hand-built AuditInput.
     e.outcomeStatus ?? "settled",
+    // Same rule for the chain id: absent hashes as "", so an event written
+    // before chains were named verifies unchanged.
+    e.chainId ?? "",
   ];
   return createHash("sha256").update(prevHash + "\n" + JSON.stringify(ordered)).digest("hex");
 }
 
-export function createAuditLog(sink: AuditSink, opts?: { genesisHash?: string }): AuditLog {
+/** Options for a chain.
+ *
+ *  CHAIN IDENTITY. `seq` and `prevHash` live in this process. A restart, or a
+ *  second instance, starts a SECOND chain at sequence 1 - so `verifyChain` over
+ *  a log merged from several instances fails unless the reader splits it by
+ *  chain first. That is not a defect in the hashing; it is what per-process
+ *  state means. `chainId` makes the split possible: it is stamped on every
+ *  event, so a collector can partition by it, and it is folded into the genesis
+ *  so two chains cannot be spliced together undetected. Pass the instance id
+ *  (createServer's `instanceId`, the pod name) and keep the boot in it if the
+ *  sink appends across restarts. */
+export interface AuditLogOptions {
+  genesisHash?: string;
+  /** Identity of THIS chain. Stamped on every event and folded into the
+   *  genesis hash. Defaults to a per-process random id. */
+  chainId?: string;
+}
+
+export function createAuditLog(sink: AuditSink, opts?: AuditLogOptions): AuditLog {
   let seq = 0;
-  let prevHash = opts?.genesisHash ?? AUDIT_GENESIS_HASH;
+  const chainId = opts?.chainId ?? `chain-${crypto.randomUUID()}`;
+  let prevHash = opts?.genesisHash
+    ?? (opts?.chainId
+      // Fold the chain id into the genesis so events from two chains cannot be
+      // read as one intact sequence.
+      ? createHash("sha256").update(AUDIT_GENESIS_HASH + "\n" + opts.chainId).digest("hex")
+      : AUDIT_GENESIS_HASH);
   return {
     record(input, now) {
       seq += 1;
       // Store an explicit status so persisted events are self-describing
       // (hashEvent applies the same default, so this doesn't change the hash).
       const withoutHash: Omit<AuditEvent, "hash"> = {
-        ...input, outcomeStatus: input.outcomeStatus ?? "settled", seq, ts: now, prevHash,
+        ...input, outcomeStatus: input.outcomeStatus ?? "settled", chainId, seq, ts: now, prevHash,
       };
       const hash = hashEvent(prevHash, withoutHash);
       const event: AuditEvent = { ...withoutHash, hash };

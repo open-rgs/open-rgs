@@ -38,7 +38,7 @@
 //   /healthz              JSON diagnostics + status (503 if unhealthy)
 //   /admin/logs           ring buffer (?level=&limit=)
 //   /admin/metrics        Prometheus exposition (if metrics passed)
-//   /admin/sessions       active session list
+//   /admin/sessions       active session summaries (no carry, no round payloads)
 //   /admin/manifest       serialised GameManifest
 //   /admin/modes          mode catalog
 //   /admin/autoclose POST external autoclose trigger
@@ -160,7 +160,7 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
         }), req);
       }
       if (matches("/admin/sessions")) {
-        return cors(json(sessions.all()), req);
+        return cors(json(sessionSummaries()), req);
       }
       if (matches("/admin/manifest")) {
         return cors(json(serializeManifest()), req);
@@ -259,6 +259,41 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       ...sessions.openRoundStats(Date.now()),
       math,
     };
+  }
+
+  /** Operational view of the session cache.
+   *
+   *  This used to serialise `sessions.all()` - the whole LocalSession, including
+   *  the math carry and the open round's full ops and action logs. That is
+   *  player game state and it is far more than an operator needs to answer "is
+   *  this session stuck?". The summary keeps what an operator acts on (which
+   *  session, which round, how old, how far in) and drops the payloads. */
+  function sessionSummaries() {
+    const now = Date.now();
+    return sessions.all().map((s) => ({
+      session_id:     s.sessionId,
+      connection_id:  s.connectionId,
+      currency:       s.currency,
+      balance:        s.balance,
+      demo:           s.currency === "",
+      created_at:     s.createdAt,
+      age_ms:         now - s.createdAt,
+      has_carry:      s.carry !== undefined,
+      next_mode:      s.nextMode ?? null,
+      promo:          s.promo ? { id: s.promo.id, remaining: s.promo.remaining, active: s.promo.active } : null,
+      open_round:     s.openRound
+        ? {
+            round_id:   s.openRound.roundId,
+            mode_id:    s.openRound.modeId,
+            bet:        s.openRound.bet,
+            opened_at:  s.openRound.openedAt,
+            age_ms:     now - s.openRound.openedAt,
+            actions:    s.openRound.actionLog.length,
+            ops:        s.openRound.opsLog.length,
+            awaiting:   s.openRound.awaiting?.type ?? null,
+          }
+        : null,
+    }));
   }
 
   function logs(url: URL) {

@@ -39,17 +39,38 @@ export function activeOverride(s: LocalSession, modeId?: string): { promoId: str
   return { promoId: s.promo.id, bet: s.promo.bet };
 }
 
-/** Apply post-round update from the adapter. Removes the pool when
- *  drained. */
+/** Consume one round from the pool locally.
+ *
+ *  The engine owns this countdown. It used to be left entirely to the wallet:
+ *  the pool only ever shrank when a receipt carried `promo.remaining`, and that
+ *  field is optional on `RoundReceipt` - some wires have no place to put it at
+ *  all. Against such a wallet a pool of three free rounds was a pool of
+ *  unlimited free rounds, because nothing on this side counted.
+ *
+ *  So a funded round decrements here, and a wallet that DOES report its own
+ *  number still wins (see `applyUpdate`) - the local count is the floor, not a
+ *  second opinion. */
+export function consume(s: LocalSession): void {
+  if (!s.promo) return;
+  s.promo.remaining -= 1;
+  if (s.promo.remaining <= 0) drained(s);
+}
+
+/** Apply post-round update from the adapter. The wallet is authoritative when
+ *  it reports a number; when it doesn't, `consume` has already counted the
+ *  round. Removes the pool when drained. */
 export function applyUpdate(s: LocalSession, u: { remaining: number }): void {
   if (!s.promo) return;
   s.promo.remaining = u.remaining;
-  if (u.remaining <= 0) {
-    log.info("Promo pool drained", {
-      "event.category": "promo",
-      "session.id": s.sessionId,
-      "promo.id": s.promo.id,
-    });
-    s.promo = undefined;
-  }
+  if (u.remaining <= 0) drained(s);
+}
+
+function drained(s: LocalSession): void {
+  if (!s.promo) return;
+  log.info("Promo pool drained", {
+    "event.category": "promo",
+    "session.id": s.sessionId,
+    "promo.id": s.promo.id,
+  });
+  s.promo = undefined;
 }

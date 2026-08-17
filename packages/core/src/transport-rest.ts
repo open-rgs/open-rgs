@@ -43,6 +43,8 @@ import type {
 } from "@open-rgs/contract";
 import { RGSError } from "@open-rgs/contract";
 import { log } from "./log.js";
+import { clientMessage } from "./error-policy.js";
+import { validateRequest } from "./wire-validate.js";
 
 export interface RestTransportOptions {
   port?: number;
@@ -102,23 +104,34 @@ export function restTransport(opts: RestTransportOptions = {}): ClientTransport 
 
   return {
     async start(api: OrchestratorAPI): Promise<{ port: number }> {
-      // Each request is its own connection. The id exists so the orchestrator
-      // has something to key by; it is never reused across requests, because
-      // over REST there is nothing that persists between them.
-      let seq = 0;
+      // Connection identity over REST is the session id, and nothing else.
+      //
+      // The id used to be minted per request (`rest-1`, `rest-2`, ...), which
+      // made every call look like a NEW connection arriving on a session that
+      // was still bound to the previous one. Nothing ever detaches - REST has
+      // no socket to close, so `onDisconnect` is never called - so
+      // `concurrencyPolicy: "reject-new"` refused every request after the
+      // first, permanently, for the same player. Deriving the id from the sid
+      // means a player's own repeat requests are the SAME connection (no
+      // policy trip) while a genuine second connection - a WebSocket holding
+      // the session - still is a different one and the policy still applies.
+      let anon = 0;
       const metaFor = (sid: string | undefined): ConnectionMeta =>
-        ({ connectionId: `rest-${++seq}`, sessionId: sid }) as ConnectionMeta;
+        ({ connectionId: sid ? `rest:${sid}` : `rest-anon-${++anon}`, sessionId: sid }) as ConnectionMeta;
 
       const route = async (path: string, body: Record<string, unknown>): Promise<unknown> => {
         const sid = typeof body["sid"] === "string" ? body["sid"] : undefined;
         const conn = metaFor(sid);
+        // The body is client-controlled and reaches math (`params`), the
+        // session store (`sid`) and the wallet adapter. Check its shape here
+        // rather than casting and hoping.
         switch (path) {
-          case "/session":      return api.init(body as never, conn);
-          case "/spin":         return api.spin(body as never, conn);
-          case "/round/open":   return api.openRound(body as never, conn);
-          case "/round/step":   return api.stepRound(body as never, conn);
-          case "/round/end":    return api.closeRound(body as never, conn);
-          case "/promo/accept": return api.promoAccept(body as never, conn);
+          case "/session":      return api.init(validateRequest("init", body), conn);
+          case "/spin":         return api.spin(validateRequest("spin", body), conn);
+          case "/round/open":   return api.openRound(validateRequest("open", body), conn);
+          case "/round/step":   return api.stepRound(validateRequest("step", body), conn);
+          case "/round/end":    return api.closeRound(validateRequest("close", body), conn);
+          case "/promo/accept": return api.promoAccept(validateRequest("promo", body), conn);
           default:              return undefined;
         }
       };
@@ -147,10 +160,15 @@ export function restTransport(opts: RestTransportOptions = {}): ClientTransport 
           if (declared > maxBody) {
             return fail("INVALID_FORMAT", `body exceeds ${maxBody} bytes`);
           }
-          const raw = await req.text();
-          if (raw.length > maxBody) {
+          // Read as BYTES. `String.length` counts UTF-16 units, so a body of
+          // multibyte characters passed a byte limit it was three times over -
+          // and a chunked request carries no content-length to pre-check at
+          // all, so this is the only bound that always runs.
+          const bytes = new Uint8Array(await req.arrayBuffer());
+          if (bytes.byteLength > maxBody) {
             return fail("INVALID_FORMAT", `body exceeds ${maxBody} bytes`);
           }
+          const raw = new TextDecoder().decode(bytes);
 
           let body: Record<string, unknown>;
           try {
@@ -162,22 +180,39 @@ export function restTransport(opts: RestTransportOptions = {}): ClientTransport 
             return fail("INVALID_FORMAT", "body must be a JSON object");
           }
 
+          const ref = crypto.randomUUID();
           inFlight++;
           try {
             const result = await route(path, body);
             if (result === undefined) return fail("INVALID_FORMAT", `unknown route ${path}`);
             return new Response(JSON.stringify(result), { status: 200, headers: headers() });
           } catch (e) {
-            if (e instanceof RGSError) return fail(e.code, e.message);
+            if (e instanceof RGSError) {
+              // Codes that wrap upstream detail are logged and genericized -
+              // the same policy the binary transport applies, now shared
+              // (error-policy.ts) so the two wires cannot drift apart again.
+              const safe = clientMessage(e.code, e.message, ref);
+              if (safe !== e.message) {
+                log.exception("restTransport: opaque error", e, {
+                  "event.category": "transport",
+                  "event.action": "rest_opaque_error",
+                  "http.path": path,
+                  "error.code": e.code,
+                  "correlation.id": ref,
+                });
+              }
+              return fail(e.code, safe);
+            }
             log.error("restTransport: unhandled error", {
               "event.category": "transport",
               "event.action": "rest_unhandled",
               "http.path": path,
               "error.message": e instanceof Error ? e.message : String(e),
+              "correlation.id": ref,
             });
             // Never leak internal detail to a client - the message may wrap a
             // stack, a file path, or an upstream response body.
-            return fail("INTERNAL_ERROR", "internal error");
+            return fail("INTERNAL_ERROR", `internal error (ref: ${ref})`);
           } finally {
             inFlight--;
           }

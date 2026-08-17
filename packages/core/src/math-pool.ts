@@ -36,6 +36,11 @@ export interface MathPoolOptions {
   /** Per-call budget (ms). A call that overruns it kills its worker and fails
    *  with MATH_TIMEOUT; the worker is replaced. Default 1000. */
   timeoutMs?: number;
+  /** Most calls that may wait for a free worker. Beyond this the pool sheds
+   *  load: the call fails immediately with MATH_TIMEOUT rather than joining an
+   *  unbounded queue, because a request that waits behind ten thousand others
+   *  has already missed whatever deadline the client had. Default 1000. */
+  maxQueue?: number;
 }
 
 export interface MathPool extends SimpleMath {
@@ -61,6 +66,7 @@ interface PoolMeta { name: string; version: string; rtp: number; contentHash: st
 export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
   const size = Math.max(1, opts.size ?? 4);
   const timeoutMs = opts.timeoutMs ?? 1000;
+  const maxQueue = Math.max(1, opts.maxQueue ?? 1000);
   const workerUrl = new URL("./math-worker.ts", import.meta.url).href;
 
   const workers: W[] = [];
@@ -160,7 +166,17 @@ export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
       if (shuttingDown) { reject(new RGSError("INTERNAL_ERROR", "math pool is shut down")); return; }
       const task: Task = { prev, ctx, resolve, reject };
       const idle = workers.find(w => !w.busy);
-      if (idle) assign(idle, task); else queue.push(task);
+      if (idle) { assign(idle, task); return; }
+      if (queue.length >= maxQueue) {
+        // Shed rather than grow. An unbounded queue turns overload into memory
+        // growth and serves rounds nobody is still waiting for.
+        log.warn("math pool queue full  - shedding the call", {
+          "event.category": "process", "event.action": "math_pool_shed", "queue.max": maxQueue,
+        });
+        reject(new RGSError("MATH_TIMEOUT", `math pool queue is full (${maxQueue} waiting)`));
+        return;
+      }
+      queue.push(task);
     });
   }
 

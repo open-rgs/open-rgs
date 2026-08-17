@@ -173,6 +173,16 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     ? undefined
     : createRequestCache(cfg.requestCache ?? {});
 
+  // The active-session gauge is DERIVED, never accumulated. It used to be an
+  // inc/dec pair across three lifecycle paths, and the INIT path incremented on
+  // every re-INIT of an already-cached session - which is what a reconnect is -
+  // while idle-overflow eviction decremented nothing. The gauge drifted upward
+  // all day. `sessions.size()` is a Map read, so reading the truth costs the
+  // same as guessing at it.
+  function syncSessionGauge(): void {
+    metrics?.sessionsActive.set(sessions.size());
+  }
+
   // Record one tamper-evident audit event per money-moving round. Never let
   // an audit-sink failure break the round (the sink owns durability).
   function recordAudit(
@@ -282,11 +292,11 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         }).catch((err) => log.exception("autoclose-on-session-close failed", err, {
           "event.category": "orchestrator",
           "session.id": e.sessionId,
-        })).finally(() => { sessions.remove(e.sessionId); requestCache?.clearScope(e.sessionId); metrics?.sessionsActive.dec(); });
+        })).finally(() => { sessions.remove(e.sessionId); requestCache?.clearScope(e.sessionId); syncSessionGauge(); });
       } else {
         sessions.remove(e.sessionId);
         requestCache?.clearScope(e.sessionId);
-        metrics?.sessionsActive.dec();
+        syncSessionGauge();
       }
     } else if (e.type === "promoGranted") {
       const s = sessions.get(e.sessionId);
@@ -483,7 +493,6 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         () => platform.openSession(req.sid, conn.connectionId));
       conn.sessionId = req.sid;
       conn.demo = !info.currency;
-      metrics?.sessionsActive.inc();
 
       // Math-version migration: if the platform returns a carry but
       // its mathVersion doesn't match what's currently loaded, we
@@ -522,7 +531,11 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         ...(info.promo && info.promo.remaining > 0 ? { promo: sessions.promoFromApi(info.promo) } : {}),
         createdAt: Date.now(),
       };
-      sessions.put(s);
+      // put() can evict idle overflow. Those sessions are gone from the cache,
+      // so their request-cache entries are unreachable state - drop them with
+      // the session rather than leaving them to age out on the TTL.
+      for (const evicted of sessions.put(s)) requestCache?.clearScope(evicted);
+      syncSessionGauge();
 
       if (restoredCarry !== undefined) {
         log.info("Carry restored from platform", {
@@ -612,6 +625,12 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     const betInfo = computeBet(s, mode, requestedMode, req.betIndex, req.priceMultiplier);
 
     if (!betInfo.promoId && betInfo.effectiveCost > s.balance) {
+      // Refused before anything moved - the audit vocabulary's `rejected`.
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: "", kind: "settle",
+        type: "insufficient-balance", bet: betInfo.bet, win: 0, multiplier: 0, reason: "",
+        outcomeStatus: "rejected",
+      });
       throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
@@ -693,10 +712,13 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       outcomeStatus: cappedOutcome.type === "max_win_reached" ? "settled-max-win" : "settled",
     });
 
-    // Capture promo state for the response BEFORE applyUpdate may drain
-    // the pool (we want to surface the post-round view to the client).
+    // Capture promo state for the response BEFORE the pool may drain (we want
+    // to surface the post-round view to the client). The wallet's own number
+    // wins when it sends one; otherwise the engine counts the round itself, so
+    // a pool always drains even against a wire with no promo field.
     const wasPromo = Boolean(betInfo.promoId);
     if (receipt.promo) promo.applyUpdate(s, receipt.promo);
+    else if (betInfo.promoId) promo.consume(s);
 
     // Math returned ops; we forward them as-is. Balance is a separate
     // top-level response field  - math is currency-blind.
@@ -734,6 +756,11 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     const betInfo = computeBet(s, mode, requestedMode, req.betIndex, req.priceMultiplier);
     if (!betInfo.promoId && betInfo.effectiveCost > s.balance) {
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: "", kind: "open",
+        type: "insufficient-balance", bet: betInfo.bet, win: 0, multiplier: 0, reason: "",
+        outcomeStatus: "rejected",
+      });
       throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
@@ -766,6 +793,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     }
 
     sessions.setBalance(s.sessionId, receipt.balance);
+    // A complex round consumes its promo round at OPEN - that is where it was
+    // funded. The close only applies whatever the wallet reports afterwards.
+    if (receipt.promo) promo.applyUpdate(s, receipt.promo);
+    else if (betInfo.promoId) promo.consume(s);
     incBets(metrics, s, requestedMode, betInfo);
     s.openRound = {
       roundId: receipt.roundId,
@@ -903,6 +934,17 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "close"),
       }));
     } catch (e) {
+      // The stake was taken at open and the credit just failed. That is the
+      // exact case `failed-win` exists for, and it was never being written:
+      // the round would show an `opened` event and no terminal event, which
+      // reads identically to a round still in flight. Record it so
+      // reconciliation can find it. The round stays open for a retry or an
+      // autoclose - no state is discarded here.
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: open.roundId, kind: "close",
+        type: cappedClose.type, bet: open.bet, win, multiplier: cappedClose.multiplier, reason: "",
+        outcomeStatus: "failed-win",
+      });
       throw translate(e, "CLOSE_FAILED");
     }
 
@@ -1060,6 +1102,13 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         "session.id": req.sessionId,
         "round.id": open.roundId,
       });
+      // Stake taken at open, credit failed here - `failed-win`, same as a
+      // client close (see closeRound). The round stays open.
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: open.roundId, kind: "autoclose",
+        type: cappedClose.type, bet: open.bet, win, multiplier: cappedClose.multiplier, reason: req.reason,
+        outcomeStatus: "failed-win",
+      });
       return { closed: false, reason: `platform-error: ${e instanceof Error ? e.message : String(e)}` };
     }
 
@@ -1123,8 +1172,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       return;
     }
 
+    // NOTE: the request cache is deliberately NOT cleared here. A dropped
+    // socket is the precise case it exists for - the client retries the call
+    // whose response it never saw - so clearing on disconnect would re-run the
+    // round instead of replaying it. The cache is scoped to a session id and
+    // dropped when the SESSION ends (sessionClosed) or leaves the cache
+    // (eviction), not when a connection does.
     sessions.remove(conn.sessionId);
-    metrics?.sessionsActive.dec();
+    syncSessionGauge();
   }
 
   // Serialize every client-facing operation per session (autocloseRound is

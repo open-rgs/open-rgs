@@ -13,6 +13,8 @@ import {
   type RGSErrorCode,
 } from "@open-rgs/contract";
 import { log } from "./log.js";
+import { clientMessage, isOpaque } from "./error-policy.js";
+import { validateRequest } from "./wire-validate.js";
 
 /** Max wire frame size, both directions (Spec 04: a frame >1 MiB SHOULD
  *  disconnect). Inbound: enforced by Bun via `maxPayloadLength` (oversized
@@ -277,18 +279,20 @@ async function dispatch(
   const reply = (t: number, resp: unknown): void => sendFrame(ws, t, withCid(resp, cid), capture);
   try {
     switch (type) {
+      // Decoded frames are validated, not cast - see wire-validate.ts. The
+      // payload reaches the session store, the wallet adapter and the math.
       case MSG_INIT_REQUEST:
-        return reply(MSG_INIT_RESPONSE, await api.init(payload as Parameters<OrchestratorAPI["init"]>[0], conn));
+        return reply(MSG_INIT_RESPONSE, await api.init(validateRequest("init", payload), conn));
       case MSG_SPIN_REQUEST:
-        return reply(MSG_SPIN_RESPONSE, await api.spin(payload as Parameters<OrchestratorAPI["spin"]>[0], conn));
+        return reply(MSG_SPIN_RESPONSE, await api.spin(validateRequest("spin", payload), conn));
       case MSG_OPEN_REQUEST:
-        return reply(MSG_OPEN_RESPONSE, await api.openRound(payload as Parameters<OrchestratorAPI["openRound"]>[0], conn));
+        return reply(MSG_OPEN_RESPONSE, await api.openRound(validateRequest("open", payload), conn));
       case MSG_STEP_REQUEST:
-        return reply(MSG_STEP_RESPONSE, await api.stepRound(payload as Parameters<OrchestratorAPI["stepRound"]>[0], conn));
+        return reply(MSG_STEP_RESPONSE, await api.stepRound(validateRequest("step", payload), conn));
       case MSG_CLOSE_REQUEST:
-        return reply(MSG_CLOSE_RESPONSE, await api.closeRound(payload as Parameters<OrchestratorAPI["closeRound"]>[0], conn));
+        return reply(MSG_CLOSE_RESPONSE, await api.closeRound(validateRequest("close", payload), conn));
       case MSG_PROMO_ACCEPT:
-        return reply(MSG_PROMO_ACCEPT_RESP, await api.promoAccept(payload as Parameters<OrchestratorAPI["promoAccept"]>[0], conn));
+        return reply(MSG_PROMO_ACCEPT_RESP, await api.promoAccept(validateRequest("promo", payload), conn));
       case MSG_PING:
         return sendFrame(ws, MSG_PONG, {}); // unsolicited  - no correlation id
       default:
@@ -302,13 +306,13 @@ async function dispatch(
     // error with a file path, an upstream wallet body, a stack). Never send
     // that to the client  - log it server-side and return a generic message
     // plus the correlation id so an operator can find the log line. (M11)
-    if (OPAQUE_ERROR_CODES.has(err.code)) {
+    if (isOpaque(err.code)) {
       log.exception("transport dispatch error", e, {
         "event.category": "transport",
         "error.code": err.code,
         "correlation.id": cid === undefined ? "" : String(cid),
       });
-      sendError(ws, err.code, `internal error (ref: ${cid === undefined ? "n/a" : String(cid)})`, cid, capture);
+      sendError(ws, err.code, clientMessage(err.code, err.message, cid), cid, capture);
     } else {
       // Controlled-vocabulary errors (INVALID_BET, INSUFFICIENT_BALANCE, ...)
       // carry author-written, non-sensitive messages  - safe to surface.
@@ -338,12 +342,6 @@ function checkOpSeq(data: WsData, payload: unknown): OpSeqResult {
   if (raw === data.lastOpSeq) return { kind: "duplicate" };
   return { kind: "error", message: `expected operation sequence ${expected}, got ${raw}` };
 }
-
-/** Error codes whose `message` may contain internal detail (wrapped math /
- *  upstream errors). Their client-facing message is genericized. */
-const OPAQUE_ERROR_CODES: ReadonlySet<RGSErrorCode> = new Set<RGSErrorCode>([
-  "INTERNAL_ERROR", "INIT_FAILED", "SPIN_FAILED", "OPEN_FAILED", "STEP_FAILED", "CLOSE_FAILED",
-]);
 
 /** Read the correlation id a client stamped on a request payload. */
 function correlationId(payload: unknown): unknown {

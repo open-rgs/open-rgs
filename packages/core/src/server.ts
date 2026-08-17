@@ -170,6 +170,25 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       });
     }
   }
+  // A 0-stake mode is legitimate - an internal free-spins mode whose winnings
+  // accumulate into the parent round's carry - and it is also the one shape
+  // that fails mid-round rather than at boot: a 0 effective bet times any
+  // multiplier settles to 0, so the engine refuses to pay it (assertFundedWin).
+  // Say so at boot, where the author is watching, rather than at settle, where
+  // the player is.
+  for (const [id, mode] of Object.entries(cfg.manifest.modes)) {
+    if (mode.stakeMultiplier === 0) {
+      log.warn("Mode has stakeMultiplier 0  - it can never pay a win directly", {
+        "event.category": "process",
+        "event.action":   "zero_stake_mode",
+        "mode.id":        id,
+        "detail":         "a 0-bet round that produces a win is refused (INVALID_BET). " +
+                          "Accumulate the feature's winnings into the parent round's carry, " +
+                          "or fund the rounds with a promo pool, which carries a non-zero bet.",
+      });
+    }
+  }
+
   const modeKeys = Object.keys(cfg.manifest.modes);
   if (modeKeys.length === 1) {
     const onlyMode = cfg.manifest.modes[modeKeys[0]!]!;
@@ -222,13 +241,11 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const finLogMs = cfg.financialLogIntervalMs ?? 600_000;
   const finLog = finLogMs > 0 ? setInterval(() => {
     const byCurrency = new Map<string, Record<string, number>>();
-    const fold = (rows: ReadonlyArray<{ labels: string; value: number }>, kind: "bets" | "wins") => {
-      for (const { labels, value } of rows) {
-        // label key format: `k="v",k="v"` in label-name order
-        const l = Object.fromEntries(labels.split(",").map((kv) => {
-          const eq = kv.indexOf("=");
-          return [kv.slice(0, eq), kv.slice(eq + 1).replace(/^"|"$/g, "")] as [string, string];
-        }));
+    const fold = (rows: ReadonlyArray<{ values: Readonly<Record<string, string>>; value: number }>, kind: "bets" | "wins") => {
+      for (const { values: l, value } of rows) {
+        // The label map comes straight from the registry now. This used to
+        // re-parse the rendered `k="v",k="v"` string by splitting on commas,
+        // which any label value containing a comma turned into nonsense.
         const cur = l["currency"] ?? "?";
         const slot = byCurrency.get(cur) ?? { bets_real: 0, bets_promo: 0, wins_real: 0, wins_promo: 0 };
         slot[`${kind}_${l["funding"] ?? "real"}`] = (slot[`${kind}_${l["funding"] ?? "real"}`] ?? 0) + value;
@@ -299,7 +316,10 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     ...(canKick ? { kickConnection: (connectionId: string, reason: string) =>
       cfg.transport.closeConnection!(connectionId, "SESSION_IN_USE", reason) } : {}),
     ...(cfg.idempotency ? { idempotency: cfg.idempotency } : {}),
-    ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink) } : {}),
+    // Name the chain after the instance: sequence numbers and prevHash links
+    // only mean something within one process, so a collector merging pods needs
+    // the id to split them again before verifying.
+    ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink, { chainId: instanceId }) } : {}),
     ...(cfg.auditMode ? { auditMode: cfg.auditMode } : {}),
   });
 
