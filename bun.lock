@@ -141,6 +141,14 @@
         "@open-rgs/weights": "0.1.0",
       },
     },
+    "packages/scatters": {
+      "name": "@open-rgs/scatters",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
     "packages/selectors": {
       "name": "@open-rgs/selectors",
       "version": "0.1.0",
@@ -231,6 +239,8 @@
     "@open-rgs/paytable": ["@open-rgs/paytable@workspace:packages/paytable"],
 
     "@open-rgs/recipes": ["@open-rgs/recipes@workspace:packages/recipes"],
+
+    "@open-rgs/scatters": ["@open-rgs/scatters@workspace:packages/scatters"],
 
     "@open-rgs/selectors": ["@open-rgs/selectors@workspace:packages/selectors"],
 
