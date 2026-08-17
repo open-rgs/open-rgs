@@ -12,10 +12,11 @@
     "games/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights && tsc --noEmit -p packages/selectors && tsc --noEmit -p packages/fill && tsc --noEmit -p packages/markov && tsc --noEmit -p packages/recipes && tsc --noEmit -p packages/holdwin && tsc --noEmit -p packages/paytable && tsc --noEmit -p packages/pay-lines && tsc --noEmit -p packages/pay-ways && tsc --noEmit -p packages/pay-anywhere && tsc --noEmit -p packages/pay-cluster",
+    "typecheck": "tsc --noEmit -p packages/grid && tsc --noEmit -p packages/weights && tsc --noEmit -p packages/selectors && tsc --noEmit -p packages/fill && tsc --noEmit -p packages/markov && tsc --noEmit -p packages/recipes && tsc --noEmit -p packages/holdwin && tsc --noEmit -p packages/paytable && tsc --noEmit -p packages/pay-lines && tsc --noEmit -p packages/pay-ways && tsc --noEmit -p packages/pay-anywhere && tsc --noEmit -p packages/pay-cluster && tsc --noEmit -p games/demo-holdwin",
     "test": "bun test",
     "changeset": "changeset",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "sim": "bun games/demo-holdwin/tools/sim.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

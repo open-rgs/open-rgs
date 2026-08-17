@@ -10,6 +10,21 @@
         "typescript": "^6.0.3",
       },
     },
+    "games/demo-holdwin": {
+      "name": "@open-rgs/demo-holdwin",
+      "version": "0.0.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/holdwin": "0.1.0",
+        "@open-rgs/markov": "0.1.0",
+        "@open-rgs/pay-anywhere": "0.1.0",
+        "@open-rgs/pay-lines": "0.1.0",
+        "@open-rgs/paytable": "0.1.0",
+        "@open-rgs/recipes": "0.1.0",
+        "@open-rgs/selectors": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
+      },
+    },
     "packages/fill": {
       "name": "@open-rgs/fill",
       "version": "0.1.0",
@@ -144,6 +159,8 @@
     "@nodelib/fs.stat": ["@nodelib/fs.stat@2.0.5", "", {}, "sha512-RkhPPp2zrqDAQA/2jNhnztcPAlv64XdhIp7a7454A5ovI7Bukxgt7MX7udwAu3zg1DcpPU0rz3VV1SeaqvY4+A=="],
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
+
+    "@open-rgs/demo-holdwin": ["@open-rgs/demo-holdwin@workspace:games/demo-holdwin"],
 
     "@open-rgs/fill": ["@open-rgs/fill@workspace:packages/fill"],
 
