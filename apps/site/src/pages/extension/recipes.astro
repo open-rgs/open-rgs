@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/recipes  - Named boards"
+  description="Recipes: Every board comes from exactly one declared recipe."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/recipes</h1>
+
+    <p class="lede">Every board comes from exactly one declared recipe.</p>
+
+    <Anim kind="recipes" caption="The pointer picks a recipe at its declared rate. Probabilities must sum to 1: a mixture summing to 0.98 silently misprices every spin." />
+
+    <p>So RTP is a sum over recipes, each independently measurable, and a tease is a REAL draw that goes through the pay evaluator honestly. Decorating a drawn board instead would misprice RTP silently - and build the near-miss behaviour regulators prohibit.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/recipes";`}</code></pre>
+    <p class="dim">recipes([&#123; name, p, draw &#125;])  &middot;  place  &middot;  placeAt  &middot;  placeDrawn  &middot;  stack  &middot;  fixed</p>
+  </main>
+</BaseLayout>

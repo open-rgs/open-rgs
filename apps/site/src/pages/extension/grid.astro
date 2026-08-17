@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/grid  - The board"
+  description="Grid: Shape is a height PER COLUMN, not width x height."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/grid</h1>
+
+    <p class="lede">Shape is a height PER COLUMN, not width x height.</p>
+
+    <Anim kind="grid" caption="The fifth cell exists in the tall reels and simply is not there in the short ones. Off-grid coordinates report rather than throw, because on a ragged board that is normal, not exceptional." />
+
+    <p>Ragged reel sets are ordinary in production slots (4-5-5-5-5-4). An evaluator written against a rectangle bakes that assumption into every traversal, so adding ragged support later is not a feature - it is a rewrite of everything that reads a grid.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/grid";`}</code></pre>
+    <p class="dim">rect(5, 3)  &middot;  makeGrid  &middot;  fromColumns  &middot;  at  &middot;  positionsWhere  &middot;  countOf  &middot;  withAt  &middot;  neighbours</p>
+  </main>
+</BaseLayout>

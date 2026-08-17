@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/cascade  - Tumbles"
+  description="Cascade: Clear, fall, refill, repeat."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/cascade</h1>
+
+    <p class="lede">Clear, fall, refill, repeat.</p>
+
+    <Anim kind="cascade" caption="The loop is bounded. A refill can always win again, so unbounded, one unlucky spin hangs the process; <code>truncated</code> reports when the cap fired." />
+
+    <p>Gravity is per column: a short reel drops a shorter distance, and treating the board as a rectangle produces a shuffle rather than a fall. The multiplier ladder applies to each step's OWN win - applying it to the running total compounds and inflates RTP badly.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/cascade";`}</code></pre>
+    <p class="dim">runCascade  &middot;  tumble  &middot;  clear  &middot;  collapse  &middot;  refill  &middot;  multiplierForStep</p>
+  </main>
+</BaseLayout>

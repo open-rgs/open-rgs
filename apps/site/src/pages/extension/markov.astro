@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/markov  - Stacking"
+  description="Markov: Changes how clumpy reels look. Provably does not change frequency."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/markov</h1>
+
+    <p class="lede">Changes how clumpy reels look. Provably does not change frequency.</p>
+
+    <Anim kind="markov" caption="Two columns, same symbols, same rates - only the runs differ. Left is s = 0, right is s = 0.8." />
+
+    <p>Under <code>sticky(base, s)</code> the chain's stationary distribution is exactly <code>base</code> for every s &lt; 1. So s is a pure feel knob - turn it up for stacks and your RTP does not move. That is the property a reel strip cannot offer.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/markov";`}</code></pre>
+    <p class="dim">stackyFill(shape, base, 0.35)  &middot;  sticky  &middot;  transitions  &middot;  stationary  &middot;  meanRunLength</p>
+  </main>
+</BaseLayout>

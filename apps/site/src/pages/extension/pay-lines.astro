@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/pay-lines  - Runs along a line"
+  description="Pay-lines: Longest run, paid once."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/pay-lines</h1>
+
+    <p class="lede">Longest run, paid once.</p>
+
+    <Anim kind="pay-lines" caption="A run must start at the leftmost reel. Under bothWays the two directions COMPETE rather than accumulate, or a full-width run is counted twice." />
+
+    <p>Paying every prefix - 3 of a kind AND 4 AND 5 on the same run - roughly doubles a game's RTP. A wild-opening run is ambiguous and pays whichever reading is worth more. And a wild never substitutes for a scatter, or it manufactures feature triggers.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/pay-lines";`}</code></pre>
+    <p class="dim">evalLine  &middot;  evalLines  &middot;  rowLines(5, 3)  &middot;  &#123; bothWays: true &#125;</p>
+  </main>
+</BaseLayout>

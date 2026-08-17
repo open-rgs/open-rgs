@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/fill  - Frequency"
+  description="Fill: Weighted draws, one cell at a time."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/fill</h1>
+
+    <p class="lede">Weighted draws, one cell at a time.</p>
+
+    <Anim kind="fill" caption="Every cell drawn independently. <code>expectedCount</code> makes &quot;how many scatters per spin&quot; arithmetic rather than a simulation." />
+
+    <p>This is the direct strip replacement, and it deliberately does NOT do adjacency - that belongs to markov, layered on top. Most balancing work is frequency work and should not require thinking about neighbours.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/fill";`}</code></pre>
+    <p class="dim">fillWeights(shape, weights)  &middot;  fillWeightsPerColumn  &middot;  constant  &middot;  expectedCount</p>
+  </main>
+</BaseLayout>

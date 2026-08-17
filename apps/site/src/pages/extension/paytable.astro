@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/paytable  - What things are worth"
+  description="Paytable: One shared notion of payout, wild and scatter."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/paytable</h1>
+
+    <p class="lede">One shared notion of payout, wild and scatter.</p>
+
+    <Anim kind="paytable" caption="<code>bands</code> expands size ranges into exact counts. Watch the top band - it is OPEN-ENDED, running all the way to maxCount. On 49 cells &quot;7 or more&quot; is common, not a lottery ticket." />
+
+    <p>All four evaluators read this, so a symbol means the same thing in each. When each carried its own idea of a wild, a game using two of them could disagree with itself about whether the wild substitutes for the scatter - and the two RTPs would quietly differ.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/paytable";`}</code></pre>
+    <p class="dim">paytable(&#123; HIGH: &#123; 3: 10, 4: 50 &#125; &#125;)  &middot;  bands  &middot;  substitutes  &middot;  isWild  &middot;  isScatter</p>
+  </main>
+</BaseLayout>

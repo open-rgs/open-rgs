@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/pay-ways  - Consecutive columns"
+  description="Pay-ways: Paid by the product of per-column counts."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/pay-ways</h1>
+
+    <p class="lede">Paid by the product of per-column counts.</p>
+
+    <Anim kind="pay-ways" caption="Each column contributes its own count. Ways games are dense, so a prefix-paying bug here is far worse than on lines - nearly every spin would win." />
+
+    <p>2 on reel 0, 1 on reel 1, 3 on reel 2 is 2 x 1 x 3 = 6 ways. "1024 ways" is just 4^5 - a consequence of the grid, not a setting. A gap ENDS the run; counting non-contiguous columns inflates both the count and the multiplier.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/pay-ways";`}</code></pre>
+    <p class="dim">evalWay  &middot;  evalWays  &middot;  totalWays</p>
+  </main>
+</BaseLayout>

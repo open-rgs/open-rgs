@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/pay-cluster  - Connected groups"
+  description="Pay-cluster: A wild belongs to every cluster it touches."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/pay-cluster</h1>
+
+    <p class="lede">A wild belongs to every cluster it touches.</p>
+
+    <Anim kind="pay-cluster" caption="Orthogonal only - diagonals do not connect. The outlined wild is counted in both the teal group and the amber one." />
+
+    <p>Which is the whole difficulty. The flood fill runs per symbol and consumes only real matches - consume the wild for the first cluster and the second silently shrinks by one, with nothing on the board looking wrong. A cluster is never seeded from a wild either.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/pay-cluster";`}</code></pre>
+    <p class="dim">clustersOf  &middot;  evalClusters  &middot;  evalAllClusters  &middot;  largestCluster</p>
+  </main>
+</BaseLayout>

@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/selectors  - Which cells?"
+  description="Selectors: One primitive serving placement and hold-and-win targeting."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/selectors</h1>
+
+    <p class="lede">One primitive serving placement and hold-and-win targeting.</p>
+
+    <Anim kind="selectors" caption="Order is column-major and stable. A selector returning set-iteration order would make a seeded replay diverge between versions - the kind of bug that only surfaces in a certification rerun." />
+
+    <p>"Put 3 HIGH somewhere on reels 0-2" and "collect every coin into that collector" are the same shape: pick some positions, then do something to them. Only the first half varies.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/selectors";`}</code></pre>
+    <p class="dim">all  &middot;  cols  &middot;  rows  &middot;  where  &middot;  holding  &middot;  randomN  &middot;  upTo  &middot;  union  &middot;  except  &middot;  not</p>
+  </main>
+</BaseLayout>

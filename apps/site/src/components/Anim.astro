@@ -1,0 +1,236 @@
+---
+// Looped explainer animatics. Square divs, no rounded corners, CSS keyframes -
+// no script, and `prefers-reduced-motion` stops them properly.
+//
+// `kind` picks which animation to render; `caption` is the one-line lesson.
+interface Props { kind: string; caption?: string }
+const { kind, caption } = Astro.props;
+---
+
+<figure class="anim" data-kind={kind}>
+  <div class="stage">
+    {kind === "grid" && (
+      <div class="ragged">
+        <div class="colr h4"><i></i><i></i><i></i><i></i></div>
+        <div class="colr h5"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="colr h5"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="colr h4"><i></i><i></i><i></i><i></i></div>
+      </div>
+    )}
+
+    {kind === "weights" && (
+      <div class="bar">
+        <span class="w1"></span><span class="w2"></span><span class="w3"></span>
+        <b class="ptr"></b>
+      </div>
+    )}
+
+    {kind === "selectors" && (
+      <div class="g3">
+        {Array.from({ length: 9 }).map((_, i) => <i class={i % 3 === 1 ? "pick" : ""}></i>)}
+      </div>
+    )}
+
+    {kind === "fill" && (
+      <div class="g3 rollg">
+        {Array.from({ length: 9 }).map(() => <i></i>)}
+      </div>
+    )}
+
+    {kind === "markov" && (
+      <div class="pair">
+        <div class="colr roll loose"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="colr roll tight"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    )}
+
+    {kind === "recipes" && (
+      <div class="mix">
+        <span class="m1"></span><span class="m2"></span><span class="m3"></span>
+        <b class="ptr"></b>
+      </div>
+    )}
+
+    {kind === "pay-lines" && (
+      <div class="g5">
+        {Array.from({ length: 15 }).map((_, i) => <i class={i >= 5 && i < 8 ? "run" : ""}></i>)}
+      </div>
+    )}
+
+    {kind === "pay-ways" && (
+      <div class="ways">
+        <div class="colr"><i class="hit"></i><i class="hit"></i><i></i></div>
+        <div class="colr"><i class="hit"></i><i></i><i></i></div>
+        <div class="colr"><i class="hit"></i><i class="hit"></i><i class="hit"></i></div>
+      </div>
+    )}
+
+    {kind === "pay-anywhere" && (
+      <div class="g3">
+        {[0, 4, 8].includes(0) && null}
+        {Array.from({ length: 9 }).map((_, i) => <i class={[0, 4, 8].includes(i) ? "sc" : ""}></i>)}
+      </div>
+    )}
+
+    {kind === "pay-cluster" && (
+      <div class="g3 wgrid">
+        <i class="a lft"></i><i class="a lft"></i><i class="b rgt"></i>
+        <i class="a lft"></i><i class="wild both"></i><i class="b rgt"></i>
+        <i class="c"></i><i class="b rgt"></i><i class="b rgt"></i>
+      </div>
+    )}
+
+    {kind === "cascade" && (
+      <div class="casc">
+        <i class="a s0"></i><i class="b s1"></i><i class="c s2"></i><i class="a s3"></i>
+      </div>
+    )}
+
+    {kind === "holdwin" && (
+      <div class="hw">
+        <div class="meter"><i class="a"></i><i class="a m2"></i><i class="a m3"></i></div>
+        <i class="b landing"></i>
+      </div>
+    )}
+
+    {kind === "paytable" && (
+      <div class="ladder">
+        <span class="r1"></span><span class="r2"></span><span class="r3"></span><span class="r4"></span>
+      </div>
+    )}
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .anim {
+    border: 1px solid var(--fg-mute, #888);
+    padding: 1.1rem 1.2rem;
+    margin: 0 0 1.2rem;
+    display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  .stage { display: flex; align-items: flex-start; gap: 1.2rem; min-height: 84px; }
+  figcaption {
+    font-family: var(--mono, monospace);
+    font-size: 0.72rem; line-height: 1.5;
+    color: var(--fg-mute, #888);
+  }
+
+  /* shared cell */
+  i, span, b {
+    display: block;
+    width: 22px; height: 22px;
+    background: var(--bg-soft, #eee);
+    border: 1px solid var(--fg-mute, #888);
+    border-radius: 0;
+  }
+  .colr { display: flex; flex-direction: column; gap: 3px; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
+  .g5 { display: grid; grid-template-columns: repeat(5, 22px); gap: 3px; }
+  .a, .hit { background: #0E6B62; border-color: #0E6B62; }
+  .b { background: #8A5A15; border-color: #8A5A15; }
+  .c { background: #4A6570; border-color: #4A6570; }
+  .wild { background: transparent; border: 2px solid #0E6B62; }
+
+  /* grid - ragged columns, breathing to show shape is per column */
+  .ragged { display: flex; gap: 3px; align-items: flex-start; }
+  @keyframes raggedPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .ragged .h5 i:last-child { animation: raggedPulse 2.4s infinite; background:#0E6B62; border-color:#0E6B62; }
+
+  /* weights - a pointer sweeping proportional bands */
+  .bar, .mix, .ladder { position: relative; display: flex; width: 264px; height: 22px; }
+  .bar span, .mix span { height: 22px; border-radius: 0; }
+  .w1 { width: 60%; background:#0E6B62; border-color:#0E6B62; }
+  .w2 { width: 30%; background:#8A5A15; border-color:#8A5A15; }
+  .w3 { width: 10%; background:#4A6570; border-color:#4A6570; }
+  .m1 { width: 94%; background:#0E6B62; border-color:#0E6B62; }
+  .m2 { width: 5%;  background:#8A5A15; border-color:#8A5A15; }
+  .m3 { width: 1%;  background:#4A6570; border-color:#4A6570; }
+  .ptr {
+    position: absolute; top: -7px; width: 2px; height: 36px;
+    background: var(--fg, #222); border: 0;
+    animation: sweep 4s infinite ease-in-out;
+  }
+  @keyframes sweep { 0%,100%{left:2%} 50%{left:97%} }
+
+  /* selectors - a subset lighting up */
+  @keyframes pick { 0%,40%{background:var(--bg-soft,#eee)} 50%,90%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
+  .pick { animation: pick 3s infinite; }
+
+  /* fill - independent per-cell re-roll */
+  @keyframes rollA { 0%{background:#0E6B62;border-color:#0E6B62}33%{background:#8A5A15;border-color:#8A5A15}66%{background:#4A6570;border-color:#4A6570} }
+  @keyframes rollB { 0%{background:#8A5A15;border-color:#8A5A15}33%{background:#4A6570;border-color:#4A6570}66%{background:#0E6B62;border-color:#0E6B62} }
+  @keyframes rollC { 0%{background:#4A6570;border-color:#4A6570}33%{background:#0E6B62;border-color:#0E6B62}66%{background:#8A5A15;border-color:#8A5A15} }
+  .rollg i { animation: rollA 3s infinite steps(1,end); }
+  .rollg i:nth-child(3n+2) { animation-name: rollB; }
+  .rollg i:nth-child(3n+3) { animation-name: rollC; }
+
+  /* markov - same rates, different runs */
+  .pair { display: flex; gap: 1.2rem; }
+  .roll i { animation: rollA 4s infinite steps(1,end); }
+  .loose i:nth-child(2){animation-name:rollC}.loose i:nth-child(3){animation-name:rollB}
+  .loose i:nth-child(5){animation-name:rollC}.loose i:nth-child(6){animation-name:rollB}
+  .tight i:nth-child(1),.tight i:nth-child(2),.tight i:nth-child(3){animation-name:rollA}
+  .tight i:nth-child(4),.tight i:nth-child(5){animation-name:rollB}
+  .tight i:nth-child(6){animation-name:rollC}
+
+  /* pay-lines - a left-anchored run flashing */
+  @keyframes runFlash { 0%,30%{background:var(--bg-soft,#eee)} 40%,80%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
+  .run { animation: runFlash 3s infinite; }
+
+  /* pay-ways - per-column counts multiplying */
+  .ways { display: flex; gap: 3px; }
+  @keyframes waysPulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+  .ways .hit { animation: waysPulse 2.4s infinite; }
+  .ways .colr:nth-child(2) .hit { animation-delay: .3s; }
+  .ways .colr:nth-child(3) .hit { animation-delay: .6s; }
+
+  /* pay-anywhere - scattered, position-independent */
+  @keyframes scPulse { 0%,100%{background:#8A5A15;border-color:#8A5A15} 50%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
+  .sc { animation: scPulse 2.6s infinite; }
+
+  /* pay-cluster - the wild in two groups */
+  @keyframes ringL { 0%,45%{outline:3px solid #0E6B62;outline-offset:-3px}50%,100%{outline:0 solid transparent} }
+  @keyframes ringR { 0%,45%{outline:0 solid transparent}50%,100%{outline:3px solid #8A5A15;outline-offset:-3px} }
+  .wgrid .lft { animation: ringL 3s infinite; }
+  .wgrid .rgt { animation: ringR 3s infinite; }
+  .wgrid .both { animation: ringL 3s infinite, ringR 3s infinite; }
+
+  /* cascade - clear, fall, refill */
+  .casc { position: relative; height: 100px; width: 22px; }
+  .casc i { position: absolute; left: 0; }
+  @keyframes fallOne { 0%,22%{transform:translateY(0)} 30%,100%{transform:translateY(25px)} }
+  @keyframes clearOne {
+    0%,18%{opacity:1;outline:0 solid #0E6B62}
+    22%{opacity:1;outline:3px solid #0E6B62;outline-offset:-3px}
+    28%,92%{opacity:0;outline:0 solid #0E6B62} 100%{opacity:0}
+  }
+  @keyframes dropIn { 0%,26%{opacity:0;transform:translateY(-25px)} 36%,100%{opacity:1;transform:translateY(0)} }
+  .casc .s0 { top:0;    animation: dropIn 3.2s infinite ease-out; }
+  .casc .s1 { top:25px; animation: fallOne 3.2s infinite ease-in; }
+  .casc .s2 { top:50px; animation: fallOne 3.2s infinite ease-in; }
+  .casc .s3 { top:75px; animation: clearOne 3.2s infinite; }
+
+  /* holdwin - the counter resets on a landing */
+  .hw { display: flex; gap: 1.2rem; align-items: flex-start; }
+  .meter { display: flex; gap: 3px; }
+  @keyframes burn3 { 0%,24%{opacity:1}25%,66%{opacity:.15}67%,100%{opacity:1} }
+  @keyframes burn2 { 0%,49%{opacity:1}50%,66%{opacity:.15}67%,100%{opacity:1} }
+  @keyframes coinLand { 0%,60%{opacity:0;transform:translateY(-10px)}67%,100%{opacity:1;transform:translateY(0)} }
+  .meter .m3 { animation: burn3 4s infinite steps(1,end); }
+  .meter .m2 { animation: burn2 4s infinite steps(1,end); }
+  .landing { animation: coinLand 4s infinite; }
+
+  /* paytable - bands, the top one open-ended */
+  .ladder span { border-radius: 0; }
+  .r1 { width: 22%; background:#4A6570; border-color:#4A6570; }
+  .r2 { width: 20%; background:#8A5A15; border-color:#8A5A15; }
+  .r3 { width: 18%; background:#0E6B62; border-color:#0E6B62; }
+  @keyframes openEnded { 0%,100%{opacity:.4} 50%{opacity:1} }
+  .r4 { width: 40%; background:#0E6B62; border-color:#0E6B62; animation: openEnded 2.4s infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .anim :is(i, span, b) { animation: none !important; }
+    .casc .s3 { opacity: .3; }
+  }
+</style>

@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/weights  - Exact sampling"
+  description="Weights: The number you read is the number you get."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/weights</h1>
+
+    <p class="lede">The number you read is the number you get.</p>
+
+    <Anim kind="weights" caption="The pointer sweeps [0,1) and lands in each band exactly as often as its declared weight. Draws take an r you supply - nothing here makes randomness." />
+
+    <p>A reel strip encodes probability indirectly - you move symbols around an array to shift odds. A weighted set answers <code>probabilityOf(WILD)</code> directly, and that readability IS the balancing story: RTP is a sum of probability x payout.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/weights";`}</code></pre>
+    <p class="dim">sampler(&#123; LOW: 60, MID: 30, HIGH: 10 &#125;)  &middot;  probabilityOf  &middot;  distribution  &middot;  pickDistinct</p>
+  </main>
+</BaseLayout>

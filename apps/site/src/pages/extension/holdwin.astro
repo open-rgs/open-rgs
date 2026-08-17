@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/holdwin  - Respins"
+  description="Hold &amp; win: A landing RESETS the counter."
+>
+  <main>
+    <p class="dim"><a href="/extension">&larr; extensions</a></p>
+    <h1>@open-rgs/holdwin</h1>
+
+    <p class="lede">A landing RESETS the counter.</p>
+
+    <Anim kind="holdwin" caption="MINI / MINOR / MAJOR / GRAND resolve through one table, so retuning GRAND never means touching every coin. A collected coin is emptied, not removed - so it still fills the board but cannot be harvested twice." />
+
+    <p>Not decrements - resets. That single rule is what makes the feature feel alive, and it is also why a cycle has no natural end, so a max-win cap is what makes the round finite. The five coin mechanics are one shape with different selectors, not five features.</p>
+
+    <h2 data-section="&sect;">Reach for</h2>
+    <pre><code>{`import { ... } from "@open-rgs/holdwin";`}</code></pre>
+    <p class="dim">triggers(grid, 6)  &middot;  beginRespins  &middot;  stepRespins  &middot;  settleRespins  &middot;  collector  &middot;  payer  &middot;  multiplier  &middot;  upgrader  &middot;  spawner</p>
+  </main>
+</BaseLayout>

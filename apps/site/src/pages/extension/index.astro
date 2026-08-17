@@ -1,0 +1,60 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Extensions  - open-rgs"
+  description="The @open-rgs/* slot libraries: one small package per concern, each an ordinary TypeScript import."
+>
+  <main>
+    <h1>Extensions</h1>
+
+    <p class="lede">
+      Small packages a math file imports. There is no plugin system  - TS math
+      can just <code>import</code>, so an extension is an ordinary package.
+    </p>
+
+    <pre><code>{`Generator<S> = (next) => Grid<S>          // makes a board
+Selector<S>  = (grid, next) => Pos[]      // picks cells
+Effect       = (grid, pos, next) => Grid  // changes a board`}</code></pre>
+
+    <p>
+      Three signatures carry all of it. <code>next</code> is always
+      <code>host.rng_next</code>  - nothing here makes randomness, everything
+      receives it, and that is what lets one recorded seed replay a round.
+    </p>
+
+    <h2 data-section="&sect; 1">The packages</h2>
+    <ul>
+      <li><a href="/extension/grid">@open-rgs/grid</a>  - <span class="dim">Shape is a height PER COLUMN, not width x height.</span></li>
+      <li><a href="/extension/weights">@open-rgs/weights</a>  - <span class="dim">The number you read is the number you get.</span></li>
+      <li><a href="/extension/selectors">@open-rgs/selectors</a>  - <span class="dim">One primitive serving placement and hold-and-win targeting.</span></li>
+      <li><a href="/extension/fill">@open-rgs/fill</a>  - <span class="dim">Weighted draws, one cell at a time.</span></li>
+      <li><a href="/extension/markov">@open-rgs/markov</a>  - <span class="dim">Changes how clumpy reels look. Provably does not change frequency.</span></li>
+      <li><a href="/extension/recipes">@open-rgs/recipes</a>  - <span class="dim">Every board comes from exactly one declared recipe.</span></li>
+      <li><a href="/extension/paytable">@open-rgs/paytable</a>  - <span class="dim">One shared notion of payout, wild and scatter.</span></li>
+      <li><a href="/extension/pay-lines">@open-rgs/pay-lines</a>  - <span class="dim">Longest run, paid once.</span></li>
+      <li><a href="/extension/pay-ways">@open-rgs/pay-ways</a>  - <span class="dim">Paid by the product of per-column counts.</span></li>
+      <li><a href="/extension/pay-anywhere">@open-rgs/pay-anywhere</a>  - <span class="dim">Total count, position irrelevant.</span></li>
+      <li><a href="/extension/pay-cluster">@open-rgs/pay-cluster</a>  - <span class="dim">A wild belongs to every cluster it touches.</span></li>
+      <li><a href="/extension/cascade">@open-rgs/cascade</a>  - <span class="dim">Clear, fall, refill, repeat.</span></li>
+      <li><a href="/extension/holdwin">@open-rgs/holdwin</a>  - <span class="dim">A landing RESETS the counter.</span></li>
+    </ul>
+
+    <h2 data-section="&sect; 2">Writing your own</h2>
+    <p>
+      Every extension point is one of the three signatures, so extending means
+      writing a function. "Collect only from the same column" is a selector, not
+      a new engine.
+    </p>
+    <pre><code>{`const sameColumn = (src) => (grid, next) =>
+  coinCells()(grid, next).filter((p) => p.col === src.col);
+
+const columnCollector = (src) => collector(sameColumn(src), JACKPOTS);`}</code></pre>
+    <p class="warn">
+      <strong>The one rule:</strong> take <code>next</code>, never make it. Code
+      that reaches for <code>Math.random()</code> looks right, passes every test
+      you would think to write, and silently voids any RTP measured from a replay.
+    </p>
+  </main>
+</BaseLayout>
