@@ -1,20 +1,18 @@
 // CI gate for the twin-slot pair. Two claims:
-//   1. PARITY - the Lua math (maths/slot.lua), the Zig/WASM math
-//      (maths/slot.wasm) and the TS math (maths/slot.ts) return identical
-//      outcomes for the same RNG stream. This is the whole point of the set, so
-//      we assert it hard: thousands of spins across several seeds, full-outcome
-//      equality. Three runtimes, one game, one auditable RNG seam.
+//   1. PARITY - the TS math (maths/slot.ts) and the Zig/WASM math
+//      (maths/slot.wasm) return identical outcomes for the same RNG stream.
+//      This is the whole point of the pair, so we assert it hard: thousands of
+//      spins across several seeds, full-outcome equality. Two runtimes, one
+//      game, one auditable RNG seam.
 //   2. RTP - the slot pays ~0.96, measured by the kernel's in-WASM self-play
-//      (exact + fast). The Lua twin inherits that RTP *by parity* (claim 1), so
-//      we don't separately Monte-Carlo the slower Lua path.
+//      (exact + fast). The TS twin inherits that RTP *by parity* (claim 1).
 
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { loadLuaMath, loadWasmMath, loadTsMath } from "../../../packages/core/src/index.js";
+import { loadWasmMath, loadTsMath } from "../../../packages/core/src/index.js";
 import type { SimpleMath } from "../../../packages/contract/src/index.js";
 
-const LUA = resolve(import.meta.dir, "../maths/slot.lua");
 const WASM = resolve(import.meta.dir, "../maths/slot.wasm");
 const TS = resolve(import.meta.dir, "../maths/slot.ts");
 const ctx = { mode: "default" } as const;
@@ -39,29 +37,25 @@ interface SimExports {
   sim_batch(spins: number, seedHi: number, seedLo: number, outP: number): void;
 }
 
-describe("twin-slot: Lua, Zig and TS are 1:1", () => {
+describe("twin-slot: TS and Zig are 1:1", () => {
   test("identical outcomes for the same RNG stream (20k spins, 5 seeds)", async () => {
     for (const seed of [1, 7, 42, 123, 1000]) {
       // Fresh, identically-seeded generators: each draws one value per play(),
-      // so all three runtimes see the same stream and must agree spin-for-spin.
-      const lua = (await loadLuaMath(LUA, { rng: mulberry32(seed), timeoutMs: 0 })) as SimpleMath;
+      // so both runtimes see the same stream and must agree spin-for-spin.
       const wasm = (await loadWasmMath(WASM, { rng: mulberry32(seed) })) as SimpleMath;
       const ts = (await loadTsMath(TS, { rng: mulberry32(seed) })) as SimpleMath;
       for (let i = 0; i < 4000; i++) {
-        const a = await lua.play(undefined, ctx);
         const b = await wasm.play(undefined, ctx);
         const c = await ts.play(undefined, ctx);
-        expect(a).toEqual(b); // multiplier + ops + type all match
-        expect(c).toEqual(b);
+        expect(c).toEqual(b); // multiplier + ops + type all match
       }
     }
   });
 
-  test("all three declare the same metadata", async () => {
-    const lua = (await loadLuaMath(LUA, { rng: mulberry32(1) })) as SimpleMath;
+  test("both declare the same metadata", async () => {
     const wasm = (await loadWasmMath(WASM, { rng: mulberry32(1) })) as SimpleMath;
     const ts = (await loadTsMath(TS, { rng: mulberry32(1) })) as SimpleMath;
-    for (const m of [lua, wasm, ts]) {
+    for (const m of [wasm, ts]) {
       expect(m.kind).toBe("simple");
       expect(m.name).toBe("twin-slot");
       expect(m.rtp).toBe(0.96);
@@ -70,7 +64,7 @@ describe("twin-slot: Lua, Zig and TS are 1:1", () => {
 });
 
 describe("twin-slot: RTP and payouts", () => {
-  test("in-WASM self-play measures RTP ~0.96 (and Lua inherits it by parity)", async () => {
+  test("in-WASM self-play measures RTP ~0.96 (and TS inherits it by parity)", async () => {
     const bytes = await readFile(WASM);
     const { instance } = await WebAssembly.instantiate(bytes, { host: { rng_next: () => 0, log_debug: () => {} } });
     const ex = instance.exports as unknown as SimExports;

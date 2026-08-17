@@ -44,7 +44,7 @@ import type {
   RoundOutcome, OpenOutcome, StepOutcome, CloseOutcome, PlayerAction,
 } from "@open-rgs/contract";
 import { log } from "./log.js";
-import { resolveRng } from "./lua-math.js";
+import { resolveRng } from "./rng.js";
 import {
   adaptRoundOutcome, adaptOpenOutcome, adaptStepOutcome, adaptCloseOutcome,
 } from "./math-adapt.js";

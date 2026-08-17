@@ -35,7 +35,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import type { MathHost, MathModule, MathFactory } from "@open-rgs/contract";
 import { log } from "./log.js";
-import { resolveRng } from "./lua-math.js";
+import { resolveRng } from "./rng.js";
 
 /** A math whose every entry-point call is reconstructable from one recorded
  *  number. Returned by {@link loadTsMath} under `rngMode: "seed-expand"`. */

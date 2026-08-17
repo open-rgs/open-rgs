@@ -6,7 +6,7 @@
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer, binaryTransport, loadLuaMath, cryptoRng } from "@open-rgs/core";
+import { createServer, binaryTransport, loadTsMath, cryptoRng } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 
@@ -16,7 +16,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 // system CSPRNG (`cryptoRng`, WebCrypto -> BoringSSL)  - never Math.random  -
 // and fails closed in production unless you choose a source explicitly. We
 // pass it here; a production deployment wires its certified/approved RNG.
-const math = await loadLuaMath(resolve(here, "../maths/spin.lua"), { rng: cryptoRng });
+const math = await loadTsMath(resolve(here, "../maths/spin.ts"), { rng: cryptoRng });
 
 const manifest = defineGame({
   id:               "hello-spin",

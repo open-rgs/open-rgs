@@ -6,7 +6,7 @@
 // dependent (see math-pool.ts), so the pool is not a portable no-DoS sandbox.
 
 import { loadWasmMath } from "./wasm-math.js";
-import { cryptoRng } from "./lua-math.js";
+import { cryptoRng } from "./rng.js";
 import type { SimpleMath, RoundOutcome } from "@open-rgs/contract";
 
 // Worker-scope globals (declared so this file typechecks without a DOM/webworker lib).

@@ -150,7 +150,7 @@ export interface MathExpectations {
   tagShare?: Record<string, MathTarget>;
 }
 
-/** The collector backing `host.mark.*` calls in Lua. The simulator
+/** The collector backing `host.mark.*` calls in math. The simulator
  *  drives the per-spin lifecycle (beginSpin / endSpin) and reads the
  *  final snapshot. The orchestrator never touches it  - marks are
  *  inert outside a simulator run. */
@@ -185,10 +185,9 @@ export interface MarkSnapshot {
 
 // --- Math contract ----------------------------------------------------------
 
-/** The host surface a math module draws through. Identical in all three
- *  runtimes: Lua sees it as the `host` global, a WASM kernel imports it from
- *  the "host" module, and a TS math receives it as the argument to its
- *  default-exported factory ({@link MathFactory}).
+/** The host surface a math module draws through. Identical in both runtimes:
+ *  a WASM kernel imports it from the "host" module, and a TS math receives it
+ *  as the argument to its default-exported factory ({@link MathFactory}).
  *
  *  This is the RNG seam. Math has no other source of randomness - a TS math
  *  reaching for `Math.random()` bypasses the auditable generator, breaks seed
@@ -203,7 +202,7 @@ export interface MathHost {
 
 /** What a TS math module default-exports: a factory taking the host and
  *  returning the math. The indirection is what gives TS math the same
- *  injected-RNG guarantee the Lua and WASM tiers already have. */
+ *  injected-RNG guarantee the WASM tier already has. */
 export type MathFactory = (host: MathHost) => MathModule;
 
 /** Pure simple-round math: prev -> outcome. Currency-blind, RNG-injected.
@@ -221,10 +220,10 @@ export interface SimpleMath {
    *  RTP contributions). Picked up by the simulator for deviation reports. */
   readonly expected?: MathExpectations;
   /** Optional mark collector. Populated by the loader when marks are
-   *  opted in (loadLuaMath({ marks: true })). Simulator uses it; the
+   *  opted in (loader option `marks: true`). Simulator uses it; the
    *  orchestrator ignores it. */
   readonly marks?: MarkCollector;
-  /** SHA-256 of the math source (hex). Populated by loadLuaMath at
+  /** SHA-256 of the math source (hex). Populated by the loader at
    *  load time. Stamped on every round so the platform / audit log
    *  can prove which version of the math computed a given outcome. */
   readonly contentHash?: string;
@@ -651,55 +650,6 @@ export interface PlatformAdapter {
   onEvent(handler: (e: PlatformEvent) => void): void;
 }
 
-// --- Lua extension contract -------------------------------------------------
-//
-// By default a math file gets two host helpers (host.rng_next and
-// host.log_debug) and nothing else. Real ecosystems need more  - reel
-// utilities, paytable evaluators, distribution helpers, sometimes even
-// DSL preprocessors. Extensions are how that lands in the Lua VM without
-// core needing to know what a "reel" is.
-//
-// An extension is one of three things, often combined:
-//   - a pure-Lua module returned by require("<name>")
-//   - a table of native (TS) functions merged into that same module
-//   - a source transform applied before any Lua code is evaluated
-//
-// Extensions are registered per-math via loadLuaMath(path, { extensions: [...] }).
-// They install once into a fresh VM, then math sees them via require().
-
-/** Minimal handle the loader gives extensions for VM-level operations.
- *  Kept tiny on purpose; if you need more than setGlobal you probably
- *  want a peer package, not an extension. */
-export interface LuaVm {
-  /** Register a value as a global on the Lua side. Use sparingly; the
-   *  per-extension namespace via {@link LuaExtension.host} is preferred. */
-  setGlobal(name: string, value: unknown): void;
-}
-
-export interface LuaExtension {
-  /** Module name. `require("<name>")` in Lua returns the installed table. */
-  name: string;
-  /** Semver. Surfaced in logs + admin diagnostics for debuggability. */
-  version: string;
-  /** Pure-Lua source. Evaluated once during install; the returned table
-   *  becomes the require() result. Optional  - a host-only extension is
-   *  legal. */
-  lua?: string;
-  /** Native helpers exposed to Lua. Merged into the table require()
-   *  returns, shadowing same-named keys from `lua`. Use for hot paths
-   *  (SIMD, native crypto, fast RNG variants) or for things Lua can't
-   *  reasonably do (filesystem, network  - though both should be rare in
-   *  math). */
-  host?: (vm: LuaVm) => Record<string, unknown>;
-  /** Pre-evaluation source transform. Runs once per source string
-   *  (every extension's `lua`, plus every loaded math file), in the
-   *  order extensions are registered. Use for DSL expansion (a reel-
-   *  strip shorthand, for instance), Teal->Lua compilation, or
-   *  build-flavour conditionals. Identity is a no-op; pass-through is
-   *  the default by omission. */
-  transform?: (source: string, path: string) => string;
-}
-
 // --- Client transport contract ----------------------------------------------
 
 /** Wire correlation-id key. The client stamps a unique id on each request
@@ -936,7 +886,7 @@ export type RGSErrorCode =
   | "INVALID_ROUND"
   | "PLATFORM_UNAVAILABLE"
   /** Math exceeded its per-call execution budget and was aborted (see
-   *  loadLuaMath `timeoutMs`). Protects the single-threaded server from a
+   *  the loader's execution budget). Protects the single-threaded server from a
    *  runaway/hostile math file. */
   | "MATH_TIMEOUT"
   | "ROUND_ALREADY_OPEN"
