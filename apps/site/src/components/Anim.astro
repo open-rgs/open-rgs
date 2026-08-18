@@ -241,6 +241,26 @@ const n = (k: number) => Array.from({ length: k });
         <i class="c"></i><i class="b"></i><i class="a"></i><i class="a big"></i>
       </div>
     )}
+    {kind === "holdwin-land" && (
+      <div class="g3">
+        <i class="a"></i><i class="b"></i><i class="empty e0"></i>
+        <i class="empty e1"></i><i class="a"></i><i class="empty e2"></i>
+        <i class="empty e3"></i><i class="empty e4"></i><i class="b"></i>
+      </div>
+    )}
+    {kind === "holdwin-mystery" && (
+      <div class="row gap">
+        <span class="num myst m0">?</span><span class="num myst m1">?</span><span class="num myst m2">?</span>
+        <span class="num reveal">5&times;</span>
+      </div>
+    )}
+    {kind === "holdwin-cellmult" && (
+      <div class="g3">
+        <i class="a"></i><i class="b"></i><i class="a"></i>
+        <i class="b cellx"></i><i class="a"></i><i class="b"></i>
+        <i class="a"></i><i class="b"></i><i class="a"></i>
+      </div>
+    )}
     {kind === "holdwin-full" && (
       <div class="g3">{n(9).map((_, i) => <i class={`a fillseq f${i}`}></i>)}</div>
     )}
@@ -589,6 +609,24 @@ const n = (k: number) => Array.from({ length: k });
   .f0{animation-delay:0s}.f1{animation-delay:.12s}.f2{animation-delay:.24s}
   .f3{animation-delay:.36s}.f4{animation-delay:.48s}.f5{animation-delay:.6s}
   .f6{animation-delay:.72s}.f7{animation-delay:.84s}.f8{animation-delay:.96s}
+
+  /* Empty cells that keep trying, and the one that takes. */
+  @keyframes tryLand { 0%,100%{opacity:.14} 46%{opacity:.14} 52%{opacity:1;background:#0E6B62} }
+  .empty { opacity: .14; }
+  .e0{animation:tryLand 4s infinite .0s}.e1{animation:tryLand 4s infinite 1.1s}
+  .e2{animation:tryLand 4s infinite 2.2s}.e3{animation:tryLand 4s infinite 3.0s}
+  .e4{animation:tryLand 4s infinite .6s}
+
+  /* Three hidden cells, one shared value. */
+  @keyframes hide  { 0%,55%{opacity:1} 62%,100%{opacity:0} }
+  @keyframes show  { 0%,58%{opacity:0} 66%,100%{opacity:1;color:#0E6B62} }
+  .myst { opacity: 1; }
+  .m0{animation:hide 4s infinite}.m1{animation:hide 4s infinite .06s}.m2{animation:hide 4s infinite .12s}
+  .reveal{animation:show 4s infinite}
+
+  /* A factor printed on the cell, not carried by the coin. */
+  @keyframes cellGlow { 0%,100%{outline:1px solid rgba(14,107,98,.35)} 50%{outline:2px solid #0E6B62} }
+  .cellx { outline: 1px solid rgba(14,107,98,.35); outline-offset: 1px; animation: cellGlow 3s infinite; }
 
   .short i { opacity: .35 }
   @keyframes blockPulse { 0%,100%{outline:0 solid transparent} 50%{outline:2px solid #0E6B62;outline-offset:-1px} }
