@@ -250,7 +250,7 @@ of `init`, `spin`, `openRound`, `stepRound`, `closeRound`, `promoAccept`,
 and `autocloseRound` (including event- and admin-triggered autoclose) runs
 under a per-`sessionId` async queue, so at most one is in flight for a
 session at a time. An operation runs start-to-finish, including clearing
-`session.openRound`: before the next begins, so a close racing an
+`session.openRound`, before the next begins, so a close racing an
 autoclose collapses to one credit (the second observes no open round). This
 is the orchestrator-level guard; idempotency keys (deterministic per round
 for closes: see Spec 05) are the wallet-level backstop. Operations on

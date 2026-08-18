@@ -21,7 +21,7 @@ encoding of the typed request or response.
 **Correlation id.** The client stamps a unique id on each request payload
 under the reserved key `$cid` (`WIRE_CORRELATION_KEY`); the transport echoes
 it on the matching response / error frame. The client matches responses by
-this id, not just by frame type: so a late or duplicate response from a
+this id, not just by frame type, so a late or duplicate response from a
 timed-out request can't resolve a newer call. `PING`/`PONG` are unsolicited
 and carry no id; a pre-dispatch error (unparseable frame) may omit it. The
 client strips `$cid` before returning the response to callers.
@@ -134,7 +134,7 @@ excluded server-side. The catalog is the authoritative source for
 
 `ClientResponseInit.resume`: present iff a round was in flight when
 the player previously disconnected. The client SHOULD replay
-`resume.ops` in order to rebuild visual state, then render UI for
+`resume.ops` to rebuild visual state, then render UI for
 `resume.awaiting`. The action history `resume.actionLog` is provided so
 the client can narrate "you've already gambled twice."
 

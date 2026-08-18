@@ -164,7 +164,7 @@ When implemented, it MUST honour Guarantee 2 (`specs/00-guarantees.md`):
 The reference `@open-rgs/platform-mock` implements these semantics correctly (a
 per-session LIFO stack of `(roundId, balanceBefore, carryBefore)` snapshots,
 plus a receipt map for idempotent replay). It keeps all of that **in memory**  -
-by design, it is a dev mock: so it is deliberately not a model for the
+by design, it is a dev mock, so it is deliberately not a model for the
 durable-tracking rule above. The conformance suite asserts the whole-record,
 latest-first, and no-double-credit properties.
 

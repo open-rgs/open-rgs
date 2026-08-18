@@ -44,7 +44,7 @@ interface WsData extends ConnectionMeta {
   connectedAt: number;
   /** Replay-guard state (only used when cfg.replayGuard is on). The highest
    *  operation-sequence processed on this connection, and the encoded response
-   *  bytes for it: so an exact re-send (a retry after a dropped response)
+   *  bytes for it, so an exact re-send (a retry after a dropped response)
    *  replays the same bytes instead of re-running the round. */
   lastOpSeq: number;
   lastOpResponse?: Uint8Array;

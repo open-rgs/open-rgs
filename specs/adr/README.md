@@ -2,7 +2,7 @@
 
 Short, durable records of major architectural decisions. Each ADR
 captures *what* was decided, *why*, and *what alternatives were
-rejected*: so future maintainers (and AI sessions) can understand the
+rejected*, so future maintainers (and AI sessions) can understand the
 reasoning without re-litigating it.
 
 ## Format

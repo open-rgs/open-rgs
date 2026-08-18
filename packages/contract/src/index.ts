@@ -665,7 +665,7 @@ export interface PlatformAdapter {
    *  "One Round, One Record"). Because it is wallet-initiated it is NOT
    *  covered by the orchestrator's per-session lock: it MUST be safe to
    *  invoke concurrently with settleSimple/openComplex/closeComplex on the
-   *  same session: and a real adapter MUST keep its reversed-round tracking
+   *  same session, and a real adapter MUST keep its reversed-round tracking
    *  durable across restarts. The reference @open-rgs/platform-mock implements
    *  the semantics correctly (in memory: it's a mock) and the conformance
    *  suite checks them. */
@@ -890,7 +890,7 @@ export interface IdempotencyConfig {
  *    while the older connection stays attached.
  *, "allow": both connections coexist (the pre-enforcement behaviour).
  *    Money stays safe either way: per-session operation serialization +
- *    wallet idempotency hold regardless: but coexisting windows see
+ *    wallet idempotency hold regardless, but coexisting windows see
  *    diverging balance views; prefer kick-old.
  *
  *  A connection that disconnects detaches from its session, so a reconnect

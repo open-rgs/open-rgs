@@ -115,7 +115,7 @@ replay tools and integration harnesses end up game-specific too.
 
 `@open-rgs/contract/ops` is the opt-in middle ground: nine shapes covering
 what a slot needs to say: `board`, `win`, `cascade`, `respin`, `coin`,
-`award`, `feature`, `meter`, `message`: plus `isCanonicalOp`,
+`award`, `feature`, `meter`, `message`, plus `isCanonicalOp`,
 `canonicalOps` and `opsTotal`. A game emitting these can be driven by any
 client that understands them, including `@open-rgs/client`'s
 `UniversalClient`.

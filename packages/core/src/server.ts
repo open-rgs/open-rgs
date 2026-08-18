@@ -34,7 +34,7 @@ export interface ServerConfig {
    *  the generation (e.g. the pod name via the k8s downward API), and an
    *  explicit value here wins over both. Surfaced as the `instance_id`
    *  label on `rgs_build_info`, as `instance_id` in /healthz, and as
-   *  `service.instance.id` on every log line: so per-instance metrics,
+   *  `service.instance.id` on every log line, so per-instance metrics,
    *  logs, and health all correlate on one key. */
   instanceId?: string;
   /** HTTP admin port. Default: same as transport port (single-port mode,

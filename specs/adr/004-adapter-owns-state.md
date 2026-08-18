@@ -40,7 +40,7 @@ the adapter.
 
 - RGS is genuinely stateless (modulo the in-memory cache). No
   database in core. K8s rolling restarts are cheap.
-- Wallets already keep audit trails of round state: we leverage
+- Wallets already keep audit trails of round state, so this reuses
   that instead of duplicating.
 - Operators can swap RGS instances at will; whichever pod the next
   player request lands on rebuilds the session from the wallet.

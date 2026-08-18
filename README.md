@@ -33,7 +33,7 @@ await createServer({
     },
   }),
   platform:  new MockPlatform({ startingBalance: 100_000 }),
-  transport: binaryTransport({ port: 80 }),
+  transport: binaryTransport({ port: 8080 }),
 });
 ```
 
@@ -81,7 +81,7 @@ serving, where compute is rounding error against the wallet RPC; it makes a
 visible difference to a million-spin tuning sweep, which is the reason the
 default is the in-process tier.
 
-TS math is checked for purity at load: no `Math.random`, no clock, no I/O, no
+TypeScript math is checked for purity at load: no `Math.random`, no clock, no I/O, no
 implementation-defined float ops. See
 [spec 03](./specs/03-math-runtime.md#the-purity-gate).
 
@@ -98,7 +98,7 @@ implementation-defined float ops. See
             +-------------------------------+
             |         ORCHESTRATOR          | ◀---- admin http
             |   +-----------------------+   |       /livez /healthz
-            |   |  TypeScript / WASM math   |   |       /admin/*
+            |   |    TS / WASM math     |   |       /admin/*
             |   +-----------------------+   |
             +----------------+--------------+
                              |  PlatformAdapter (one interface)
@@ -149,6 +149,7 @@ enforces each guarantee, what it prevents, and how an integrator must not break 
 | `@open-rgs/adapter-test-kit` | conformance suite for any PlatformAdapter implementation |
 | `@open-rgs/client` | tiny TS WebSocket client (Bun / Node / browser) |
 | `@open-rgs/simulator` | per-mode RTP / hit-rate / mark simulator + reports; fast WASM & native-Zig batch tiers |
+| `@open-rgs/grid`, `weights`, `pay-lines`, `pay-ways`, `cascade`, `holdwin`, ... | the slot libraries: one small package per mechanic ([full set](https://open-rgs.dev/extension)) |
 
 ## Build a game
 
@@ -179,7 +180,7 @@ See [open-rgs.dev/extension](https://open-rgs.dev/extension) for the library set
 
 How-to recipes: <https://open-rgs.dev/extend>
 
-## What open-rgs does NOT do
+## What open-rgs leaves to the platform
 
 - Tournaments, leaderboards, progressive jackpots, Daily Drops
 - Cashback, promotional campaigns (beyond the granted free-rounds pool)
@@ -187,16 +188,16 @@ How-to recipes: <https://open-rgs.dev/extend>
 - Multi-currency sessions, master sessions
 - Bonuses initiated by the math (the math returns a multiplier; nothing more)
 
-All of the above belong to the platform's gamification layer. open-rgs
-is a round calculator + wallet driver.
+These belong to the platform's gamification layer. open-rgs is a round
+calculator and a wallet driver.
 
 ## Status
 
 `v1.x` is stable, following a full production-readiness audit. The public contract (`@open-rgs/contract`
 + `@open-rgs/core`) follows semver from 1.0: a breaking change means a
 major bump, not a surprise. Releases and per-package changelogs are
-managed with [Changesets](https://github.com/changesets/changesets)  -
-watch the GitHub releases.
+managed with [Changesets](https://github.com/changesets/changesets); watch
+the GitHub releases.
 
 ## License
 

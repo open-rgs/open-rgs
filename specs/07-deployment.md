@@ -275,7 +275,7 @@ multi-tenancy isn't worth its complexity (spec 10, "What we deliberately
 AVOID"; spec 02, "Open questions").
 
 To run several games, run several single-game processes, on separate
-ports, or as separate images: and route to them at the edge (an ingress
+ports, or as separate images, and route to them at the edge (an ingress
 or reverse proxy mapping a path or host per game):
 
 ```ts
