@@ -901,8 +901,16 @@ function artubeSessionToContract(
     info.promo = artubeCampaignToPromo(p.free_round_campaign);
   }
   if (p.last_round) {
-    info.carry       = p.last_round.round_state;
-    info.mathVersion = String(p.last_round.round_version);
+    info.carry = p.last_round.round_state;
+    // `round_state_version` is the field the settle WRITES mathVersion into
+    // (see settleSimple), so it is the field to read it back from. This used to
+    // read `round_version` - the wallet's own round counter, an unrelated
+    // number - so the version that came back was never the version that was
+    // sent. The RGS compares it against the loaded math's version to decide
+    // whether a stored carry is still safe to thread in; against the wrong
+    // number that comparison mismatches every time, and the carry it was meant
+    // to protect was discarded on every reconnect.
+    info.mathVersion = p.last_round.round_state_version;
   }
   return info;
 }

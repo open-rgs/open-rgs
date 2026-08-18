@@ -64,6 +64,12 @@ interface MockState {
   defaultBetIndex: number;
   promo?: PromoFreeRounds;
   openRound?: { roundId: string; bet: number; finalState?: string; balanceBefore: number; carryBefore: CarryState | undefined };
+  /** Math version that produced `carry`. Stored with it and handed back on the
+   *  next openSession, so the RGS can tell a carry written by older math from
+   *  one written by the math it is currently running - it discards the former
+   *  rather than threading it into a different model. A wallet that keeps the
+   *  carry but forgets this cannot make that distinction for it. */
+  mathVersion?: string;
   /** Cross-round carry the math threaded in (Guarantee 1  - persisted only with
    *  the money that earned it; written in the same settle that moved the win). */
   carry?: CarryState;
@@ -141,8 +147,10 @@ export class MockPlatform implements PlatformAdapter {
       allowedBets: s.allowedBets,
       defaultBetIndex: s.defaultBetIndex,
       promo: s.promo,
-      // The wallet is the source of truth for carry; hand back what we stored.
+      // The wallet is the source of truth for carry; hand back what we stored,
+      // with the math version that wrote it.
       ...(s.carry !== undefined ? { carry: s.carry } : {}),
+      ...(s.mathVersion !== undefined ? { mathVersion: s.mathVersion } : {}),
     };
   }
 
@@ -178,6 +186,7 @@ export class MockPlatform implements PlatformAdapter {
     }
     s.balance += req.win;
     s.carry = req.roundState;        // persist carry IN the same settle (Guarantee 1)
+    s.mathVersion = req.mathVersion; // ... and the math version that produced it
     this.roundCounter++;
     const roundId = this.nextRoundId();
     this.pushReversal(s, roundId, balanceBefore, carryBefore);
@@ -241,6 +250,7 @@ export class MockPlatform implements PlatformAdapter {
     // (Guarantee 1). The reversal entry uses the snapshot taken at OPEN, so
     // reversing restores both the pre-debit balance and the pre-round carry.
     s.carry = req.carry;
+    s.mathVersion = req.mathVersion;
     s.openRound = undefined;
     this.roundCounter++;
     this.pushReversal(s, req.roundId, open.balanceBefore, open.carryBefore);

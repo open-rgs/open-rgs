@@ -22,6 +22,7 @@ import { ArtubeAdapter } from "../src/index.js";
 function fakeArtube() {
   const balances = new Map<string, number>();
   const known = new Set<string>();
+  const lastRounds = new Map<string, Record<string, unknown>>();
   // Index 2 is 100 on purpose: the conformance fixture uses betIndex 2 with
   // bet 100, and this wire is amount-blind - the wallet derives the stake from
   // its own ladder, so the ladder has to agree with the fixture or every
@@ -62,10 +63,16 @@ function fakeArtube() {
           // that an unknown session is refused, so this must not auto-create.
           if (!balances.has(sid)) balances.set(sid, START);
           known.add(sid);
+          // A real wallet returns the player's last round, and the adapter maps
+          // its round_state / round_version onto the contract's carry and
+          // mathVersion. The fake used to omit it, so the cross-round state the
+          // RGS depends on was never exercised against this wire at all.
+          const last = lastRounds.get(sid);
           reply("SessionInfoResponse", {
             security_hash: "hash",
             currency: "USD",
             balance: balances.get(sid),
+            ...(last ? { last_round: last } : {}),
             game_settings: {
               default_bet_index: 0,
               allowed_bets: [100, 200, 500, 1000],
@@ -100,8 +107,24 @@ function fakeArtube() {
           }
           const next = have - bet + win;
           balances.set(sid, next);
+          const roundId = `round-${++roundSeq}`;
+          // Store the round the way the wallet does, so the next
+          // SessionInfoResponse can hand its state back.
+          lastRounds.set(sid, {
+            round_id: roundId,
+            price_multiplier: priceMul,
+            bet_index: betIndex,
+            win_multiplier: winMul,
+            win,
+            started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
+            round_version: Number(p["round_version"] ?? 1),
+            round_state_version: String(p["round_state_version"] ?? "1"),
+            round_state: String(p["round_state"] ?? ""),
+            is_platform_max_win_reached: false,
+          });
           reply("PlayRoundResponse", {
-            round_id: `round-${++roundSeq}`,
+            round_id: roundId,
             balance: next,
             win,
           });
@@ -205,6 +228,7 @@ describe("conformance", () => {
     const unexpected = report.checks
       .filter((c) => c.status === "fail" && !WIRE_CANNOT.has(c.id))
       .map((c) => `${c.id}: ${c.message ?? ""}`);
+    if (unexpected.length > 0) console.error("unexpected conformance failures:", unexpected);
     expect(unexpected).toEqual([]);
   }, 30_000);
 

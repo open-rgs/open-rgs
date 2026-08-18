@@ -208,6 +208,104 @@ export async function runConformance(
     }
   });
 
+  // --- carry: the state the adapter is the source of truth for ----
+  //
+  // ADR-004 makes the adapter authoritative for cross-round state: the RGS
+  // hands `carry` and `mathVersion` to the settle, and reads them back from the
+  // next openSession to seed the next round's math. Nothing here used to check
+  // that round trip, so an adapter that dropped either one - or stored it and
+  // never returned it - passed conformance and lost every player's progress on
+  // reconnect, in a way only that player would notice.
+
+  await run("state.carry.round-trip", "state", "carry survives settle -> openSession", async () => {
+    const carry = JSON.stringify({ conformance: "carry", n: 7 });
+    await adapter.settleSimple({
+      sessionId: fixture.sessionId,
+      bet: fixture.bet,
+      betIndex: fixture.betIndex,
+      priceMultiplier: fixture.priceMultiplier,
+      win: 0,
+      multiplier: 0,
+      type: "loss",
+      roundState: carry,
+      mathVersion: "conformance-math-1",
+      idempotencyKey: "conf-carry-1",
+    });
+    const reopened = await adapter.openSession(fixture.sessionId, fixture.connectionId);
+    if (reopened.carry === undefined) {
+      throw new Error(
+        "openSession returned no carry after a settle that supplied one. The RGS seeds the " +
+        "next round's math from this, so a player's cross-round progress is lost on reconnect.",
+      );
+    }
+    if (reopened.carry !== carry) {
+      throw new Error(`carry came back changed: sent ${carry}, got ${reopened.carry}`);
+    }
+  });
+
+  await run("state.mathVersion.round-trip", "state", "mathVersion is stored beside the carry and returned with it", async () => {
+    const reopened = await adapter.openSession(fixture.sessionId, fixture.connectionId);
+    if (reopened.carry === undefined) throw new Error("no carry (prerequisite check failed)");
+    if (reopened.mathVersion !== "conformance-math-1") {
+      throw new Error(
+        `mathVersion came back as ${String(reopened.mathVersion)}, expected "conformance-math-1". ` +
+        "The RGS discards a carry whose math version does not match the loaded math; without " +
+        "this field it cannot tell, and a carry from old math is threaded into new math.",
+      );
+    }
+  });
+
+  // --- promo free rounds ------------------------------------------
+  //
+  // The engine counts a funded round down locally, and a wallet that reports
+  // its own `remaining` overrides that count. Both halves are checked: an
+  // adapter that reports a number must report a SHRINKING one, and an adapter
+  // that reports nothing must say so by omitting the field rather than sending
+  // a stale number that would freeze the pool.
+
+  if (fixture.promo) {
+    const promo = fixture.promo;
+    await run("promo.consumed", "promo", "a promo-funded settle reports a pool that shrank, or reports nothing", async () => {
+      const before = await adapter.openSession(fixture.sessionId, fixture.connectionId);
+      const pool = before.promo;
+      if (!pool) {
+        throw new Error(
+          `fixture.promo names pool '${promo.id}' but openSession returned none  - ` +
+          "grant it on the wallet first, or drop fixture.promo",
+        );
+      }
+      if (pool.remaining <= 0) throw new Error(`pool '${pool.id}' has no rounds left to test with`);
+      const r = await adapter.settleSimple({
+        sessionId: fixture.sessionId,
+        bet: pool.bet,
+        betIndex: fixture.betIndex,
+        priceMultiplier: fixture.priceMultiplier,
+        win: 0,
+        multiplier: 0,
+        type: "loss",
+        roundState: "",
+        promoId: pool.id,
+        idempotencyKey: "conf-promo-1",
+      });
+      if (r.promo === undefined) {
+        // Legitimate: some wires have no field for it, and the engine counts
+        // down on its own. What is NOT legitimate is claiming a number and
+        // keeping it constant, which the next branch catches.
+        return;
+      }
+      if (r.promo.remaining >= pool.remaining) {
+        throw new Error(
+          `receipt.promo.remaining is ${r.promo.remaining}, was ${pool.remaining} before this round  - ` +
+          "a consumed free round must shrink the pool. A constant number overrides the engine's own " +
+          "countdown and the pool never drains.",
+        );
+      }
+    });
+  } else {
+    skip("promo.consumed", "promo", "a promo-funded settle reports a pool that shrank, or reports nothing",
+      "no fixture.promo configured  - grant a free-round pool on the wallet and name it to run this");
+  }
+
   // --- error paths ------------------------------------------------
   await run("errors.insufficient-funds", "errors", "a bet exceeding balance is rejected", async () => {
     await expectReject(() => adapter.settleSimple({

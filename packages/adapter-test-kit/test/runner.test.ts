@@ -19,6 +19,9 @@ class TinyAdapter implements PlatformAdapter {
   private handlers: ((e: PlatformEvent) => void)[] = [];
   private openRoundId: string | undefined;
   private receipts = new Map<string, RoundReceipt>();
+  // Cross-round state, which ADR-004 makes the adapter's job: the RGS writes it
+  // with the settle and reads it back on the next openSession.
+  private carry = new Map<string, { carry: string; mathVersion?: string }>();
 
   async connect()    { this.connected = true; }
   disconnect()       { this.connected = false; }
@@ -36,6 +39,7 @@ class TinyAdapter implements PlatformAdapter {
 
   async openSession(sessionId: string): Promise<SessionInfo> {
     if (!this.balances.has(sessionId)) this.balances.set(sessionId, 10_000);
+    const stored = this.carry.get(sessionId);
     return {
       sessionId,
       currency: "USD",
@@ -43,6 +47,8 @@ class TinyAdapter implements PlatformAdapter {
       balance: this.balances.get(sessionId)!,
       allowedBets: [10, 50, 100, 500],
       defaultBetIndex: 2,
+      ...(stored ? { carry: stored.carry } : {}),
+      ...(stored?.mathVersion !== undefined ? { mathVersion: stored.mathVersion } : {}),
     };
   }
 
@@ -54,6 +60,11 @@ class TinyAdapter implements PlatformAdapter {
     const next = bal - req.bet + req.win;
     this.balances.set(req.sessionId, next);
     const roundId = `r-${this.nextRoundId++}`;
+    // Carry and money commit together - one round, one record.
+    this.carry.set(req.sessionId, {
+      carry: req.roundState,
+      ...(req.mathVersion !== undefined ? { mathVersion: req.mathVersion } : {}),
+    });
     this.emit({ type: "balanceChanged", sessionId: req.sessionId, balance: next, reason: "spin" });
     return this.remember(req.idempotencyKey, { roundId, balance: next });
   }

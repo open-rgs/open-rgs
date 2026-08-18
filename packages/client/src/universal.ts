@@ -60,9 +60,17 @@ export interface UniversalOptions {
   decide?(awaiting: { type: string; options?: unknown[] }, steps: readonly Step[]): PlayerAction;
   /** Guard against a math bug that never reaches a terminal state. Default 200. */
   maxSteps?: number;
-  /** Mint an idempotency token per logical call. Default is a counter, so a
-   *  retry inside this client reuses the token and the server answers from
-   *  cache rather than running the round twice. */
+  /** Mint an idempotency token per logical call. The default is a per-instance
+   *  random prefix plus a counter, so a retry inside this client reuses its
+   *  token (the server answers from cache rather than running the round twice)
+   *  while a DIFFERENT client cannot collide with it.
+   *
+   *  The prefix is the part that matters. The default used to be the counter
+   *  alone - `uc-spin-1` - which is unique only within one object's lifetime.
+   *  Two clients on the same session inside the server's cache window (a
+   *  reconnect, a rerun of a smoke test, two workers) minted identical tokens,
+   *  and the server correctly answered the second run from the first run's
+   *  cache: the run passed without a single round having executed. */
   keyFor?(call: string, n: number): string;
   /** Retries per call on a transport or platform failure. Default 2. Safe
    *  because every retry carries the same token. */
@@ -80,6 +88,8 @@ const DEFAULT_DECIDE: NonNullable<UniversalOptions["decide"]> = (awaiting) => {
 
 export class UniversalClient {
   private seq = 0;
+  /** Random per instance, so tokens from two clients never coincide. */
+  private readonly run = Math.random().toString(36).slice(2, 10);
 
   constructor(
     private readonly rgs: RgsClient,
@@ -88,7 +98,7 @@ export class UniversalClient {
 
   private key(call: string): string {
     const n = ++this.seq;
-    return this.opts.keyFor ? this.opts.keyFor(call, n) : `uc-${call}-${n}`;
+    return this.opts.keyFor ? this.opts.keyFor(call, n) : `uc-${this.run}-${call}-${n}`;
   }
 
   /** Call with retries, reusing one token so a retry is deduplicated by the

@@ -47,6 +47,17 @@ export interface ConformanceFixture {
   betIndex: number;
   /** Price multiplier the orchestrator would pass to the platform. */
   priceMultiplier: number;
+  /** A free-round pool already granted on the wallet for this session.
+   *
+   *  Optional, because granting one is a wallet-side action the suite cannot
+   *  perform. Name it and the promo checks run; leave it out and they are
+   *  reported as skips rather than passes - the pool countdown is the one place
+   *  where a wallet's silence and a wallet's wrong answer have very different
+   *  consequences, so "not tested" must not read as "fine". */
+  promo?: {
+    /** Pool id, as the adapter surfaces it in `SessionInfo.promo.id`. */
+    id: string;
+  };
 }
 
 export const DEFAULT_FIXTURE: ConformanceFixture = {

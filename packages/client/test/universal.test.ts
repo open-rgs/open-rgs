@@ -205,3 +205,24 @@ describe("an abandoned round is replayed and closed", () => {
     rgs.disconnect();
   });
 });
+
+describe("default idempotency tokens", () => {
+  test("two clients on the same session do not mint the same tokens", () => {
+    // The server caches by (session, token). Identical tokens from a second
+    // client would be answered from the first client's cache - a smoke test
+    // that "passes" without running a round.
+    const keys = (c: UniversalClient) =>
+      [1, 2, 3].map(() => (c as unknown as { key(call: string): string }).key("spin"));
+    const a = new UniversalClient({} as never);
+    const b = new UniversalClient({} as never);
+    const ka = keys(a);
+    const kb = keys(b);
+    expect(new Set([...ka, ...kb]).size).toBe(6);
+  });
+
+  test("one client still reuses its own token for a retry of the same call", () => {
+    const c = new UniversalClient({} as never);
+    const k = (c as unknown as { key(call: string): string }).key("spin");
+    expect(k).toMatch(/^uc-[a-z0-9]+-spin-1$/);
+  });
+});
