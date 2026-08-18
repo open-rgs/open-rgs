@@ -44,7 +44,7 @@ is declined writes **nothing**: no balance change, and no state change.
   (`RoundOutcomeStatus`) in the tamper-evident audit log, `settled`,
   `settled-max-win`, `opened`, `autoclosed`, and crucially `failed-bet`: a
   declined bet logs `failed-bet` with `win = 0` and is **never** a `settled`.
-  So "no money, no honey" is not just a code property, it's visible in the
+  So "no money, no honey" is a code property that is also visible in the
   audit trail. An auditor can confirm no phantom settle exists for a round
   whose money never moved.
 

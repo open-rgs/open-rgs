@@ -114,7 +114,7 @@ const jsonLd = isLanding
     {/* Mermaid loader, lazy-imports the lib from a CDN only when the
         page actually has a diagram, then re-renders on theme toggle so
         colors track the site palette. SVG output is unframed so
-        diagrams blend seamlessly into the reading column. */}
+        diagrams sit in the reading column without a frame. */}
     <script is:inline>
       (function () {
         var diagrams = document.querySelectorAll("[data-mermaid]");
@@ -444,7 +444,7 @@ const jsonLd = isLanding
       }
       pre.diagram .accent { color: var(--accent); }
 
-      /* Mermaid diagram, seamless, no frame, blends into the page.
+      /* Mermaid diagram: no frame, sits in the page.
          Source is shown briefly as a styled pre until the JS renderer
          swaps in the SVG. If JS or the lib fails, the source remains
          readable. */

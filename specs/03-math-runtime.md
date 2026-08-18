@@ -271,7 +271,7 @@ rescans them, and re-imports the ENTRY under a cache-busting URL derived from
 the graph hash, so an edited entry takes effect and the caller can swap its
 math reference. Imported helpers are already in the module cache under their
 own URLs and are NOT re-imported - the loader warns when the graph hash moved,
-because the alternative is silently running the old code. Restart the process
+because the alternative is running stale code without saying so. Restart the process
 to pick up an edited helper.
 
 In-flight rounds during a reload finish with the math reference they started
