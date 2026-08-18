@@ -6,14 +6,14 @@ ops and awaiting hints, all crossing the JS↔WASM boundary as MessagePack.
 
 The mechanic is a gamble ladder: you start at `1.00x`; each `climb` either busts
 (25% chance, pays 0) or grows the multiplier `×1.28`; you cash out by closing
-before you bust. (Just one example — more complex games live in the
+before you bust. (Just one example, more complex games live in the
 [open-rgs-examples](https://github.com/open-rgs/open-rgs-examples) gallery.)
 
 ## The key idea: the kernel keeps nothing
 
 Core stores the round's `state` (an opaque string) and threads it back into the
 next `step` / `is_terminal` / `close`. So the kernel must **serialize the whole
-round state on every call and rehydrate it on the next** — it holds no globals
+round state on every call and rehydrate it on the next**: it holds no globals
 between calls. That is exactly why a round survives a reconnect or a server
 restart, and why one reused wasm instance can interleave many concurrent rounds.
 
@@ -31,14 +31,14 @@ autoclose(state)     -> close-shaped   // external trigger only (wallet/admin)
 **bytes**. The loader owns the bridge: the kernel emits `state` as a MessagePack
 `bin`; `loadWasmMath` **base64**s it into the `RoundState` string and base64-
 decodes it back before the next call. The kernel never sees base64; core never
-sees bytes. (See `maths/play.zig` — an 8-byte `State` struct it packs/unpacks
+sees bytes. (See `maths/play.zig`, an 8-byte `State` struct it packs/unpacks
 itself.) `ops` are opaque and forwarded to the client verbatim.
 
 ## Files
 
 | File | | What |
 |------|---|------|
-| `maths/play.zig` | — | the kernel: `State` (de)serialize + open/step/close/is_terminal/autoclose |
+| `maths/play.zig` |, | the kernel: `State` (de)serialize + open/step/close/is_terminal/autoclose |
 | `maths/play.zig` → `maths/play.wasm` | `zig` → wasm32 | the served, hashable artifact (committed so CI needs no zig) |
 
 ## Run
@@ -55,11 +55,11 @@ zig build-exe play.zig -target wasm32-freestanding -fno-entry -rdynamic \
 
 ## Simulating options (RTP is policy-relative)
 
-A game with choices has **no single RTP** — only an RTP *per policy*. Here the
+A game with choices has **no single RTP**, only an RTP *per policy*. Here the
 policy is "climb up to N rungs, then cash out". Two ways to measure it:
 
 **Kernel self-play (blazing).** `maths/play.zig` also exports
-`sim_ladder(spins, seedHi, seedLo, stopLevel, outP)` — it self-plays the whole
+`sim_ladder(spins, seedHi, seedLo, stopLevel, outP)`: it self-plays the whole
 policy loop *inside* the kernel (no per-step JS↔WASM crossing) and writes the
 same 6×f64 aggregate the simulator's batch tier consumes. Sweep the policy:
 
@@ -78,12 +78,12 @@ bun examples/cash-ladder/src/sweep.ts
 
 50M self-played rounds *per policy point* in a fraction of a second. The curve
 makes the design legible: each climb bleeds ~4% (the house edge compounds), so
-the optimal policy is to not climb at all. That is the point of a sweep — the
+the optimal policy is to not climb at all. That is the point of a sweep, the
 "RTP" you certify depends entirely on the player's strategy.
 
 **Host-driven policy (flexible).** When the choice is among *step options*
-(e.g. gamble vs collect — see `examples/gamble-slot`), pass a strategy function to the per-spin
-simulator instead — it sees the public context (`awaiting` + the latest `ops`)
+(e.g. gamble vs collect, see `examples/gamble-slot`), pass a strategy function to the per-spin
+simulator instead. It sees the public context (`awaiting` + the latest `ops`)
 at each decision, never the opaque state:
 
 ```ts
@@ -95,7 +95,7 @@ const policy: StrategyFn = ({ awaiting, ops }) =>
 const [report] = await simulate(manifest, { complexStrategy: policy });
 ```
 
-This tier runs *arbitrary* policies (even an optimal solver) at ~100k–1M
+This tier runs *arbitrary* policies (even an optimal solver) at ~100k, 1M
 rounds/sec; the kernel tier is for a *fixed* policy at ~native speed.
 
 ## Wire it into a game
@@ -112,6 +112,6 @@ const manifest = defineGame({
 ```
 
 > ⚠️ `loadWasmMath` has **no execution watchdog**, and the worker pool
-> (`createMathPool`) is simple-only today — so a complex kernel has no
+> (`createMathPool`) is simple-only today, so a complex kernel has no
 > fail-closed timeout yet. Keep complex WASM kernels **trusted and bounded**.
 > See `specs/03-math-runtime.md`.

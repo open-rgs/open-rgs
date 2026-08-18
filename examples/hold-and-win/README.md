@@ -1,7 +1,7 @@
 # Example: hold-&-win math in Zig
 
 A **generic** hold-&-win slot, written in Zig and compiled to WASM. The numbers
-here are **invented** to demonstrate the runtime — not taken from any specific
+here are **invented** to demonstrate the runtime, not taken from any specific
 commercial game.
 
 ## The mechanic
@@ -21,7 +21,7 @@ the sum of locked coins (capped at 5000×). Tuned to **RTP ≈ 96%**.
 
 | file | built with | role |
 |---|---|---|
-| `maths/kernel.zig` | — | the math: PRNG + `playRound` (generic over the RNG) + `Stats` |
+| `maths/kernel.zig` |, | the math: PRNG + `playRound` (generic over the RNG) + `Stats` |
 | `maths/play.zig` → `maths/play.wasm` | `zig` → wasm32 | served game (`play`, host CSPRNG) **and** fast batch sim (`sim_batch`) |
 | `maths/sim.zig` → `sim` | `zig` → native | native multithreaded simulator (build your own; gitignored) |
 
@@ -48,7 +48,7 @@ zig build-exe play.zig -target wasm32-freestanding -fno-entry -rdynamic \
 ## Measured (this machine, 10 cores)
 
 - in-WASM batch: ~**200M spins/sec** (sandboxed)
-- native + threads: **1B spins in ~5s (~200M/s)** — heavier per-spin than a
+- native + threads: **1B spins in ~5s (~200M/s)**, heavier per-spin than a
   one-draw slot (15+ draws + the respin loop)
 - RTP **95.9%**, hit **30.7%**, feature **1 in 100**, grand **1 in ~12,500**,
   max **1541×**

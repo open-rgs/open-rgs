@@ -47,7 +47,7 @@ pick one.
 ### 4 . No half-features in core
 
 If autoclose isn't done, it's not in core. Better five solid pieces
-than eight half-baked ones. (We saw this with `patchBalance`, it was
+than eight half-baked ones. (We saw this with `patchBalance`: it was
 half-finished, rotted, removed.)
 
 ### 5 . Push concerns out of core

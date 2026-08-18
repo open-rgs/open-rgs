@@ -60,7 +60,7 @@ in CI on every commit that touches `maths/`.
 
 ## Strategy testing for complex rounds
 
-For complex maths, the simulator can't drive itself, it needs
+For complex maths, the simulator can't drive itself: it needs
 strategies (action pickers). Math files ship a `simulate.pickAction`
 function or the game ships separate strategy files in `strategies/`:
 

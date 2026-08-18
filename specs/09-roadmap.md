@@ -145,7 +145,7 @@ The order above prioritises:
    the CLI, math designers can't iterate or certify, and the project
    doesn't deliver its core value.
 2. **Production-readiness gaps** (cheat strip, manifest validation,
-   metrics, graceful shutdown), the runtime is correct but operators
+   metrics, graceful shutdown): the runtime is correct but operators
    would refuse to deploy without these.
 3. **Architectural breadth** (WASM loader, bonus engine, public/private
    state), needed once we onboard the second game or the second wallet.

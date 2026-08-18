@@ -28,7 +28,7 @@ computing the same game - run `bun examples/twin-slot/src/bench.ts`):
 | Zig -> WASM | 1,176 ns | 850,016 |
 | **TS (in-process)** | **13 ns** | **77,978,628** |
 
-TypeScript is ~92x the WASM kernel. The gap is not the language, it is the
+TypeScript is ~92x the WASM kernel. The gap is not the language but the
 boundary: a WASM kernel round-trips MessagePack through linear memory, and an
 in-process TypeScript math crosses nothing at all.
 

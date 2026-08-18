@@ -27,7 +27,7 @@ await createServer({
     modes: { default: { math: await loadTsMath("./maths/spin.ts"), stakeMultiplier: 1 } },
   }),
   platform:  new MockPlatform({ startingBalance: 100_000 }),
-  transport: binaryTransport({ port: 80 }),
+  transport: binaryTransport({ port: 8080 }),
 });`}</code></pre>
 
     <h2 data-section="§ start">Start here</h2>

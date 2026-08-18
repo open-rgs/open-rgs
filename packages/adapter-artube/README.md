@@ -18,7 +18,7 @@ await createServer({
     gameId:    "my-game",
     authToken: process.env.GAMES_API_KEY,
   }),
-  transport: binaryTransport({ port: 80 }),
+  transport: binaryTransport({ port: 8080 }),
 });
 ```
 

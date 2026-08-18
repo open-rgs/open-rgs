@@ -1,7 +1,7 @@
-# twin-slot — one simple-round slot, in TypeScript *and* Zig
+# twin-slot: one simple-round slot, in TypeScript *and* Zig
 
-The same slot math written twice — once in TypeScript (`maths/slot.ts`), once in Zig
-compiled to WASM (`maths/slot.zig` → `maths/slot.wasm`) — with a test that proves
+The same slot math written twice, once in TypeScript (`maths/slot.ts`), once in Zig
+compiled to WASM (`maths/slot.zig` → `maths/slot.wasm`), with a test that proves
 the two produce **identical outcomes** for the same RNG stream.
 
 Why a pair? Because open-rgs treats both runtimes the same: a math is a math. TypeScript
@@ -21,7 +21,7 @@ One RNG draw → a paytable. RTP = **0.96**:
 | otherwise  |        ×0  |       0.58  |
 
 `0.02·20 + 0.04·5 + 0.36·1 = 0.96`. The TypeScript ternary ladder and the Zig
-`decide()` use the **same thresholds and payouts** and draw exactly once — keep
+`decide()` use the **same thresholds and payouts** and draw exactly once, keep
 them in lock-step or the parity test fails. That test *is* the contract between
 the two files.
 
@@ -29,11 +29,11 @@ the two files.
 
 | File | What |
 |---|---|
-| `maths/slot.ts` | the slot in TypeScript — the readable reference |
+| `maths/slot.ts` | the slot in TypeScript, the readable reference |
 | `maths/slot.zig` | the same slot in Zig (+ an in-WASM `sim_batch` for RTP) |
 | `maths/slot.wasm` | committed build of `slot.zig` (CI uses it; no zig needed) |
 | `src/compare.ts` | runnable demo: the same stream through both, side by side |
-| `test/twin-slot.test.ts` | CI proof — 20k-spin parity + measured RTP |
+| `test/twin-slot.test.ts` | CI proof, 20k-spin parity + measured RTP |
 
 ## Run
 
@@ -52,6 +52,6 @@ zig build-exe slot.zig -target wasm32-freestanding -fno-entry -rdynamic \
 
 ## See also
 
-- `examples/twin-gamble` — the same idea for a **complex** (multi-step) round.
-- `examples/hello-spin` — a TypeScript simple slot wired into a runnable server.
-- `packages/core/test/fixtures/wasm` — the reference WASM ABI kernels.
+- `examples/twin-gamble`. The same idea for a **complex** (multi-step) round.
+- `examples/hello-spin`. A TypeScript simple slot wired into a runnable server.
+- `packages/core/test/fixtures/wasm`, the reference WASM ABI kernels.

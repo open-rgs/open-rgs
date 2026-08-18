@@ -27,14 +27,15 @@ await createServer({
     modes: { default: { math: await loadTsMath("./maths/spin.ts"), stakeMultiplier: 1 } },
   }),
   platform:  new MockPlatform({ startingBalance: 100_000 }),
-  transport: binaryTransport({ port: 80 }),
+  transport: binaryTransport({ port: 8080 }),
 });
 ```
 
 ## Math runtimes
 
 A game's math is a `MathModule` (`@open-rgs/contract`). Core loads it from
-one of three source forms - same contract, swappable by a manifest entry:
+one of two source forms, and runs a WASM kernel either inline or in a worker
+pool. Same contract in every case, swappable by a manifest entry:
 
 | Loader | Source | Use case |
 |--------|--------|----------|
@@ -90,15 +91,15 @@ Guarantee 5). It is **not a portable no-DoS sandbox**, though: whether
 leak. Treat WASM kernels as **trusted and bounded** regardless; a hard
 cross-platform no-DoS kill needs process isolation (SIGKILL), not implemented.
 The pool's win over bare `loadWasmMath` is off-thread concurrency + round-level
-failure. v1 is simple (single `play`) math. 
+failure. v1 is simple (single `play`) math.
 
 **Complex rounds.** A kernel with `kind=1` and `open` / `step` / `is_terminal` /
 `close` (+ optional `autoclose`) exports loads as complex math. Core threads the
 kernel's serialized `state` (base64) back into each call; the kernel keeps
 nothing between calls. See `examples/cash-ladder` for a worked Zig kernel and
 `specs/03-math-runtime.md` for the ABI. (The pool is simple-only today; and even
-for simple math its worker-kill is platform-dependent — it fails the *round* on
-timeout but isn't a portable no-DoS sandbox — so keep all WASM kernels trusted.)
+for simple math its worker-kill is platform-dependent, it fails the *round* on
+timeout but isn't a portable no-DoS sandbox, so keep all WASM kernels trusted.)
 
 Why Zig for kernels: comptime RTP invariants, no GC pauses, no JIT warmup,
 tiny hashable output, and one source that compiles to **both** WASM (server)

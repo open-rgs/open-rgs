@@ -4,7 +4,7 @@
 //
 // Wire protocol:
 //   - Transport      ws subprotocol "json", auth via headers X-Game-ID /
-//                    X-Api-Key. URL is used verbatim — the env var
+//                    X-Api-Key. URL is used verbatim, the env var
 //                    GamesApiUrl already encodes ?game=<id>.
 //   - Handshake      send Hello{supports:{max_schema:1}} on open,
 //                    wait for Welcome{use:{max_schema:1}}. RPCs are
@@ -46,7 +46,7 @@ import type {
 import { createLogger, type Logger } from "@open-rgs/log";
 import pkg from "../package.json" with { type: "json" };
 
-/** Version of this adapter package — exported so consumers can log it
+/** Version of this adapter package, exported so consumers can log it
  *  alongside their own boot banner. The same string is stamped as
  *  `service.version` on every line the adapter writes via its default
  *  logger, so you can grep `service.name="open-rgs-adapter-artube"` and
@@ -170,7 +170,7 @@ export interface ArtubeAdapterOptions {
   /** WS PING interval in ms. Default 20s. Set 0 to disable heartbeat. */
   heartbeatIntervalMs?: number;
   /** Treat the connection as a zombie if no PONG (or any inbound frame)
-   *  arrives within this many ms — terminate + reconnect. Default 60s
+   *  arrives within this many ms, terminate + reconnect. Default 60s
    *  (3× the default interval). */
   heartbeatTimeoutMs?: number;
   /** Optional logger. If omitted, the adapter constructs its own
@@ -207,13 +207,13 @@ export class ArtubeAdapter implements PlatformAdapter {
 
   // ── Heartbeat / zombie detection ─────────────────────────────────────
   // Bun on long-lived TLS sockets behind an LB has been observed to keep
-  // a WebSocket in readyState=OPEN long after the peer side is gone —
+  // a WebSocket in readyState=OPEN long after the peer side is gone, 
   // the pod's adapter looks "connected" but every RPC times out and no
   // GoAway / close ever arrives. We send WS PING frames on an interval
   // and listen for PONG; if no PONG arrives within heartbeatTimeoutMs we
   // assume the connection is a zombie, call terminate() (skip the close
   // handshake, force a 1006 + reconnect). Application-layer idle
-  // timeouts at the Artube side are separate — these pings keep our
+  // timeouts at the Artube side are separate, these pings keep our
   // view of the socket honest, they do NOT reset Artube's IdleTimeout.
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastPongAt = 0;
@@ -256,7 +256,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     // its own (tests, dev probes). We stamp the logger's
     // service.version with this package's actual version (read from
     // package.json at bundle time) so every adapter log line carries
-    // the running adapter version — answers "which adapter is in the
+    // the running adapter version, answers "which adapter is in the
     // pod right now" without bumping into the ambiguity that hardcoded
     // logger labels created.
     this.log = opts.logger ?? createLogger({
@@ -424,7 +424,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     this.ws = ws;
 
     ws.on("open", () => {
-      this.log.info("Artube WS open — sending Hello", {
+      this.log.info("Artube WS open, sending Hello", {
         "event.category": "artube",
         "event.action":   "ws_open",
         "artube.ws_url":  this.wsUrl,
@@ -438,7 +438,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     });
 
     ws.on("pong", () => {
-      // Refresh the liveness clock. Don't log per pong — too noisy at
+      // Refresh the liveness clock. Don't log per pong, too noisy at
       // 20s cadence; we only log when a heartbeat fails or the timeout
       // fires. lastPongAt is also bumped on any inbound message
       // (handleMessage) so app traffic counts as liveness too.
@@ -480,7 +480,7 @@ export class ArtubeAdapter implements PlatformAdapter {
 
     ws.on("unexpected-response", (_req, res) => {
       // Fires when the HTTP upgrade returns a non-101 (401, 403, 404,
-      // 502...). This is the auth/permission-failure path — without
+      // 502...). This is the auth/permission-failure path, without
       // logging it explicitly we'd just see a generic "WS closed".
       this.log.error("Artube WS upgrade rejected", {
         "event.category": "artube",
@@ -522,7 +522,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     // Hello/Welcome handshake deadline
     const handshakeTimer = setTimeout(() => {
       if (!this.ready && this.readyReject) {
-        this.log.error("Artube handshake timeout — no Welcome received", {
+        this.log.error("Artube handshake timeout, no Welcome received", {
           "event.category": "artube",
           "event.action":   "ws_handshake_timeout",
           "artube.timeout_ms": this.handshakeTimeoutMs,
@@ -546,7 +546,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     // orphan Error reply that doesn't match any in-flight RPC. First
     // schedule wins; subsequent calls until the timer fires are no-ops.
     if (this.reconnectTimer !== null) {
-      this.log.debug("Artube reconnect already scheduled — dropping duplicate", {
+      this.log.debug("Artube reconnect already scheduled, dropping duplicate", {
         "event.category": "artube",
         "event.action":   "ws_reconnect_duplicate",
         "artube.attempt": this.reconnectAttempts,
@@ -554,7 +554,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       return;
     }
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.log.error("Artube max reconnect attempts reached — giving up", {
+      this.log.error("Artube max reconnect attempts reached, giving up", {
         "event.category": "artube",
         "event.action":   "ws_reconnect_exhausted",
         "artube.max_attempts": this.maxReconnectAttempts,
@@ -601,13 +601,13 @@ export class ArtubeAdapter implements PlatformAdapter {
 
   private tickHeartbeat(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      // Socket isn't OPEN — nothing to ping. The close handler will
+      // Socket isn't OPEN, nothing to ping. The close handler will
       // stopHeartbeat() when it fires; this is just defensive.
       return;
     }
     const silentMs = Date.now() - this.lastPongAt;
     if (silentMs > this.heartbeatTimeoutMs) {
-      this.log.warn("Artube WS heartbeat timeout — terminating zombie connection", {
+      this.log.warn("Artube WS heartbeat timeout, terminating zombie connection", {
         "event.category": "artube",
         "event.action":   "ws_heartbeat_timeout",
         "artube.silent_ms":           silentMs,
@@ -615,7 +615,7 @@ export class ArtubeAdapter implements PlatformAdapter {
         "artube.ws_state":            this.wsStateString(),
         "artube.pending_rpcs":        this.pending.size,
       });
-      // terminate() skips the TCP/TLS close handshake — the right move
+      // terminate() skips the TCP/TLS close handshake, the right move
       // when the peer is unresponsive. ws fires 'close' with code 1006
       // immediately, which schedules a reconnect.
       try { this.ws.terminate(); }
@@ -644,7 +644,7 @@ export class ArtubeAdapter implements PlatformAdapter {
   // ── Inbound dispatch ────────────────────────────────────────────────
 
   private handleMessage(msg: Envelope): void {
-    // Any inbound application frame is proof the peer is alive — refresh
+    // Any inbound application frame is proof the peer is alive, refresh
     // the liveness clock so we don't terminate a busy connection that
     // happens to skip a PONG window (some intermediaries drop control
     // frames under load).
@@ -663,7 +663,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     if (msg.chan === "control") {
       if (msg.type === "Welcome") {
         const wp = msg.payload as WelcomePayload;
-        this.log.info("Artube handshake complete — Welcome received", {
+        this.log.info("Artube handshake complete, Welcome received", {
           "event.category": "artube",
           "event.action":   "ws_welcome",
           "artube.use_schema": wp.use?.max_schema,
@@ -791,7 +791,7 @@ export class ArtubeAdapter implements PlatformAdapter {
 
   private async rpc<Req, Res>(type: string, payload: Req): Promise<Envelope<Res>> {
     if (!this.ready || this.ws?.readyState !== WebSocket.OPEN) {
-      this.log.error("Artube RPC refused — not ready", {
+      this.log.error("Artube RPC refused, not ready", {
         "event.category": "artube",
         "event.action":   "rpc_refused",
         "artube.rpc_type": type,
@@ -894,7 +894,7 @@ function artubeSessionToContract(
     currency:        p.currency,
     // Artube wire amounts are minor units of a 2-decimal currency
     // (EUR/USD/RUB-class). The wire schema does not carry a
-    // precision field — if Artube ever supports JPY (0) or BTC (8),
+    // precision field, if Artube ever supports JPY (0) or BTC (8),
     // this needs to become per-currency lookup or per-session metadata.
     currencyDecimals: 2,
     balance:         p.balance,
@@ -920,7 +920,7 @@ function artubeSessionToContract(
 
 /** Map Artube's FreeRoundCampaign wire shape into the contract's
  *  neutral PromoFreeRounds. The Artube-specific tracking fields
- *  (total_win, is_complete, valid_from) stay inside this adapter —
+ *  (total_win, is_complete, valid_from) stay inside this adapter, 
  *  the platform's bonus engine owns those numbers, not the RGS. */
 function artubeCampaignToPromo(c: ArtubeFreeRoundCampaign): PromoFreeRounds {
   return {
