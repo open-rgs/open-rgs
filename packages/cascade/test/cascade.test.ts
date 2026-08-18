@@ -4,10 +4,8 @@
 // still looks plausible on screen.
 
 import { describe, expect, test } from "bun:test";
-import { at, column, fromColumns, makeGrid, rect } from "@open-rgs/grid";
-import {
-  clear, collapse, holeCount, multiplierForStep, refill, runCascade, tumble,
-} from "../src/index.js";
+import { at, column, fromColumns, makeGrid, rect , toColumns } from "@open-rgs/grid";
+import { clear, collapse, holeCount, multiplierForStep, refill, refillAvoiding, refillFrom, refillPerColumn, runCascade, tumble, type Holed } from "../src/index.js";
 
 const seq = (xs: string[]) => { let i = 0; return () => xs[i++ % xs.length]!; };
 /** A picker that ignores randomness, so refills are readable in assertions. */
@@ -307,5 +305,49 @@ describe("a step reports what fell in", () => {
     );
     expect(run.steps[0]!.cleared).toEqual([1]);   // the middle cell won
     expect(run.steps[0]!.refilled).toEqual([0]);  // the top one is what fell in
+  });
+});
+
+describe("refill helpers", () => {
+  const A = { pick: () => "A" };
+  const B = { pick: () => "B" };
+  const holed = (): Holed<string> => clear(fromColumns([["x", "y"], ["z", "w"]]), [0, 1, 2, 3]);
+
+  test("refillPerColumn gives each column its own set", () => {
+    const out = refillPerColumn(holed(), [A, B], () => 0.5);
+    expect(toColumns(out)).toEqual([["A", "A"], ["B", "B"]]);
+  });
+
+  test("columns past the end of the list reuse the last set", () => {
+    const g = clear(fromColumns([["x"], ["y"], ["z"]]), [0, 1, 2]);
+    expect(toColumns(refillPerColumn(g, [A, B], () => 0.5))).toEqual([["A"], ["B"], ["B"]]);
+  });
+
+  test("refillPerColumn leaves surviving symbols alone", () => {
+    const g = clear(fromColumns([["x", "y"]]), [0]);      // only the top cell is a hole
+    expect(toColumns(refillPerColumn(g, [A], () => 0.5))).toEqual([["A", "y"]]);
+  });
+
+  test("an empty set list is a build-time error, not a blank board", () => {
+    expect(() => refillPerColumn(holed(), [], () => 0.5)).toThrow(/at least one set/);
+  });
+
+  test("refillAvoiding retries a board that would win, and reports how often", () => {
+    let calls = 0;
+    const pick = () => (++calls <= 4 ? "WIN" : "SAFE");     // first two boards win
+    const out = refillAvoiding(holed(), pick, () => 0.5, (g) => g.cells.includes("WIN"));
+    expect(out.grid.cells.every((c) => c === "SAFE")).toBe(true);
+    expect(out.rejected).toBe(1);
+  });
+
+  test("it gives up rather than spinning forever, because a spin must finish", () => {
+    const out = refillAvoiding(holed(), () => "WIN", () => 0.5, () => true, 3);
+    expect(out.rejected).toBe(3);
+    expect(out.grid.cells.every((c) => c === "WIN")).toBe(true);
+  });
+
+  test("a board that does not win is taken on the first try", () => {
+    const out = refillAvoiding(holed(), () => "SAFE", () => 0.5, () => false);
+    expect(out.rejected).toBe(0);
   });
 });

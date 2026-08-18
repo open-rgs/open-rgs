@@ -1,0 +1,41 @@
+{
+  "name": "@open-rgs/symbols",
+  "version": "0.1.0",
+  "description": "Symbol-level mechanics: mystery reveals, transforms, walking wilds, wilds that carry a multiplier, and symbols that count more than once.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/symbols"
+  },
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "slot",
+    "wilds",
+    "mystery",
+    "math"
+  ],
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0",
+    "@open-rgs/weights": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "homepage": "https://open-rgs.dev/extension/symbols"
+}

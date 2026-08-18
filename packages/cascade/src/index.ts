@@ -88,6 +88,73 @@ export function refill<S>(grid: Holed<S>, pick: (next: () => number) => S, next:
   return { shape: grid.shape, cells };
 }
 
+// --- where the new symbols come from ----------------------------------------
+//
+// `refill` takes a `pick`, and what you hand it is a real decision. Three
+// shapes cover it, and the third is the one games get wrong.
+
+/** Refill every hole from one set: the plain case. */
+export function refillFrom<S>(set: { pick(r: number): S }): (next: () => number) => S {
+  return (next) => set.pick(next());
+}
+
+/**
+ * Refill each column from its own set.
+ *
+ * The reason to bother: a cascade that refills every column from the base
+ * game's single set quietly flattens a game whose columns differ, which is
+ * most games with a premium-light first reel. Columns past the end of the list
+ * reuse the last set.
+ */
+export function refillPerColumn<S>(
+  grid: Holed<S>,
+  sets: ReadonlyArray<{ pick(r: number): S }>,
+  next: () => number,
+): Grid<S> {
+  if (sets.length === 0) throw new Error("refillPerColumn: needs at least one set");
+  const cells: S[] = [];
+  let i = 0;
+  for (let col = 0; col < widthOf(grid.shape); col++) {
+    const set = sets[Math.min(col, sets.length - 1)]!;
+    const h = heightOf(grid.shape, col);
+    for (let row = 0; row < h; row++, i++) {
+      const v = grid.cells[i]!;
+      cells.push(v === null ? set.pick(next()) : v);
+    }
+  }
+  return { shape: grid.shape, cells };
+}
+
+/**
+ * Refill, then reject boards that would win immediately, up to `attempts`.
+ *
+ * Sometimes wanted for presentation ("no instant re-win"), and it is worth
+ * being blunt about the cost: rejection sampling CHANGES THE DISTRIBUTION. The
+ * refilled cells are no longer drawn from your set, they are drawn from your
+ * set conditioned on not winning, which lowers the RTP of the cascade by an
+ * amount that depends on the paytable. Measure the game with it on. It is here
+ * because games ship it either way, and doing it by hand tends to lose the
+ * attempt cap, which is the part that keeps a spin finite.
+ */
+export function refillAvoiding<S>(
+  grid: Holed<S>,
+  pick: (next: () => number) => S,
+  next: () => number,
+  wouldWin: (candidate: Grid<S>) => boolean,
+  attempts = 8,
+): { grid: Grid<S>; rejected: number } {
+  let rejected = 0;
+  let last = refill(grid, pick, next);
+  for (let i = 0; i < attempts; i++) {
+    if (!wouldWin(last)) return { grid: last, rejected };
+    rejected++;
+    last = refill(grid, pick, next);
+  }
+  // Out of attempts: take the board. A spin that cannot finish is worse than a
+  // board that pays twice in a row.
+  return { grid: last, rejected };
+}
+
 /** How many holes a board has. */
 export function holeCount<S>(grid: Holed<S>): number {
   let n = 0;

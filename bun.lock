@@ -162,6 +162,10 @@
         "@open-rgs/grid": "0.1.0",
       },
     },
+    "packages/gamble": {
+      "name": "@open-rgs/gamble",
+      "version": "0.1.0",
+    },
     "packages/grid": {
       "name": "@open-rgs/grid",
       "version": "0.1.0",
@@ -186,6 +190,10 @@
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
       },
+    },
+    "packages/meters": {
+      "name": "@open-rgs/meters",
+      "version": "0.1.0",
     },
     "packages/multiways": {
       "name": "@open-rgs/multiways",
@@ -285,6 +293,14 @@
       },
       "devDependencies": {
         "@open-rgs/core": "1.7.0",
+      },
+    },
+    "packages/symbols": {
+      "name": "@open-rgs/symbols",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+        "@open-rgs/weights": "0.1.0",
       },
     },
     "packages/weights": {
@@ -505,6 +521,8 @@
 
     "@open-rgs/freespins": ["@open-rgs/freespins@workspace:packages/freespins"],
 
+    "@open-rgs/gamble": ["@open-rgs/gamble@workspace:packages/gamble"],
+
     "@open-rgs/grid": ["@open-rgs/grid@workspace:packages/grid"],
 
     "@open-rgs/holdwin": ["@open-rgs/holdwin@workspace:packages/holdwin"],
@@ -512,6 +530,8 @@
     "@open-rgs/log": ["@open-rgs/log@workspace:packages/log"],
 
     "@open-rgs/markov": ["@open-rgs/markov@workspace:packages/markov"],
+
+    "@open-rgs/meters": ["@open-rgs/meters@workspace:packages/meters"],
 
     "@open-rgs/multiways": ["@open-rgs/multiways@workspace:packages/multiways"],
 
@@ -538,6 +558,8 @@
     "@open-rgs/simulator": ["@open-rgs/simulator@workspace:packages/simulator"],
 
     "@open-rgs/site": ["@open-rgs/site@workspace:apps/site"],
+
+    "@open-rgs/symbols": ["@open-rgs/symbols@workspace:packages/symbols"],
 
     "@open-rgs/weights": ["@open-rgs/weights@workspace:packages/weights"],
 
