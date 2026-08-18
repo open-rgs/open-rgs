@@ -12,10 +12,20 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "publishConfig": { "access": "public", "provenance": true },
-  "files": ["src", "README.md"],
-  "keywords": ["open-rgs", "rgs", "platform-adapter", "wallet", "websocket"],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "rgs",
+    "platform-adapter",
+    "wallet",
+    "websocket"
+  ],
   "dependencies": {
     "@open-rgs/contract": "1.2.0",
     "@open-rgs/log": "1.0.0",
@@ -25,5 +35,9 @@
     "@open-rgs/adapter-test-kit": "1.1.0",
     "@types/ws": "^8.5.13"
   },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" }
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "private": true
 }

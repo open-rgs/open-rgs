@@ -4,10 +4,10 @@
 // open-rgs already derives a stable idempotency key for the wallet, so a retry
 // reaches the wallet with the same key and a compliant wallet collapses it to
 // one money movement. That guarantee has a hole in it, and the hole is not
-// hypothetical: it depends on the wallet. `@open-rgs/adapter-artube` cannot
-// forward the key at all, because the Artube wire has no field for it. Against
-// a wallet like that, a client retry after a timeout runs the math a second
-// time and moves money a second time.
+// hypothetical: it depends on the wallet. Some wallet wires have no field for
+// an idempotency key at all, so no adapter for them can forward one. Against a
+// wallet like that, a client retry after a timeout runs the math a second time
+// and moves money a second time.
 //
 // This closes the hole on our side. Keyed on (session, client token), the
 // orchestrator answers a repeat from cache and never touches math or the

@@ -141,7 +141,6 @@ not break it  - in **[specs/00-guarantees.md](specs/00-guarantees.md)**.
 | `@open-rgs/log` | structured logger (JSON / Server-core / Console formats) |
 | `@open-rgs/platform-mock` | in-memory dev wallet with promo + autoclose helpers |
 | `@open-rgs/adapter-kit` | WS / HTTP RPC helpers + currency conversion for adapter authors |
-| `@open-rgs/adapter-artube` | Artube wallet adapter: WebSocket, reconnect, heartbeat, RPC deadlines |
 | `@open-rgs/adapter-test-kit` | conformance suite for any PlatformAdapter implementation |
 | `@open-rgs/client` | tiny TS WebSocket client (Bun / Node / browser) |
 | `@open-rgs/simulator` | per-mode RTP / hit-rate / mark simulator + reports; fast WASM & native-Zig batch tiers |

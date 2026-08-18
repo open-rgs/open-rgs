@@ -13,6 +13,7 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
+    "@open-rgs/adapter-artube",
     "@open-rgs/demo-holdwin",
     "@open-rgs/demo-tumble",
     "@open-rgs/site",

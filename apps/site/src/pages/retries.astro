@@ -86,10 +86,9 @@ const decide = `const uc = new UniversalClient(rgs, {
       resent call arrives with the same key and a compliant wallet collapses it
       to one money movement. That guarantee has a hole in it, and the hole is
       not hypothetical: it depends on the wallet. Some wire protocols have no
-      field to carry the key at all  -
-      <code>@open-rgs/adapter-artube</code> is one. Against a wallet like that,
-      a client retry after a timeout runs the math a second time and moves money
-      a second time.
+      field to carry the key at all. Against a wallet like that, a client retry
+      after a timeout runs the math a second time and moves money a second
+      time.
     </p>
 
     <p>

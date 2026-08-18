@@ -30,8 +30,12 @@
 //   BalanceChanged event         becomes PlatformEvent{type:"balanceChanged"}
 //   SessionClosed  event         becomes PlatformEvent{type:"sessionClosed"}
 //
-// NDA: this repo is private. The wire shape lives here; nothing leaks
-// into the MIT @open-rgs/* tree.
+// NOT PUBLISHED. This package lives in the monorepo for the workspace, the
+// typecheck and the conformance run, and is marked `private` so `changeset
+// publish` never picks it up - it is also on the changesets ignore list, so a
+// changeset cannot version it by accident. The wire shape stays here; nothing
+// about it leaks into the published @open-rgs/* packages, the specs or the
+// docs site, which stay wallet-neutral (CLAUDE.md).
 
 import WebSocket from "ws";
 import type {

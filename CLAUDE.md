@@ -43,7 +43,7 @@ open-rgs/
 
 ## What's shipped
 
-- All nine `@open-rgs/*` packages
+- All published `@open-rgs/*` packages (adapter-artube is private, see below)
 - `apps/site`  - public docs site (Astro static SSG)
 - Specs `00-10` + `12` + ADRs
 - `deploy/`  - reference Docker + k8s templates
@@ -78,10 +78,12 @@ list. Short version:
 - Autoclose is NEVER timer-driven inside RGS  - always external trigger.
 - Public packages have neutral examples  - never name a specific
   provider's wire shape, brand, or product id in code or spec.
-  ONE EXCEPTION: a published platform adapter is provider-specific by
-  definition (`packages/adapter-artube`). Keep the rule for core, contract,
-  the specs and the docs site; an adapter names its own wallet and nothing
-  else does.
+  ONE EXCEPTION: `packages/adapter-artube`, which is provider-specific by
+  definition. It is `private: true` and on the changesets ignore list, so it
+  is never published; it lives here for the workspace, the typecheck and the
+  conformance run. Everything that DOES ship - core, contract, the specs, the
+  docs site, the examples - stays wallet-neutral, and the adapter names its
+  own wallet inside its own package and nowhere else.
 
 ## Out of scope for open-rgs
 

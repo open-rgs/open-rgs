@@ -264,9 +264,8 @@ wallet being the source of truth across processes.
 The per-session lock orders concurrent calls; it does not stop a *resent*
 call from being a second real round. That job belongs to the idempotency
 key, and the key only works if the wallet honours it. Some wallet
-protocols have no field to carry one  - `@open-rgs/adapter-artube` is the
-worked example  - and against those, a client retry after a timeout runs
-the math again and moves money again.
+protocols have no field to carry one at all, and against those a client
+retry after a timeout runs the math again and moves money again.
 
 So the orchestrator caches the call itself. `spin`, `openRound`,
 `stepRound` and `closeRound` are keyed on `(sessionId, phase, client
