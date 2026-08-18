@@ -2,7 +2,10 @@
 // that crossed two thresholds, losing the remainder when it fills.
 
 import { describe, expect, test } from "bun:test";
-import { collect, isFull, meter, progress, reset, spinsToFill, toNext, type MeterConfig } from "../src/index.js";
+import {
+  METER_CARRY_VERSION, collect, fillLevel, fromCarry, isAtMax, isFull, meter, progress,
+  reset, spend, spinsToFill, toCarry, toNext, type MeterConfig,
+} from "../src/index.js";
 
 const CFG: MeterConfig<string> = {
   thresholds: [{ at: 3, award: "MINI" }, { at: 6, award: "MINOR" }, { at: 10, award: "MAJOR" }],
@@ -141,3 +144,107 @@ function mulberry32(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+describe("bounds", () => {
+  const CAPPED: MeterConfig<string> = { thresholds: [{ at: 2, award: "X" }], max: 5 };
+
+  test("collecting past the ceiling clamps rather than throwing", () => {
+    // A spin that collects more than the meter can hold is a good spin.
+    const out = collect(meter<string>(CAPPED), 99, CAPPED);
+    expect(out.meter.count).toBe(5);
+    expect(out.awards).toEqual(["X"]);
+    expect(isAtMax(out.meter, CAPPED)).toBe(true);
+  });
+
+  test("a meter with a floor starts at it", () => {
+    const MULT: MeterConfig<string> = { thresholds: [{ at: 5, award: "X" }], min: 1, max: 10 };
+    expect(meter(MULT).count).toBe(1);
+    expect(fillLevel(meter(MULT), MULT)).toBe(0);
+  });
+
+  test("fill level runs between the floor and the ceiling", () => {
+    const MULT: MeterConfig<string> = { thresholds: [], min: 1, max: 11 };
+    const m = collect(meter<string>(MULT), 4, MULT).meter;   // 1 -> 5
+    expect(fillLevel(m, MULT)).toBeCloseTo(0.4, 10);
+  });
+
+  test("an unbounded meter has no fill level, which is different from being empty", () => {
+    expect(fillLevel(meter<string>(), { thresholds: [] })).toBe(0);
+    expect(isAtMax(meter<string>(), { thresholds: [] })).toBe(false);
+  });
+});
+
+describe("spending a meter down", () => {
+  const CFG2: MeterConfig<string> = { thresholds: [{ at: 3, award: "MINI" }], min: 0, max: 10 };
+
+  test("takes from the count and stops at the floor", () => {
+    const m = collect(meter<string>(CFG2), 5, CFG2).meter;
+    expect(spend(m, 2, CFG2).count).toBe(3);
+    expect(spend(m, 99, CFG2).count).toBe(0);
+    expect(spend(m, 0, CFG2)).toBe(m);
+    expect(() => spend(m, -1, CFG2)).toThrow(/non-negative/);
+  });
+
+  test("a rung already earned stays earned, so refilling does not pay twice", () => {
+    let m = collect(meter<string>(CFG2), 3, CFG2).meter;      // MINI awarded
+    m = spend(m, 3, CFG2);                                     // back to zero
+    expect(collect(m, 3, CFG2).awards).toEqual([]);            // and no second MINI
+  });
+
+  test("unless the game says otherwise", () => {
+    const REARM: MeterConfig<string> = { ...CFG2, reawardAfterSpend: true };
+    let m = collect(meter<string>(REARM), 3, REARM).meter;
+    m = spend(m, 3, REARM);
+    expect(collect(m, 3, REARM).awards).toEqual(["MINI"]);
+  });
+});
+
+describe("carry", () => {
+  const CFG3: MeterConfig<string> = { thresholds: [{ at: 3, award: "MINI" }, { at: 6, award: "MINOR" }], max: 20 };
+
+  test("a meter survives a round trip through carry", () => {
+    const m = collect(meter<string>(CFG3), 7, CFG3).meter;
+    const back = fromCarry(toCarry(m), CFG3);
+    expect(back).toEqual(m);
+  });
+
+  test("no carry is the first spin of a session", () => {
+    expect(fromCarry(undefined, CFG3)).toEqual(meter(CFG3));
+    expect(fromCarry("", CFG3)).toEqual(meter(CFG3));
+  });
+
+  test("carry this version cannot read resets by default", () => {
+    expect(fromCarry('{"v":0,"count":9}', CFG3)).toEqual(meter(CFG3));
+    expect(fromCarry("not json at all", CFG3)).toEqual(meter(CFG3));
+    expect(fromCarry('{"v":1}', CFG3)).toEqual(meter(CFG3));      // right version, wrong shape
+  });
+
+  test("'keep-count' keeps progress and lets the rungs pay again, which is the trade", () => {
+    const back = fromCarry('{"v":0,"c":7}', CFG3, "keep-count");
+    expect(back.count).toBe(7);
+    expect(back.awarded).toEqual([]);
+    // the thresholds it already passed will pay a second time on the next collect
+    expect(collect(back, 0.0001, CFG3).awards).toEqual(["MINI", "MINOR"]);
+  });
+
+  test("a function migration can preserve both progress and awards", () => {
+    const old = '{"version":0,"total":7,"paid":[3]}';
+    const back = fromCarry(old, CFG3, (raw) => {
+      const r = raw as { total?: number; paid?: number[] };
+      return { count: r.total ?? 0, awarded: r.paid ?? [], laps: 0 };
+    });
+    expect(back).toEqual({ count: 7, awarded: [3], laps: 0 });
+    expect(collect(back, 0.0001, CFG3).awards).toEqual(["MINOR"]);   // MINI stays paid
+  });
+
+  test("a count outside the bounds is clamped on the way back in", () => {
+    // The ceiling may have been lowered since this carry was written.
+    expect(fromCarry('{"v":1,"c":500,"a":[],"l":0}', CFG3).count).toBe(20);
+  });
+
+  test("the serialised form is small, since it rides every settle", () => {
+    const m = collect(meter<string>(CFG3), 7, CFG3).meter;
+    expect(toCarry(m).length).toBeLessThan(60);
+    expect(JSON.parse(toCarry(m)).v).toBe(METER_CARRY_VERSION);
+  });
+});
