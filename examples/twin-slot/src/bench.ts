@@ -50,5 +50,7 @@ console.log(`twin-slot - per play() call (${N.toLocaleString()} calls x7, best r
 console.log(`  wasm (zig):                   ${c.toFixed(0).padStart(6)} ns   ${rate(c).padStart(13)} spins/s`);
 console.log(`  ts   (in-process):            ${d.toFixed(0).padStart(6)} ns   ${rate(d).padStart(13)} spins/s`);
 console.log(`\n  -> ts is ${(c / d).toFixed(1)}x faster than the Zig/WASM kernel - the boundary, not the language`);
+console.log(`  (this math is ONE rng draw and a four-branch ladder, so the boundary IS the`);
+console.log(`   measurement. A real slot does thousands of ops per spin and the ratio narrows.)`);
 console.log(`
   (sink ${sink} - proves no tier was optimized away)`);
