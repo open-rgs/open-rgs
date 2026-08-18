@@ -149,7 +149,12 @@ enforces each guarantee, what it prevents, and how an integrator must not break 
 | `@open-rgs/adapter-test-kit` | conformance suite for any PlatformAdapter implementation |
 | `@open-rgs/client` | tiny TS WebSocket client (Bun / Node / browser) |
 | `@open-rgs/simulator` | per-mode RTP / hit-rate / mark simulator + reports; fast WASM & native-Zig batch tiers |
-| `@open-rgs/grid`, `weights`, `pay-lines`, `pay-ways`, `cascade`, `holdwin`, ... | the slot libraries: one small package per mechanic ([full set](https://open-rgs.dev/extension)) |
+| **slot libraries** | one small package per mechanic, each an ordinary import ([all of them](https://open-rgs.dev/extension)) |
+| `grid` `weights` `selectors` | the substrate: shape, weighted draws, cell selection |
+| `fill` `markov` `recipes` `strips` | making a board: per-cell draws, clumping, declared mixtures, classic reels |
+| `paytable` `pay-lines` `pay-ways` `pay-anywhere` `pay-cluster` | what a board is worth |
+| `multiways` `big-symbols` `scatters` `symbols` | reel heights, blocks, spawned scatters, symbol mechanics |
+| `cascade` `holdwin` `freespins` `picks` `gamble` `meters` | features: tumbles, respins, free spins, pick bonuses, gambles, collection meters |
 
 ## Build a game
 
@@ -171,7 +176,7 @@ Plug points (each is one interface):
 - **Transport** -> implement `ClientTransport`. Two ship: `binaryTransport` (binary-msgpack over WebSocket, the default) and `restTransport` (plain HTTP and JSON, for tooling and clients that cannot hold a socket open)
 - **Deferred close** -> wrap a simple math with `withDeferredClose` so the client finishes the round explicitly, and an abandoned round can be replayed and closed later
 - **Math** -> `loadTsMath` (default) or `loadWasmMath`; both return the same `MathModule`
-- **Slot libraries** -> `@open-rgs/grid`, `pay-lines`, `cascade`, `holdwin` and friends, imported like any package
+- **Slot libraries** -> 19 packages from `@open-rgs/grid` to `@open-rgs/freespins`, imported like any package
 - **Compiled math** -> ship a WASM kernel (`loadWasmMath`) authored in Zig/Rust; run it fail-closed under a worker pool (`createMathPool`)
 - **Metrics / logs** -> bring your own registry / formatter
 - **Idempotency** -> configurable per RPC
