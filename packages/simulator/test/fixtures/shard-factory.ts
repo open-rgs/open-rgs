@@ -1,4 +1,4 @@
-// A seedable factory manifest (TS math, no wasmoon) for shard CLI tests.
+// A seedable factory manifest (TypeScript math) for shard CLI tests.
 // Each call to the factory gets a distinct seed, so each shard draws an
 // independent mulberry32 substream.
 import { mulberry32 } from "../../src/rng.js";

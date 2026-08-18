@@ -1,0 +1,190 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+
+const step1 = `import { rect } from "@open-rgs/grid";
+
+const SHAPE = rect(5, 3);`;
+
+const step2 = `import { stackyFill } from "@open-rgs/markov";
+
+const BASE  = { LOW: 47, MID: 24, HI: 12, PREM: 7, WILD: 6, SC: 0 };
+const reels = stackyFill(SHAPE, BASE, 0.35);`;
+
+const step3 = `import { withScatters, oneInFor } from "@open-rgs/scatters";
+
+const scatters = {
+  symbol:   "SC",
+  count:    { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
+  reels:    [1, 2, 3],
+  protects: ["WILD"],
+};
+
+oneInFor(scatters, 3);`;
+
+const step4 = `import { recipes, place } from "@open-rgs/recipes";
+import { randomN, cols } from "@open-rgs/selectors";
+
+const board = recipes([
+  { name: "base",     p: 0.97, draw: withScatters(reels, scatters) },
+  { name: "hi-tease", p: 0.03, draw: place(3, "HI", randomN(3, cols([0, 1])), reels) },
+]);`;
+
+const step5 = `import { paytable, totalMultiplier } from "@open-rgs/paytable";
+import { evalLines, rowLines } from "@open-rgs/pay-lines";
+
+const roles = { wilds: ["WILD"], scatters: ["SC"] };
+const LINES = rowLines(5, 3);
+
+const PAY = paytable({
+  LOW:  { 3: 0.2, 4: 0.8, 5: 3 },
+  MID:  { 3: 0.4, 4: 1.5, 5: 6 },
+  HI:   { 3: 0.8, 4: 3,   5: 12 },
+  PREM: { 3: 1.5, 4: 5,   5: 22 },
+  WILD: { 3: 2.5, 4: 10,  5: 45 },
+});`;
+
+const step6 = `import { triggersOn } from "@open-rgs/pay-anywhere";
+import { beginRespins, stepRespins, isCycleOver, settleRespins } from "@open-rgs/holdwin";
+
+const JACKPOTS = { MINI: 8, MINOR: 20, MAJOR: 60, GRAND: 400 };
+const RESPINS  = { respins: 3, fullBoardAward: "GRAND" };`;
+
+const step7 = `import type { MathHost, SimpleMath } from "@open-rgs/contract";
+
+const MAX_WIN = 5000;
+
+export default function createMath(host: MathHost): SimpleMath {
+  return {
+    kind: "simple", name: "demo", version: "1.0.0", rtp: 0.965,
+
+    play() {
+      const { grid, recipe } = board(host.rng_next);
+
+      const wins = evalLines(grid, LINES, PAY, { roles });
+      let mult = totalMultiplier(wins);
+
+      if (triggersOn(grid, "SC", 3)) {
+        let s = beginRespins(toCoinGrid(grid, host.rng_next), RESPINS);
+        while (!isCycleOver(s)) s = stepRespins(s, landCoins(s.grid, host.rng_next), RESPINS);
+        mult += settleRespins(s, RESPINS, JACKPOTS);
+      }
+
+      const capped = Math.min(mult, MAX_WIN);
+      return {
+        multiplier: capped,
+        ops: [{ kind: "spin", grid: grid.cells, recipe }],
+        type: capped > 0 ? "win" : "loss",
+      };
+    },
+  };
+}`;
+
+const step8 = `import { createServer, binaryTransport, loadTsMath, cryptoRng } from "@open-rgs/core";
+import { defineGame } from "@open-rgs/contract";
+import { MockPlatform } from "@open-rgs/platform-mock";
+
+await createServer({
+  manifest: defineGame({
+    id: "demo", declaredRtp: 0.965, defaultMode: "default",
+    modes: {
+      default: {
+        math: await loadTsMath("./maths/demo.ts", { rng: cryptoRng }),
+        stakeMultiplier: 1,
+      },
+    },
+  }),
+  platform:  new MockPlatform({ startingBalance: 100_000 }),
+  transport: binaryTransport({ port: 80 }),
+});`;
+---
+
+<BaseLayout
+  title="Build a slot, open-rgs"
+  description="Assemble a complete slot from the @open-rgs/* libraries: shape, reels, scatters, recipes, paytable, feature, and the server that runs it."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>Build a slot</h1>
+
+    <p class="lede">
+      Eight steps from an empty grid to a running server. Every piece is a pure
+      function of a stream of floats, so the whole game replays from one
+      recorded seed.
+    </p>
+
+    <h2 data-section="&sect; 1">Pick a shape</h2>
+    <Anim kind="grid-ragged" caption="Height per column. Ragged sets are ordinary, so this decision costs nothing now and everything later." />
+    <Code code={step1} />
+
+    <h2 data-section="&sect; 2">Draw the reels</h2>
+    <Anim kind="markov-pair" caption="Stickiness controls clumping. Frequency stays exactly where you set it." />
+    <Anim kind="markov-stationary" caption="Whatever the stickiness, the chain settles on the base distribution." />
+    <Code code={step2} />
+
+    <h2 data-section="&sect; 3">Spawn the scatter</h2>
+    <Anim kind="spawn-count" caption="The count distribution IS the trigger rate - written down, not discovered." />
+    <Anim kind="spawn-onereel" caption="One per reel keeps the count exact; excluded reels never receive one." />
+    <Anim kind="spawn-protect" caption="A wild about to pay is never eaten." />
+    <Code code={step3} />
+
+    <h2 data-section="&sect; 4">Name the boards</h2>
+    <Anim kind="recipes-mix" caption="Every board comes from exactly one recipe, at its declared probability." />
+    <Anim kind="recipes-tease" caption="A tease is a real draw that goes through the pay evaluator honestly." />
+    <Code code={step4} />
+
+    <h2 data-section="&sect; 5">Price the wins</h2>
+    <Anim kind="pay-lines-run" caption="A run is anchored at the leftmost reel and pays once, for its longest length." />
+    <Anim kind="pay-lines-wildopen" caption="A wild-opening run pays whichever reading is worth more." />
+    <Code code={step5} />
+
+    <h2 data-section="&sect; 6">Add the feature</h2>
+    <Anim kind="pay-anywhere-trigger" caption="Triggering is a separate question from paying." />
+    <Anim kind="holdwin-meter" caption="A landing resets the respin counter, which is why the round needs a cap." />
+    <Anim kind="holdwin-full" caption="Filling the board pays the top tier." />
+    <Code code={step6} />
+
+    <h2 data-section="&sect; 7">Write the math</h2>
+    <p>
+      The module default-exports a <strong>factory</strong> taking the host.
+      That is the RNG seam: the math has no other source of randomness, and
+      <code>loadTsMath</code> rejects a bare-object export for exactly that
+      reason.
+    </p>
+    <Code code={step7} />
+
+    <h2 data-section="&sect; 8">Run it</h2>
+    <Code code={step8} />
+
+    <h2 data-section="&sect; 9">Where the rest of it lives</h2>
+    <p>
+      The walkthrough above builds one base game with a hold-and-win. The
+      pieces for everything else it might grow are separate packages, each with
+      its own page, and each an ordinary import:
+    </p>
+    <ul>
+      <li><a href="/extension/freespins">freespins</a>: the trigger table, the counter, retriggers, a global multiplier, cells held across spins.</li>
+      <li><a href="/extension/picks">picks</a>: pick N of M, reveal until a stop, a weighted wheel.</li>
+      <li><a href="/extension/gamble">gamble</a>: double-or-nothing and collect-or-risk, priced by their edge.</li>
+      <li><a href="/extension/symbols">symbols</a>: mystery reveals, transforms, walking wilds, multiplier wilds, splits.</li>
+      <li><a href="/extension/meters">meters</a>: collect five of these and something happens.</li>
+      <li><a href="/extension/strips">strips</a>: the classic reel, when a port or a lab asks for one.</li>
+    </ul>
+    <p>
+      A feature is a state machine your math steps through between the board
+      and the win, so adding one changes the math file and nothing else: the
+      manifest, the transport and the adapter never learn about it.
+    </p>
+
+    <h2 data-section="&sect; 10">Then measure</h2>
+    <p>
+      Nothing above tells you the game is any good. Simulate it, and check the
+      confidence interval before believing the number: a game with a rare
+      feature paying hundreds of times bet needs tens of millions of spins to
+      bound RTP usefully, and a point estimate from 400,000 will happily
+      &quot;confirm&quot; anything within several points.
+    </p>
+    <Anim kind="cascade-bounded" caption="Every round needs a cap. A feature whose counter resets has no natural end." />
+  </main>
+</BaseLayout>

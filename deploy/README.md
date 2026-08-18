@@ -10,19 +10,19 @@ A game repo with:
 
 - `package.json` declaring `@open-rgs/core`, your wallet adapter, and
   any peer deps.
-- `maths/<math-id>/play.lua` files.
+- `maths/<math-id>/play.ts` files.
 - `src/index.ts` wiring `createServer({ manifest, platform, transport })`.
 
 See `examples/` in this repo for fully-worked references.
 
 ## What this folder provides
 
-- `docker/Dockerfile`  - multi-stage Bun build that bundles your maths
+- `docker/Dockerfile`: multi-stage Bun build that bundles your maths
   alongside the core. Production runs `bun src/index.ts` directly.
-- `docker/compose.yml`  - local dev stack with the mock wallet.
-- `k8s/deployment.yml`  - minimal Deployment + Service manifests.
-- `k8s/hpa.yml`  - HorizontalPodAutoscaler for CPU-driven scaling.
-- `observability/`  - Prometheus scrape config + alert rules and a
+- `docker/compose.yml`: local dev stack with the mock wallet.
+- `k8s/deployment.yml`: minimal Deployment + Service manifests.
+- `k8s/hpa.yml`: HorizontalPodAutoscaler for CPU-driven scaling.
+- `observability/`: Prometheus scrape config + alert rules and a
   Grafana dashboard for the standard `rgs_*` series.
 
 ## Quick start (local Docker)

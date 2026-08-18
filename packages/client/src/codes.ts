@@ -1,4 +1,4 @@
-// Wire frame codes  - must match packages/core/src/transport-binary.ts.
+// Wire frame codes, must match packages/core/src/transport-binary.ts.
 // Kept as a separate file so a future codegen tool can emit it from the
 // spec.
 

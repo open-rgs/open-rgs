@@ -1,4 +1,4 @@
-// runConformance  - walks an adapter through the standard lifecycle and
+// runConformance, walks an adapter through the standard lifecycle and
 // records a pass/fail per check. Doesn't throw; you read the report.
 //
 // Coverage:
@@ -7,7 +7,7 @@
 //   - complex-round (if attempted): openComplex -> updateComplex(optional) -> closeComplex
 //   - events: onEvent registered, balanceChanged fires when expected
 //   - idempotency: a REPEATED key moves money once and returns the same
-//     receipt  - the property the contract relies on (was advertised but
+//     receipt, the property the contract relies on (was advertised but
 //     never actually run; audit H13)
 //   - error paths: overspend, unknown session, and bad round id are rejected
 //   - concurrency (opt-in via { concurrency: true }): cross-session parallel
@@ -40,7 +40,7 @@ export interface RunOptions {
    *  in-flight duplicate idempotency keys, and reversal interleave. Off by
    *  default (reported as skips, mirroring skipComplex) because it opens
    *  extra derived sessions and assumes each maps to an independent balance
-   *  - true for a mock or sandboxed wallet, the only thing this suite
+   *, true for a mock or sandboxed wallet, the only thing this suite
    *  should ever point at. */
   concurrency?: boolean;
 }
@@ -62,7 +62,7 @@ export async function runConformance(
     const start = performance.now();
     let status: CheckStatus = "ok";
     let message: string | undefined;
-    // Bound each check  - a hung adapter call must surface as a failed check,
+    // Bound each check, a hung adapter call must surface as a failed check,
     // not freeze the whole run. (perCheckTimeoutMs was plumbed but never
     // enforced; audit H13.)
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -208,6 +208,104 @@ export async function runConformance(
     }
   });
 
+  // --- carry: the state the adapter is the source of truth for ----
+  //
+  // ADR-004 makes the adapter authoritative for cross-round state: the RGS
+  // hands `carry` and `mathVersion` to the settle, and reads them back from the
+  // next openSession to seed the next round's math. Without these checks an
+  // adapter can drop either one, or store it and never return it, and still
+  // pass conformance while losing every player's progress on reconnect - in a
+  // way only that player notices.
+
+  await run("state.carry.round-trip", "state", "carry survives settle -> openSession", async () => {
+    const carry = JSON.stringify({ conformance: "carry", n: 7 });
+    await adapter.settleSimple({
+      sessionId: fixture.sessionId,
+      bet: fixture.bet,
+      betIndex: fixture.betIndex,
+      priceMultiplier: fixture.priceMultiplier,
+      win: 0,
+      multiplier: 0,
+      type: "loss",
+      roundState: carry,
+      mathVersion: "conformance-math-1",
+      idempotencyKey: "conf-carry-1",
+    });
+    const reopened = await adapter.openSession(fixture.sessionId, fixture.connectionId);
+    if (reopened.carry === undefined) {
+      throw new Error(
+        "openSession returned no carry after a settle that supplied one. The RGS seeds the " +
+        "next round's math from this, so a player's cross-round progress is lost on reconnect.",
+      );
+    }
+    if (reopened.carry !== carry) {
+      throw new Error(`carry came back changed: sent ${carry}, got ${reopened.carry}`);
+    }
+  });
+
+  await run("state.mathVersion.round-trip", "state", "mathVersion is stored beside the carry and returned with it", async () => {
+    const reopened = await adapter.openSession(fixture.sessionId, fixture.connectionId);
+    if (reopened.carry === undefined) throw new Error("no carry (prerequisite check failed)");
+    if (reopened.mathVersion !== "conformance-math-1") {
+      throw new Error(
+        `mathVersion came back as ${String(reopened.mathVersion)}, expected "conformance-math-1". ` +
+        "The RGS discards a carry whose math version does not match the loaded math; without " +
+        "this field it cannot tell, and a carry from old math is threaded into new math.",
+      );
+    }
+  });
+
+  // --- promo free rounds ------------------------------------------
+  //
+  // The engine counts a funded round down locally, and a wallet that reports
+  // its own `remaining` overrides that count. Both halves are checked: an
+  // adapter that reports a number must report a SHRINKING one, and an adapter
+  // that reports nothing must say so by omitting the field rather than sending
+  // a stale number that would freeze the pool.
+
+  if (fixture.promo) {
+    const promo = fixture.promo;
+    await run("promo.consumed", "promo", "a promo-funded settle reports a pool that shrank, or reports nothing", async () => {
+      const before = await adapter.openSession(fixture.sessionId, fixture.connectionId);
+      const pool = before.promo;
+      if (!pool) {
+        throw new Error(
+          `fixture.promo names pool '${promo.id}' but openSession returned none  - ` +
+          "grant it on the wallet first, or drop fixture.promo",
+        );
+      }
+      if (pool.remaining <= 0) throw new Error(`pool '${pool.id}' has no rounds left to test with`);
+      const r = await adapter.settleSimple({
+        sessionId: fixture.sessionId,
+        bet: pool.bet,
+        betIndex: fixture.betIndex,
+        priceMultiplier: fixture.priceMultiplier,
+        win: 0,
+        multiplier: 0,
+        type: "loss",
+        roundState: "",
+        promoId: pool.id,
+        idempotencyKey: "conf-promo-1",
+      });
+      if (r.promo === undefined) {
+        // Legitimate: some wires have no field for it, and the engine counts
+        // down on its own. What is NOT legitimate is claiming a number and
+        // keeping it constant, which the next branch catches.
+        return;
+      }
+      if (r.promo.remaining >= pool.remaining) {
+        throw new Error(
+          `receipt.promo.remaining is ${r.promo.remaining}, was ${pool.remaining} before this round  - ` +
+          "a consumed free round must shrink the pool. A constant number overrides the engine's own " +
+          "countdown and the pool never drains.",
+        );
+      }
+    });
+  } else {
+    skip("promo.consumed", "promo", "a promo-funded settle reports a pool that shrank, or reports nothing",
+      "no fixture.promo configured  - grant a free-round pool on the wallet and name it to run this");
+  }
+
   // --- error paths ------------------------------------------------
   await run("errors.insufficient-funds", "errors", "a bet exceeding balance is rejected", async () => {
     await expectReject(() => adapter.settleSimple({
@@ -261,7 +359,7 @@ export async function runConformance(
     } else {
       skip("complex.updateComplex", "complex-round", "updateComplex (optional)  - not implemented", "adapter does not implement updateComplex");
     }
-    // Bad round id is rejected  - and must leave the real open round intact,
+    // Bad round id is rejected, and must leave the real open round intact,
     // so we run it before the valid close.
     await run("errors.bad-round-id", "errors", "closeComplex with an unknown roundId is rejected", async () => {
       await expectReject(() => adapter.closeComplex({
@@ -310,7 +408,7 @@ export async function runConformance(
 
   // --- concurrency (opt-in) ---------------------------------------
   // The orchestrator serializes client traffic per session, so an adapter
-  // never sees two client-driven calls racing on ONE session  - but it DOES
+  // never sees two client-driven calls racing on ONE session, but it DOES
   // see parallel traffic across sessions, retried settles whose duplicate
   // arrives while the original is still in flight, and wallet-initiated
   // reversals that bypass the per-session lock entirely (the contract's
@@ -341,7 +439,7 @@ export async function runConformance(
 
     await run("concurrency.parallel-distinct-settles", "concurrency", "parallel settles across distinct sessions conserve each session's balance", async () => {
       // N sessions in parallel, M settles sequential WITHIN each session
-      //  - the orchestrator serializes per session, so cross-session
+      //. The orchestrator serializes per session, so cross-session
       // parallelism is the only interleaving a conformant adapter must
       // survive. Per session: final == start - sum(costs) + sum(wins).
       const N = 8, M = 5;
@@ -411,7 +509,7 @@ export async function runConformance(
         //     reverses -> final balance is post-A.
         //   - B first: B reverses (A becomes latest); A then legally
         //     reverses too -> final balance is pre-A.
-        // Anything else  - over-refund, double-credit, B refused  - fails.
+        // Anything else, over-refund, double-credit, B refused, fails.
         // Both rounds are net LOSSES on purpose: with only debits in play,
         // "final > pre-A balance" is a strict over-refund invariant (a
         // reversal credited more than the rounds ever took).
@@ -449,7 +547,7 @@ export async function runConformance(
     }
 
     await run("concurrency.post-storm-settle", "concurrency", "a plain sequential settle still reconciles after the concurrent storms", async () => {
-      // Re-read a stormed session and run one boring settle  - the adapter's
+      // Re-read a stormed session and run one boring settle, the adapter's
       // bookkeeping must come out of the races consistent, not just lucky.
       const sid = `${fixture.sessionId}-conc-dup`;
       const before = (await adapter.openSession(sid, `${fixture.connectionId}-conc-after`)).balance;

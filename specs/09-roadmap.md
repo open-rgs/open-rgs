@@ -1,18 +1,18 @@
-# Spec 09  - Roadmap
+# Spec 09: Roadmap
 
 A living document. Updated when work lands or reprioritises.
 Last reality-checked against the code: 2026-06-10.
 
 ## Done (shipped in repo)
 
-- `@open-rgs/contract`  - types-only public package, MIT.
-- `@open-rgs/core`  - orchestrator, session, promo, Lua loader, binary
+- `@open-rgs/contract`: types-only public package, MIT.
+- `@open-rgs/core`: orchestrator, session, promo, TypeScript loader, binary
   transport, admin endpoints, autoclose (external-triggered),
   resume-on-reconnect.
-- `@open-rgs/platform-mock`  - in-memory dev/test wallet with promo and
+- `@open-rgs/platform-mock`: in-memory dev/test wallet with promo and
   autoclose helpers.
-- Two example games: `lucky-digits` (simple + buyable FS) and
-  `gamble-cherry` (complex round with looping gamble).
+- Example games: `hello-spin` (the smallest working server) and
+  `gamble-slot` (complex round with a looping gamble).
 - Multi-tab drawio architecture diagrams.
 - MIT license + npm-publishable metadata.
 - Spec corpus 00-10 (overview through design philosophy).
@@ -29,9 +29,10 @@ Last reality-checked against the code: 2026-06-10.
   a per-call `terminate()` timeout (the fail-closed watchdog for the WASM tier).
 - Secure-by-default outcome RNG (`cryptoRng` via WebCrypto -> BoringSSL) with
   production fail-closed (the operator must choose an RNG explicitly) and an
-  opt-in deterministic `seed-expand` replay mode (xoshiro256++).
+  opt-in deterministic `seed-expand` replay mode (splitmix32 seeding sfc32,
+  scoped per call so concurrent rounds each replay from their own seed).
 - Worked examples on Zig kernels (e.g. `examples/hold-and-win`).
-- `open-rgs-sim` CLI (the `bin` of `@open-rgs/simulator`)  - covers the
+- `open-rgs-sim` CLI (the `bin` of `@open-rgs/simulator`), covers the
   planned `cli simulate` role: manifest in, spins/seed/`--shards`,
   md/html/json reports (`packages/simulator/src/cli.ts`). The
   `compare` / `certify` / `fuzz` commands remain open (below).
@@ -44,18 +45,18 @@ Last reality-checked against the code: 2026-06-10.
   with a periodic `financial_snapshot` log line
   (`packages/core/src/metrics-rgs.ts`, `packages/core/src/server.ts`;
   specs 06/07).
-- Graceful shutdown + drain mode  - `createServer` installs a SIGTERM
+- Graceful shutdown + drain mode: `createServer` installs a SIGTERM
   handler; `stop()` stops accepting connections and drains in-flight
   requests for `shutdownDrainMs` (default 30 s) before exit
   (`packages/core/src/server.ts`).
-- Reference deployment template  - `deploy/docker/` (Dockerfile +
+- Reference deployment template: `deploy/docker/` (Dockerfile +
   compose) and `deploy/k8s/` (Deployment + HPA), per spec 07.
-- Idempotency keys end-to-end (core side)  - the orchestrator derives or
+- Idempotency keys end-to-end (core side): the orchestrator derives or
   generates a key for every money-moving platform call: spin/open via
   `initiatingIdemKey`, close via `deriveIdempotencyKey`
   (`packages/core/src/orchestrator.ts`). Forwarding the key onto the
   provider wire is each adapter's job by design.
-- Adapter-owns-state restore  - on `openSession` the orchestrator
+- Adapter-owns-state restore: on `openSession` the orchestrator
   rebuilds the session from `SessionInfo.carry` / `nextMode` /
   `mathVersion` and discards the carry on a math-version mismatch
   (discard-and-fresh, ADR-004; `packages/core/src/orchestrator.ts`).
@@ -82,22 +83,22 @@ Last reality-checked against the code: 2026-06-10.
 
 ## Approval requests (Spec 10 §Approval requests)
 
-A  - idempotency simplification: ✓ implemented
-B  - math version field naming: ✓ implemented
-C  - loader extraction: pending
-D  - ADR directory: ✓ seeded
-E  - `specs/adapters/`: pending (per-provider analyses added as real wallet specs arrive; kept brand-neutral)
-F  - kick-old WS policy: pending
-G  - math version migration discard-fresh: pending
-H  - type tests on contract: pending
-I  - ESLint/Prettier/EditorConfig: pending
-J  - public-surface freeze v0.5: pending
+A: idempotency simplification: ✓ implemented
+B: math version field naming: ✓ implemented
+C: loader extraction: pending
+D: ADR directory: ✓ seeded
+E: `specs/adapters/`: pending (per-provider analyses added as real wallet specs arrive; kept brand-neutral)
+F: kick-old WS policy: pending
+G: math version migration discard-fresh: pending
+H: type tests on contract: pending
+I: ESLint/Prettier/EditorConfig: pending
+J: public-surface freeze v0.5: pending
 
 ## In-flight (work specified, partial implementation)
 
 | Item | Spec | Status |
 |------|------|--------|
-| Cross-process restart recovery | 02, 05, ADR-007 | designed  - ADR-007 (wallet returns `SessionInfo.openRound` on `openSession`); implementation v1.7 |
+| Cross-process restart recovery | 02, 05, ADR-007 | designed, ADR-007 (wallet returns `SessionInfo.openRound` on `openSession`); implementation v1.7 |
 | ~~Idempotency keys end-to-end~~ (core side done) | 04, 05 | orchestrator derives/generates a key on every money-moving call; forwarding onto the provider wire is each adapter's job |
 | ~~Adapter-owns-state migration~~ (done) | 04, 05 | orchestrator rebuilds sessions from SessionInfo.carry/nextMode/mathVersion (ADR-004) |
 | External API surface (casino-facing) | NEW | sketched during an early provider analysis; not yet specced |
@@ -107,9 +108,9 @@ J  - public-surface freeze v0.5: pending
 
 | Item | Spec | Why |
 |------|------|-----|
-| ~~`@open-rgs/cli simulate`~~ (covered) | 08 | `open-rgs-sim` (bin of `@open-rgs/simulator`) fills this role |
-| `@open-rgs/cli compare` | 08 | Exploit smoke test for CI |
-| `@open-rgs/cli certify` | 08 | Math labs need the report shape |
+| ~~`cli simulate`~~ (covered) | 08 | `open-rgs-sim` (bin of `@open-rgs/simulator`) fills this role |
+| `open-rgs-sim compare` | 08 | Exploit smoke test for CI |
+| `open-rgs-sim certify` | 08 | Math labs need the report shape |
 | ~~Reference deployment template~~ (done) | 07 | shipped under `deploy/docker` + `deploy/k8s` |
 | ~~Cheat fail-closed~~ (done) | 04 | Cheat removed from the wire contract; honored only via `params.cheat` with an explicit opt-in and never in production; loud warning when enabled |
 | Manifest validation: `nextMode` resolution | 01 | Catch typos at boot, not at runtime |
@@ -121,36 +122,36 @@ J  - public-surface freeze v0.5: pending
 | W3C tracing | 06 | Prometheus metrics shipped 2026-06-10 (see Done); tracing remains open |
 | Public/private state split (`view(state)`) | 01, 03, 08 | Required for honest exploit testing |
 | Bonus engine abstraction (promo -> BonusCampaign) | 02 | Jackpots, tournaments, gamification points |
-| `@open-rgs/cli fuzz` & `optimize` | 08 | Round out the math-author DX |
+| `open-rgs-sim fuzz` & `optimize` | 08 | Round out the math-author DX |
 
 ## Deferred / not committed
 
 - Federated jackpots across operators (separate service, not RGS).
 - Player communication primitives (achievements, missions).
 - Live ops / cohort A/B testing in manifest.
-- `@open-rgs/transport-json-ws`  - useful but not urgent.
-- `@open-rgs/transport-rest`  - useful but not urgent.
-- LuaJIT FFI loader path  - wait for benchmarks to justify the
+- `@open-rgs/transport-json-ws`: useful but not urgent.
+- `@open-rgs/transport-rest`: useful but not urgent.
+- Native FFI loader path: wait for benchmarks to justify the
   deployment complexity.
-- Distributed simulator runs  - wait for billion-spin demand.
-- Helm chart  - wait for operator pull.
-- Hot reload for math files in dev  - small, cheap, low priority.
+- Distributed simulator runs: wait for billion-spin demand.
+- Helm chart: wait for operator pull.
+- Hot reload for math files in dev: small, cheap, low priority.
 
 ## Sequencing rationale
 
 The order above prioritises:
 
-1. **Math-author DX** (`simulate` / `compare` / `certify`)  - without
+1. **Math-author DX** (`simulate` / `compare` / `certify`), without
    the CLI, math designers can't iterate or certify, and the project
    doesn't deliver its core value.
 2. **Production-readiness gaps** (cheat strip, manifest validation,
-   metrics, graceful shutdown)  - the runtime is correct but operators
+   metrics, graceful shutdown): the runtime is correct but operators
    would refuse to deploy without these.
 3. **Architectural breadth** (WASM loader, bonus engine, public/private
-   state)  - needed once we onboard the second game or the second wallet.
-   (Multi-game-*per-process* is explicitly out  - one game per process;
+   state), needed once we onboard the second game or the second wallet.
+   (Multi-game-*per-process* is explicitly out, one game per process;
    spec 10, "What we deliberately AVOID".)
-4. **Quality-of-life** (transports, hot reload)  - improvements that
+4. **Quality-of-life** (transports, hot reload): improvements that
    compound but don't unblock anything urgent.
 
 ## Compatibility commitments

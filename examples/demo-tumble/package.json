@@ -1,0 +1,11 @@
+{
+  "name": "@open-rgs/demo-tumble", "version": "0.0.0", "private": true,
+  "description": "Worked example: a 6x5 cluster-pays tumble slot with a rising cascade multiplier. Exercises fill, pay-cluster and cascade.",
+  "license": "MIT", "type": "module", "main": "src/math.ts",
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0", "@open-rgs/weights": "0.1.0", "@open-rgs/fill": "0.1.0",
+    "@open-rgs/recipes": "0.1.0", "@open-rgs/selectors": "0.1.0", "@open-rgs/paytable": "0.1.0",
+    "@open-rgs/pay-cluster": "0.1.0", "@open-rgs/pay-anywhere": "0.1.0", "@open-rgs/cascade": "0.1.0"
+  },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" }
+}

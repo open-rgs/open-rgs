@@ -1,0 +1,54 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/recipes, Named boards"
+  description="Recipes: Every board comes from exactly one declared recipe."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/recipes</h1>
+
+    <p class="lede">Every board comes from exactly one declared recipe.</p>
+
+    <h2 data-section="&sect; 1">A mixture, not a decoration</h2>
+
+    <p>Draw a board and then stamp extra symbols on it and the real distribution stops matching the one RTP was computed from, silently. A mixture avoids that: RTP is a sum over recipes, each independently measurable.</p>
+
+    <Anim kind="recipes-mix" caption="One recipe chosen per board, at its declared probability." />
+
+    <Code code={`import { recipes } from "@open-rgs/recipes";
+
+const board = recipes([
+  { name: "base",        p: 0.94, draw: reels },
+  { name: "two-scatter", p: 0.05, draw: tease },
+  { name: "high-stack",  p: 0.01, draw: stacked },
+]);
+
+const { grid, recipe } = board(host.rng_next);`} />    <h2 data-section="&sect; 2">A tease is a real draw</h2>
+
+    <p>The tease board goes through the pay evaluator honestly. You bias which boards appear, at a rate you wrote down, and never fake an outcome - which is also what keeps near-miss behaviour on the right side of the rules.</p>
+
+    <Anim kind="recipes-tease" caption="A tease is a real draw that goes through the pay evaluator honestly." />
+
+    <Code code={`import { place, stack } from "@open-rgs/recipes";
+import { randomN, cols } from "@open-rgs/selectors";
+
+const tease = place(2, "SC", randomN(2, cols([0, 1])), reels);
+
+board.probabilityOf("two-scatter");`} />    <h2 data-section="&sect; 3">Placement building blocks</h2>
+
+    <p>A recipe is written as a pipeline rather than a special case buried inside the base draw. Probabilities must sum to 1: a mixture summing to 0.98 misprices every spin by an amount nobody will notice.</p>
+
+    <Anim kind="recipes-place" caption="place() writes symbols into the cells a selector picked." />
+
+    <Code code={`import { placeAt, placeDrawn, fixed } from "@open-rgs/recipes";
+
+placeAt("WILD", cols([2]), reels);
+placeDrawn(3, highs, randomN(3), reels);
+stack("HIGH", 2, reels);`} />
+  </main>
+</BaseLayout>

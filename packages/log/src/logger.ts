@@ -1,4 +1,4 @@
-// createLogger  - the workhorse factory. The returned Logger is the
+// createLogger, the workhorse factory. The returned Logger is the
 // public surface; everything else here is an implementation detail.
 
 import type { LogEntry, LogLevel, Logger, LoggerOptions } from "./types.js";
@@ -37,7 +37,7 @@ function envLevel(): LogLevel | undefined {
 }
 
 /** Build a Logger. Multiple loggers can coexist (different services /
- *  components)  - they don't share state. */
+ *  components): they don't share state. */
 export function createLogger(opts: LoggerOptions): Logger {
   const resolvedSink = opts.sink
     ?? (opts.format ? makeStdoutSink(opts.format) : undefined)
@@ -85,7 +85,7 @@ function buildLogger(state: InternalState, bound: Record<string, unknown>): Logg
 
     // Always redact: even with no custom keys the default credential set +
     // value scrubbing apply (the old `size > 0` gate skipped redaction
-    // entirely when no keys were configured  - i.e. by default).
+    // entirely when no keys were configured, i.e. by default).
     const redacted = redactDeep(combined, state.redact) as Record<string, unknown>;
 
     const entry: LogEntry = {
@@ -124,7 +124,7 @@ function buildLogger(state: InternalState, bound: Record<string, unknown>): Logg
         };
         process.stderr.write(JSON.stringify(fallback) + "\n");
       } catch {
-        // process.stderr.write threw too  - at this point the runtime
+        // process.stderr.write threw too, at this point the runtime
         // is so broken there's nothing left to do. We give up rather
         // than crash the app; the absent log line will be noticed by
         // the gap in healthcheck pings.

@@ -36,7 +36,14 @@ function makeReport(samples: number[], betPerSpin = 1): SimulationReport {
     spins,
     bet: { unitsPerSpin: betPerSpin, totalUnits: totalBet },
     win: { totalUnits: totalWin, maxMultiplier: sorted[sorted.length - 1] ?? 0 },
-    rtp: { measured: totalBet ? totalWin / totalBet : 0, declared: 0.5, delta: 0, standardError: 0, ci95: [0, 0], verdict: "pass" },
+    rtp: {
+      measured: totalBet ? totalWin / totalBet : 0,
+      measuredUncapped: totalBet ? totalWin / totalBet : 0,
+      maxWinMultiplier: null,
+      capped: { rounds: 0, share: 0, rtpRemoved: 0 },
+      declared: 0.5, delta: 0, standardError: 0, ci95: [0, 0], verdict: "pass",
+      correlatedSpins: false,
+    },
     hitRate: spins ? samples.filter(m => m > 0).length / spins : 0,
     multiplier: {
       min: sorted[0] ?? 0, max: sorted[sorted.length - 1] ?? 0, mean: mu, stdDev: stdDev(samples, mu),

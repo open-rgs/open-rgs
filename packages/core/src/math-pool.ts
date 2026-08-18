@@ -2,9 +2,9 @@
 // orchestrator's I/O thread, with a per-call wall-clock budget.
 //
 // What it gives you:
-//  - Performance: math runs on worker threads -> concurrency under load (the
+//, Performance: math runs on worker threads -> concurrency under load (the
 //    I/O thread is never blocked by a spin).
-//  - Round-level fail-closed: a call that overruns its budget REJECTS with
+//, Round-level fail-closed: a call that overruns its budget REJECTS with
 //    MATH_TIMEOUT (the round refuses to pay a hung/overrunning value, and the
 //    connection isn't left waiting) and the worker is dropped + replaced, so the
 //    pool stays usable.
@@ -18,7 +18,7 @@
 // platforms. Treat WASM kernels as TRUSTED and bounded (same posture as bare
 // loadWasmMath); the pool buys off-thread concurrency + round-level failure. A
 // hard, cross-platform kill needs process isolation (SIGKILL); not implemented
-// here. (The Lua loader's in-VM debug.sethook watchdog preempts a tight loop on
+// here. (No loader preempts a tight loop on
 // any platform - that path is genuinely bounded.)
 //
 // Returns a `SimpleMath`-shaped, async math you can drop into a manifest mode;
@@ -36,6 +36,11 @@ export interface MathPoolOptions {
   /** Per-call budget (ms). A call that overruns it kills its worker and fails
    *  with MATH_TIMEOUT; the worker is replaced. Default 1000. */
   timeoutMs?: number;
+  /** Most calls that may wait for a free worker. Beyond this the pool sheds
+   *  load: the call fails immediately with MATH_TIMEOUT rather than joining an
+   *  unbounded queue, because a request that waits behind ten thousand others
+   *  has already missed whatever deadline the client had. Default 1000. */
+  maxQueue?: number;
 }
 
 export interface MathPool extends SimpleMath {
@@ -61,6 +66,7 @@ interface PoolMeta { name: string; version: string; rtp: number; contentHash: st
 export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
   const size = Math.max(1, opts.size ?? 4);
   const timeoutMs = opts.timeoutMs ?? 1000;
+  const maxQueue = Math.max(1, opts.maxQueue ?? 1000);
   const workerUrl = new URL("./math-worker.ts", import.meta.url).href;
 
   const workers: W[] = [];
@@ -148,7 +154,7 @@ export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
   }
 
   // Boot the pool. (Capture meta into a const so its non-null narrowing holds
-  // through the closures below  - a `let` assigned inside the spawn callback
+  // through the closures below, a `let` assigned inside the spawn callback
   // isn't narrowed by control-flow analysis.)
   const spawned = await Promise.all(Array.from({ length: size }, () => spawn()));
   workers.push(...spawned.map(s => s.w));
@@ -160,7 +166,17 @@ export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
       if (shuttingDown) { reject(new RGSError("INTERNAL_ERROR", "math pool is shut down")); return; }
       const task: Task = { prev, ctx, resolve, reject };
       const idle = workers.find(w => !w.busy);
-      if (idle) assign(idle, task); else queue.push(task);
+      if (idle) { assign(idle, task); return; }
+      if (queue.length >= maxQueue) {
+        // Shed rather than grow. An unbounded queue turns overload into memory
+        // growth and serves rounds nobody is still waiting for.
+        log.warn("math pool queue full  - shedding the call", {
+          "event.category": "process", "event.action": "math_pool_shed", "queue.max": maxQueue,
+        });
+        reject(new RGSError("MATH_TIMEOUT", `math pool queue is full (${maxQueue} waiting)`));
+        return;
+      }
+      queue.push(task);
     });
   }
 

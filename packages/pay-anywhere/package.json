@@ -1,0 +1,40 @@
+{
+  "name": "@open-rgs/pay-anywhere",
+  "version": "0.1.0",
+  "description": "Scatter / pay-anywhere evaluation: symbols paid on total count regardless of position.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/pay-anywhere"
+  },
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "slot",
+    "math",
+    "paytable"
+  ],
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0",
+    "@open-rgs/paytable": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "homepage": "https://open-rgs.dev/extension/pay-anywhere"
+}

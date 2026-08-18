@@ -36,7 +36,7 @@ const adapter = new MyAdapter({ ...creds });
 const report = await runConformance(adapter);
 
 console.log(mdConformanceReport(report));
-// -> # Conformance  - my-adapter @ 0.1.0
+// -> # Conformance: my-adapter @ 0.1.0
 //   18 ok . 0 warn . 0 fail . 2 skip (20 total, 312ms)
 //   ...
 
@@ -70,7 +70,7 @@ runConformance(adapter, {
 
 `concurrency: true` is opt-in (reported as skips otherwise) because the
 checks open derived sessions (`<sessionId>-conc-*`) and assume each maps
-to an independent balance  - true for a mock or sandboxed wallet, which is
+to an independent balance: true for a mock or sandboxed wallet, which is
 the only thing this suite should ever point at. The reversal-interleave
 check runs only when the adapter implements the optional `reverseRound`;
 it skips cleanly otherwise.
@@ -78,7 +78,7 @@ it skips cleanly otherwise.
 ## What it doesn't do
 
 - It doesn't load-test. For that, write a separate harness.
-- It doesn't verify real-money correctness  - bring your own mock or a
+- It doesn't verify real-money correctness: bring your own mock or a
   sandboxed credentials path. The kit assumes calls are safe to make
   back-to-back without disturbing production data.
 - It doesn't replace `bun:test` for adapter-specific cases. Conformance

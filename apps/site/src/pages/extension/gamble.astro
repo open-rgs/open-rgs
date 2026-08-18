@@ -1,0 +1,66 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/gamble, Double or nothing"
+  description="Gamble ladders and collect-or-risk rounds, with the edge, the survival odds and the limits stated as numbers."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/gamble</h1>
+
+    <p class="lede">The interesting number is the edge, not the payout.</p>
+
+    <p>Double-or-nothing at exactly one half returns everything staked. A game that offers it returns more than its base RTP to any player who uses it, and less to one who does not, which is a strange thing to ship by accident. Every function here takes the chance explicitly and reports what the round is worth.</p>
+
+    <h2 data-section="&sect; 1">One step, priced</h2>
+
+    <Code code={`import { stepReturn, stepEdge, fairChance } from "@open-rgs/gamble";
+
+stepReturn({ chance: 0.5,  on: 2 });   // 1.00, fair
+stepEdge({ chance: 0.49, on: 2 });     // 0.02, two percent to the house
+fairChance(2);                         // 0.5
+fairChance(1.5, 0.5);                  // 0.5, a half gamble that keeps half on a loss
+fairChance(4);                         // 0.25, a quadruple`} />
+
+    <p>A step that returns more than 1 pays the player to take it. That is a mistake rather than a feature, and it is easier to see as a number than in a report three weeks later.</p>
+
+    <h2 data-section="&sect; 2">A ladder changes variance, not RTP</h2>
+
+    <p>Climbing a fair ladder returns exactly what it staked however far it goes, so the feature moves the shape of the distribution and leaves its mean alone. With an edge, the return decays geometrically: five rungs at two percent keeps about 90 percent of the stake.</p>
+
+    <Anim kind="gamble-ladder" caption="Each rung risks the whole stake for the next one." />
+
+    <Code code={`import { gambleLadder, ladderReturn, survivalChance } from "@open-rgs/gamble";
+
+const STEP = { chance: 0.49, on: 2 };
+
+ladderReturn(STEP, 5);       // 0.904, per unit staked
+survivalChance(STEP, 5);     // 0.028, what the player is actually betting against
+
+const round = gambleLadder(win, STEP, (stake, steps) => wantsToContinue(stake, steps), host.rng_next, {
+  maxSteps: 5,
+  maxStake: 10_000,
+});
+
+round.stake;      // 0 when busted
+round.history;    // the stake after each step, for the replay`} />
+
+    <p>The policy argument is the player in a real round and whatever you want to price against in a simulation: "always climb" is the worst case, and it is one line.</p>
+
+    <h2 data-section="&sect; 3">Every gamble needs a limit of its own</h2>
+
+    <p><code>maxSteps</code> and <code>maxStake</code> end the round. Without them the max win is unbounded and the engine's payout cap becomes the only thing that stops it, which is a payout rule standing in for a game rule. The round says which one ended it, so a report can tell a bust from a cap.</p>
+
+    <h2 data-section="&sect; 4">Collect or risk</h2>
+
+    <p>The other shape: a prize that grows while the player declines to collect. Same arithmetic, different presentation, and worth its own function because the growth is additive, so the edge per step changes as the prize climbs.</p>
+
+    <Code code={`import { collectOrRisk } from "@open-rgs/gamble";
+
+collectOrRisk(prize, 5, 0.8, (p, steps) => steps < 3, host.rng_next, { maxSteps: 10 });`} />
+  </main>
+</BaseLayout>

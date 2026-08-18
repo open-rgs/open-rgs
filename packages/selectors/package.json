@@ -1,0 +1,40 @@
+{
+  "name": "@open-rgs/selectors",
+  "version": "0.1.0",
+  "description": "Composable position selection over a slot grid. Shared by placement directives and hold-and-win effect targeting.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/selectors"
+  },
+  "homepage": "https://open-rgs.dev/extension/selectors",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "slot",
+    "grid",
+    "selector",
+    "math"
+  ],
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  }
+}

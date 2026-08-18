@@ -2,13 +2,13 @@
 
 Short, durable records of major architectural decisions. Each ADR
 captures *what* was decided, *why*, and *what alternatives were
-rejected*  - so future maintainers (and AI sessions) can understand the
+rejected*, so future maintainers (and AI sessions) can understand the
 reasoning without re-litigating it.
 
 ## Format
 
 ```
-# ADR NNN  - <title>
+# ADR NNN: <title>
 
 **Status:** Accepted | Superseded by ADR-XXX
 **Date:** YYYY-MM-DD
@@ -20,7 +20,7 @@ What problem we're solving and what's relevant about the situation.
 What we chose to do.
 
 ## Consequences
-What that decision means  - both upsides and ongoing costs.
+What that decision means, both upsides and ongoing costs.
 
 ## Alternatives considered
 What else we looked at and why we didn't pick it.
@@ -52,4 +52,4 @@ Write one when:
 Don't write one for:
 - Style choices.
 - Refactors that don't change behavior.
-- Decisions you're not sure about yet  - write a spec instead.
+- Decisions you're not sure about yet: write a spec instead.

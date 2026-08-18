@@ -13,6 +13,8 @@ import {
   type RGSErrorCode,
 } from "@open-rgs/contract";
 import { log } from "./log.js";
+import { clientMessage, isOpaque } from "./error-policy.js";
+import { validateRequest } from "./wire-validate.js";
 
 /** Max wire frame size, both directions (Spec 04: a frame >1 MiB SHOULD
  *  disconnect). Inbound: enforced by Bun via `maxPayloadLength` (oversized
@@ -42,7 +44,7 @@ interface WsData extends ConnectionMeta {
   connectedAt: number;
   /** Replay-guard state (only used when cfg.replayGuard is on). The highest
    *  operation-sequence processed on this connection, and the encoded response
-   *  bytes for it  - so an exact re-send (a retry after a dropped response)
+   *  bytes for it, so an exact re-send (a retry after a dropped response)
    *  replays the same bytes instead of re-running the round. */
   lastOpSeq: number;
   lastOpResponse?: Uint8Array;
@@ -62,7 +64,7 @@ export interface BinaryTransportConfig {
    *  through to the built-in 404 (after the /livez fallback). */
   extraFetch?: (req: Request) => Promise<Response | undefined> | Response | undefined;
   /** Enable the per-connection operation-sequence replay guard (Guarantee 6,
-   *  "At Most Once", at the socket). Off by default  - back-compatible with
+   *  "At Most Once", at the socket). Off by default: back-compatible with
    *  clients that don't stamp `$seq`. When on, each request must carry a
    *  monotonically increasing integer under `WIRE_OPSEQ_KEY`: the transport
    *  processes `last+1`, REPLAYS the cached response for a re-sent `last`
@@ -70,7 +72,7 @@ export interface BinaryTransportConfig {
    *  gap or a frame missing the sequence. A client that opts in must stamp
    *  every frame; mixing is rejected, by design. Per-connection means per
    *  socket: a reconnect (same or different pod) starts a fresh `$seq` space
-   *  with an empty cache  - the wallet's idempotency-key dedupe (Spec 05) is
+   *  with an empty cache: the wallet's idempotency-key dedupe (Spec 05) is
    *  the cross-connection at-most-once guard. */
   replayGuard?: boolean;
 }
@@ -141,12 +143,12 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
             if (res) return res;
           }
           // Minimal fallback when no extraFetch handler claims the
-          // request  - keeps a bare transport usable in tests.
+          // request, keeps a bare transport usable in tests.
           if (url.pathname === "/livez") return new Response("OK");
           return new Response("Not found", { status: 404 });
         },
         websocket: {
-          // Reject oversized inbound frames at the WS layer  - Bun closes the
+          // Reject oversized inbound frames at the WS layer, Bun closes the
           // connection (1009) before the handler runs (Spec 04, H2).
           maxPayloadLength: MAX_FRAME_BYTES,
           open(ws) {
@@ -176,13 +178,13 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
               return sendError(ws, "DECODE_ERROR", `Frame decode failed: ${e}`);
             }
 
-            // Replay guard (Guarantee 6, opt-in). PING is exempt  - it carries no
+            // Replay guard (Guarantee 6, opt-in). PING is exempt, it carries no
             // sequence and moves no state.
             let capture: ((bytes: Uint8Array) => void) | undefined;
             if (cfg.replayGuard && type !== MSG_PING) {
               const decision = checkOpSeq(ws.data, payload);
               if (decision.kind === "duplicate") {
-                // Exact re-send of the last op  - replay the cached bytes, do not
+                // Exact re-send of the last op, replay the cached bytes, do not
                 // re-run the round. (A retry after a dropped response.)
                 if (ws.data.lastOpResponse) ws.send(ws.data.lastOpResponse);
                 return;
@@ -277,18 +279,20 @@ async function dispatch(
   const reply = (t: number, resp: unknown): void => sendFrame(ws, t, withCid(resp, cid), capture);
   try {
     switch (type) {
+      // Decoded frames are validated, not cast - see wire-validate.ts. The
+      // payload reaches the session store, the wallet adapter and the math.
       case MSG_INIT_REQUEST:
-        return reply(MSG_INIT_RESPONSE, await api.init(payload as Parameters<OrchestratorAPI["init"]>[0], conn));
+        return reply(MSG_INIT_RESPONSE, await api.init(validateRequest("init", payload), conn));
       case MSG_SPIN_REQUEST:
-        return reply(MSG_SPIN_RESPONSE, await api.spin(payload as Parameters<OrchestratorAPI["spin"]>[0], conn));
+        return reply(MSG_SPIN_RESPONSE, await api.spin(validateRequest("spin", payload), conn));
       case MSG_OPEN_REQUEST:
-        return reply(MSG_OPEN_RESPONSE, await api.openRound(payload as Parameters<OrchestratorAPI["openRound"]>[0], conn));
+        return reply(MSG_OPEN_RESPONSE, await api.openRound(validateRequest("open", payload), conn));
       case MSG_STEP_REQUEST:
-        return reply(MSG_STEP_RESPONSE, await api.stepRound(payload as Parameters<OrchestratorAPI["stepRound"]>[0], conn));
+        return reply(MSG_STEP_RESPONSE, await api.stepRound(validateRequest("step", payload), conn));
       case MSG_CLOSE_REQUEST:
-        return reply(MSG_CLOSE_RESPONSE, await api.closeRound(payload as Parameters<OrchestratorAPI["closeRound"]>[0], conn));
+        return reply(MSG_CLOSE_RESPONSE, await api.closeRound(validateRequest("close", payload), conn));
       case MSG_PROMO_ACCEPT:
-        return reply(MSG_PROMO_ACCEPT_RESP, await api.promoAccept(payload as Parameters<OrchestratorAPI["promoAccept"]>[0], conn));
+        return reply(MSG_PROMO_ACCEPT_RESP, await api.promoAccept(validateRequest("promo", payload), conn));
       case MSG_PING:
         return sendFrame(ws, MSG_PONG, {}); // unsolicited  - no correlation id
       default:
@@ -298,20 +302,20 @@ async function dispatch(
     const err = e instanceof RGSError
       ? e
       : new RGSError("INTERNAL_ERROR", e instanceof Error ? e.message : String(e));
-    // Codes whose message wraps arbitrary internal detail (a Lua runtime
+    // Codes whose message wraps arbitrary internal detail (a math runtime
     // error with a file path, an upstream wallet body, a stack). Never send
-    // that to the client  - log it server-side and return a generic message
+    // that to the client, log it server-side and return a generic message
     // plus the correlation id so an operator can find the log line. (M11)
-    if (OPAQUE_ERROR_CODES.has(err.code)) {
+    if (isOpaque(err.code)) {
       log.exception("transport dispatch error", e, {
         "event.category": "transport",
         "error.code": err.code,
         "correlation.id": cid === undefined ? "" : String(cid),
       });
-      sendError(ws, err.code, `internal error (ref: ${cid === undefined ? "n/a" : String(cid)})`, cid, capture);
+      sendError(ws, err.code, clientMessage(err.code, err.message, cid), cid, capture);
     } else {
       // Controlled-vocabulary errors (INVALID_BET, INSUFFICIENT_BALANCE, ...)
-      // carry author-written, non-sensitive messages  - safe to surface.
+      // carry author-written, non-sensitive messages, safe to surface.
       sendError(ws, err.code, err.message, cid, capture);
     }
   }
@@ -338,12 +342,6 @@ function checkOpSeq(data: WsData, payload: unknown): OpSeqResult {
   if (raw === data.lastOpSeq) return { kind: "duplicate" };
   return { kind: "error", message: `expected operation sequence ${expected}, got ${raw}` };
 }
-
-/** Error codes whose `message` may contain internal detail (wrapped Lua /
- *  upstream errors). Their client-facing message is genericized. */
-const OPAQUE_ERROR_CODES: ReadonlySet<RGSErrorCode> = new Set<RGSErrorCode>([
-  "INTERNAL_ERROR", "INIT_FAILED", "SPIN_FAILED", "OPEN_FAILED", "STEP_FAILED", "CLOSE_FAILED",
-]);
 
 /** Read the correlation id a client stamped on a request payload. */
 function correlationId(payload: unknown): unknown {

@@ -1,0 +1,841 @@
+---
+// Looped explainer animatics. Square divs, no rounded corners, CSS keyframes -
+// no script, and `prefers-reduced-motion` stops every one of them.
+//
+// One component with a branch per `kind` so the markup lives in a single file
+// and a page just names the idea it wants shown.
+interface Props { kind: string; caption?: string }
+const { kind, caption } = Astro.props;
+const n = (k: number) => Array.from({ length: k });
+---
+
+<figure class="anim" data-kind={kind}>
+  <div class="stage">
+
+    {kind === "grid-ragged" && (
+      <div class="row">
+        <div class="colr"><i></i><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i><i></i><i class="a blink"></i></div>
+        <div class="colr"><i></i><i></i><i></i><i></i><i class="a blink"></i></div>
+        <div class="colr"><i></i><i></i><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "grid-order" && (
+      <div class="row">
+        {n(4).map((_, c) => (
+          <div class="colr">{n(3).map((_, r) => <i class={`seq s${c * 3 + r}`}></i>)}</div>
+        ))}
+      </div>
+    )}
+    {kind === "grid-neighbours" && (
+      <div class="g3 nb">
+        <i></i><i class="up"></i><i></i>
+        <i class="lf"></i><i class="a"></i><i class="rt"></i>
+        <i></i><i class="dn"></i><i></i>
+      </div>
+    )}
+
+    {kind === "weights-bands" && (
+      <div class="gauge"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "weights-zero" && (
+      <div class="gauge"><span class="w50 a"></span><span class="w0 ghost"></span><span class="w50 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "weights-distinct" && (
+      <div class="row">{n(4).map((_, i) => <i class={`pickseq p${i}`}></i>)}</div>
+    )}
+
+    {kind === "selectors-pick" && (
+      <div class="g3">{n(9).map((_, i) => <i class={i % 3 === 1 ? "pick" : ""}></i>)}</div>
+    )}
+    {kind === "selectors-compose" && (
+      <div class="row">
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i < 3 ? "a" : ""}></i>)}</div>
+        <span class="op">&minus;</span>
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i === 1 ? "b" : ""}></i>)}</div>
+        <span class="op">=</span>
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i === 0 || i === 2 ? "a blink" : ""}></i>)}</div>
+      </div>
+    )}
+    {kind === "selectors-random" && (
+      <div class="g3 randg">{n(9).map(() => <i></i>)}</div>
+    )}
+
+    {kind === "fill-roll" && <div class="g3 rollg">{n(9).map(() => <i></i>)}</div>}
+    {kind === "fill-percolumn" && (
+      <div class="row">
+        <div class="colr"><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i class="a blink"></i><i></i></div>
+        <div class="colr"><i class="a blink d1"></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i class="a blink d2"></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "fill-expected" && (
+      <div class="row">
+        <div class="g3 sm">{n(9).map((_, i) => <i class={i === 2 || i === 6 ? "b blink" : ""}></i>)}</div>
+        <span class="op">=</span><span class="num">0.9</span>
+      </div>
+    )}
+
+    {kind === "markov-pair" && (
+      <div class="row gap">
+        <div><div class="colr roll loose">{n(6).map(() => <i></i>)}</div><em>s = 0</em></div>
+        <div><div class="colr roll tight">{n(6).map(() => <i></i>)}</div><em>s = 0.8</em></div>
+      </div>
+    )}
+    {kind === "markov-runs" && (
+      <div class="colr"><i class="a"></i><i class="a"></i><i class="a"></i><i class="b"></i><i class="c"></i><i class="c"></i></div>
+    )}
+    {kind === "markov-stationary" && (
+      <div class="row gap">
+        <div class="gauge sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
+        <span class="op">=</span>
+        <div class="gauge sm2"><span class="w60 a"></span><span class="w30 b"></span><span class="w10 c"></span></div>
+      </div>
+    )}
+
+    {kind === "recipes-mix" && (
+      <div class="gauge"><span class="w94 a"></span><span class="w5 b"></span><span class="w1 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "recipes-tease" && (
+      <div class="row">
+        <div class="colr"><i class="b blink"></i><i></i><i></i></div>
+        <div class="colr"><i></i><i class="b blink d1"></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "recipes-place" && (
+      <div class="g3">{n(9).map((_, i) => <i class={i === 0 || i === 4 || i === 8 ? "a dropseq" : ""}></i>)}</div>
+    )}
+
+    {kind === "paytable-bands" && (
+      <div class="gauge"><span class="w22 c"></span><span class="w20 b"></span><span class="w18 a"></span><span class="w40 a open"></span></div>
+    )}
+    {kind === "paytable-wild" && (
+      <div class="row">
+        <i class="wild"></i><span class="op">any of</span><i class="a blink"></i><i class="b blink d1"></i><i class="c blink d2"></i>
+      </div>
+    )}
+    {kind === "paytable-topband" && (
+      <div class="gauge"><span class="w20 c"></span><span class="w80 a open"></span></div>
+    )}
+
+    {kind === "pay-lines-run" && (
+      <div class="g5">{n(15).map((_, i) => <i class={i >= 5 && i < 8 ? "run" : ""}></i>)}</div>
+    )}
+    {kind === "pay-lines-wildopen" && (
+      <div class="row">
+        <i class="wild"></i><i class="wild"></i><i class="a"></i><i class="a"></i><i class="a"></i>
+        <span class="op">=</span><span class="num">5&times;A</span>
+      </div>
+    )}
+    {kind === "pay-lines-bothways" && (
+      <div class="row">
+        <i></i><i></i><i class="run"></i><i class="run d1"></i><i class="run d2"></i>
+        <span class="op arrowl">from the right</span>
+      </div>
+    )}
+
+    {kind === "pay-ways-cols" && (
+      <div class="row">
+        <div class="colr"><i class="hit"></i><i class="hit"></i><i></i></div>
+        <div class="colr"><i class="hit d1"></i><i></i><i></i></div>
+        <div class="colr"><i class="hit d2"></i><i class="hit d2"></i><i class="hit d2"></i></div>
+        <span class="op">=</span><span class="num">6</span>
+      </div>
+    )}
+    {kind === "pay-ways-gap" && (
+      <div class="row">
+        <div class="colr"><i class="hit"></i><i></i></div>
+        <div class="colr"><i class="hit"></i><i></i></div>
+        <div class="colr gapx"><i></i><i></i></div>
+        <div class="colr"><i class="hit faint"></i><i></i></div>
+      </div>
+    )}
+    {kind === "pay-ways-heights" && (
+      <div class="row gap">
+        <div class="mw">
+            <div class="mwf pwq1"><div class="mwc"><i class="a"></i><i class="a"></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i></i></div></div>
+            <div class="mwf pwq2"><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="mwf pwq3"><div class="mwc"><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i></div></div>
+            <div class="mwf pwq4"><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i></div></div>
+            <div class="mwf pwq5"><div class="mwc"><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i class="a"></i><i class="a"></i><i></i><i></i></div><div class="mwc"><i class="a"></i><i></i><i></i><i></i><i></i></div></div>
+        </div>
+        <div class="mwn">
+          <span class="num pwq1">12 ways</span>
+          <span class="num pwq2">6 ways</span>
+          <span class="num pwq3">8 ways</span>
+          <span class="num pwq4">16 ways</span>
+          <span class="num pwq5">6 ways</span>
+        </div>
+      </div>
+    )}
+
+    {kind === "pay-anywhere-scatter" && (
+      <div class="g3">{n(9).map((_, i) => <i class={[0, 4, 8].includes(i) ? "sc" : ""}></i>)}</div>
+    )}
+    {kind === "pay-anywhere-nowild" && (
+      <div class="row">
+        <i class="sc"></i><i class="wild strike"></i><i class="sc"></i>
+        <span class="op">=</span><span class="num">2</span>
+      </div>
+    )}
+    {kind === "pay-anywhere-trigger" && (
+      <div class="row">
+        <i class="sc"></i><i class="sc"></i><i class="sc d2 pop"></i>
+        <span class="op">&ge;</span><span class="num">3</span>
+      </div>
+    )}
+
+    {kind === "pay-cluster-wild" && (
+      <div class="g3 wgrid">
+        <i class="a lft"></i><i class="a lft"></i><i class="b rgt"></i>
+        <i class="a lft"></i><i class="wild both"></i><i class="b rgt"></i>
+        <i class="c"></i><i class="b rgt"></i><i class="b rgt"></i>
+      </div>
+    )}
+    {kind === "pay-cluster-flood" && (
+      <div class="g3">
+        <i class="a fl0"></i><i class="a fl1"></i><i></i>
+        <i class="a fl1"></i><i class="a fl2"></i><i></i>
+        <i></i><i class="a fl3"></i><i></i>
+      </div>
+    )}
+    {kind === "pay-cluster-diag" && (
+      <div class="g3">
+        <i class="a"></i><i></i><i></i>
+        <i></i><i class="a"></i><i></i>
+        <i></i><i></i><i class="a"></i>
+      </div>
+    )}
+
+    {kind === "cascade-fall" && (
+      <div class="casc"><i class="a s0"></i><i class="b s1"></i><i class="c s2"></i><i class="a s3"></i></div>
+    )}
+    {kind === "cascade-ladder" && (
+      <div class="row">
+        <span class="num st1">1&times;</span><span class="num st2">2&times;</span>
+        <span class="num st3">3&times;</span><span class="num st4">5&times;</span>
+      </div>
+    )}
+    {kind === "cascade-bounded" && (
+      <div class="row"><div class="gauge sm2"><span class="w80 a"></span><span class="w20 stop"></span></div></div>
+    )}
+
+    {kind === "holdwin-meter" && (
+      <div class="row gap">
+        <div class="meter"><i class="a"></i><i class="a m2"></i><i class="a m3"></i></div>
+        <i class="b landing"></i>
+      </div>
+    )}
+    {kind === "holdwin-collect" && (
+      <div class="row">
+        <i class="a pull"></i><i class="b fade1"></i><i class="b fade2"></i><i class="b fade3"></i>
+      </div>
+    )}
+    {kind === "holdwin-tiers" && (
+      <div class="row">
+        <i class="c"></i><i class="b"></i><i class="a"></i><i class="a big"></i>
+      </div>
+    )}
+    {kind === "holdwin-land" && (
+      <div class="hw">
+        <span class="hwc coin">1</span><span class="hwc coin">2</span><span class="hwc land l1">5</span>
+        <span class="hwc land l2">1</span><span class="hwc coin">1</span><span class="hwc hole"></span>
+        <span class="hwc hole"></span><span class="hwc land l3">2</span><span class="hwc coin">3</span>
+      </div>
+    )}
+    {kind === "holdwin-collect" && (
+      <div class="hw">
+        <span class="hwc coin eat e1">1</span><span class="hwc coin eat e2">3</span><span class="hwc hole"></span>
+        <span class="hwc coin eat e3">2</span><span class="hwc pot">C<b class="tot">18</b></span><span class="hwc coin eat e4">5</span>
+        <span class="hwc hole"></span><span class="hwc coin eat e5">2</span><span class="hwc coin eat e6">4</span>
+      </div>
+    )}
+    {kind === "holdwin-mystery" && (
+      <div class="hw">
+        <span class="hwc coin">2</span><span class="hwc hole"></span><span class="hwc coin">1</span>
+        <span class="hwc q">?<b class="flip">7</b></span><span class="hwc coin">3</span><span class="hwc q d1">?<b class="flip f1">7</b></span>
+        <span class="hwc hole"></span><span class="hwc q d2">?<b class="flip f2">7</b></span><span class="hwc coin">1</span>
+      </div>
+    )}
+    {kind === "holdwin-cellmult" && (
+      <div class="hw">
+        <span class="hwc coin">1</span><span class="hwc hole"></span><span class="hwc coin">2</span>
+        <span class="hwc hole"></span><span class="hwc xcell">3<b class="badge">&times;2</b><b class="badge b2">&times;5</b></span><span class="hwc coin">1</span>
+        <span class="hwc coin">4</span><span class="hwc hole"></span><span class="hwc hole"></span>
+      </div>
+    )}
+    {kind === "holdwin-expand" && (
+      <div class="hw grow">
+        <span class="hwc coin">1</span><span class="hwc coin">5</span><span class="hwc hole"></span>
+        <span class="hwc hole"></span><span class="hwc coin">2</span><span class="hwc coin">1</span>
+        <span class="hwc hole new n1"></span><span class="hwc hole new n2"></span><span class="hwc hole new n3"></span>
+      </div>
+    )}
+    {kind === "fs-multiplier" && (
+      <div class="row gap">
+        <span class="num fsx x1">1&times;</span><span class="num fsx x2">2&times;</span>
+        <span class="num fsx x3">3&times;</span><span class="num fsx x4">5&times;</span>
+        <span class="fsw">win &times; the one showing</span>
+      </div>
+    )}
+    {kind === "fs-retrigger" && (
+      <div class="row gap">
+        <div class="meter"><i class="a"></i><i class="a"></i><i class="a rt3"></i><i class="a rt4"></i><i class="a rt5"></i></div>
+        <span class="num rtlabel">+3</span>
+      </div>
+    )}
+    {kind === "fs-sticky" && (
+      <div class="hw">
+        <span class="hwc coin">W</span><span class="hwc spun s1">A</span><span class="hwc spun s2">K</span>
+        <span class="hwc spun s3">Q</span><span class="hwc coin">W</span><span class="hwc spun s1">J</span>
+        <span class="hwc spun s2">A</span><span class="hwc spun s3">K</span><span class="hwc coin">W</span>
+      </div>
+    )}
+    {kind === "picks-pool" && (
+      <div class="hw">
+        <span class="hwc box b1">?</span><span class="hwc box b2">?</span><span class="hwc box b3">?</span>
+        <span class="hwc box b4">?</span><span class="hwc box b5">?</span><span class="hwc box b6">?</span>
+      </div>
+    )}
+    {kind === "picks-wheel" && (
+      <div class="row gap">
+        <span class="num wseg w1">MINI</span><span class="num wseg w2">MINOR</span>
+        <span class="num wseg w3">MAJOR</span><span class="num wseg w4">GRAND</span>
+      </div>
+    )}
+    {kind === "strips-window" && (
+      <div class="row gap">
+        <div class="strip"><i>A</i><i>W</i><i>W</i><i>W</i><i>B</i><i>C</i><i>A</i><i>B</i><span class="win"></span></div>
+        <span class="fsw">the window slides, the reel does not change</span>
+      </div>
+    )}
+    {kind === "gamble-ladder" && (
+      <div class="row gap">
+        <span class="num gstep g1">1&times;</span><span class="num gstep g2">2&times;</span>
+        <span class="num gstep g3">4&times;</span><span class="num gbust">bust</span>
+      </div>
+    )}
+    {kind === "meter-fill" && (
+      <div class="row gap">
+        <div class="gauge"><span class="mfill"></span></div>
+        <span class="num mpay">MINI</span><span class="num mpay mp2">MINOR</span>
+      </div>
+    )}
+    {kind === "symbols-transform" && (
+      <div class="hw">
+        <span class="hwc coin tf">L</span><span class="hwc coin tf t2">L</span><span class="hwc hole"></span>
+        <span class="hwc hole"></span><span class="hwc coin tf t3">L</span><span class="hwc coin">H</span>
+        <span class="hwc coin tf t4">L</span><span class="hwc hole"></span><span class="hwc hole"></span>
+      </div>
+    )}
+    {kind === "holdwin-full" && (
+      <div class="g3">{n(9).map((_, i) => <i class={`a fillseq f${i}`}></i>)}</div>
+    )}
+    {kind === "multiways-heights" && (
+      <div class="row gap">
+        <div class="mw">
+            <div class="mwf mwq1"><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq2"><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(6).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq3"><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(7).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq4"><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq5"><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(7).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq6"><div class="mwc">{n(6).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq7"><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq8"><div class="mwc">{n(7).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(3).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq9"><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div><div class="mwc">{n(6).map(() => <i class="a"></i>)}</div><div class="mwc">{n(4).map(() => <i class="a"></i>)}</div></div>
+            <div class="mwf mwq10"><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(5).map(() => <i class="a"></i>)}</div><div class="mwc">{n(2).map(() => <i class="a"></i>)}</div></div>
+        </div>
+        <div class="mwn">
+          <span class="num mwq1">24 ways</span>
+          <span class="num mwq2">60 ways</span>
+          <span class="num mwq3">63 ways</span>
+          <span class="num mwq4">64 ways</span>
+          <span class="num mwq5">28 ways</span>
+          <span class="num mwq6">36 ways</span>
+          <span class="num mwq7">75 ways</span>
+          <span class="num mwq8">42 ways</span>
+          <span class="num mwq9">48 ways</span>
+          <span class="num mwq10">50 ways</span>
+        </div>
+      </div>
+    )}
+    {kind === "multiways-product" && (
+      <div class="row"><span class="num">2</span><span class="op">&times;</span><span class="num">3</span><span class="op">&times;</span><span class="num">4</span><span class="op">=</span><span class="num big2">24</span></div>
+    )}
+
+    {kind === "big-fit" && (
+      <div class="row">
+        <div class="colr"><i></i><i></i><i></i><i></i></div>
+        <div class="colr"><i></i><i class="a bigblk"></i><i class="a bigblk"></i><i></i></div>
+        <div class="colr"><i></i><i class="a bigblk"></i><i class="a bigblk"></i><i></i></div>
+        <div class="colr short"><i></i><i></i></div>
+      </div>
+    )}
+    {kind === "big-counts" && (
+      <div class="row">
+        <div class="g2 blk"><i class="a"></i><i class="a"></i><i class="a"></i><i class="a"></i></div>
+        <span class="op">=</span><span class="num">4</span>
+      </div>
+    )}
+
+    {kind === "spawn-count" && (
+      <div class="gauge"><span class="w90 dimb"></span><span class="w7 a"></span><span class="w25 b"></span><span class="w05 c"></span><b class="ptr"></b></div>
+    )}
+    {kind === "spawn-onereel" && (
+      <div class="row">
+        {n(5).map((_, c) => (
+          <div class="colr">{n(3).map((_, r) => <i class={r === (c % 3) && c !== 4 ? `sc pop d${c}` : ""}></i>)}</div>
+        ))}
+      </div>
+    )}
+    {kind === "spawn-protect" && (
+      <div class="row">
+        <i class="wild lock"></i><i class="sc pop"></i><i class="wild lock"></i><i class="sc pop d1"></i>
+      </div>
+    )}
+
+    {kind === "retry-inflight" && (
+      <div class="row gap">
+        <div class="colr">
+          <span class="tok">tok-A</span>
+          <span class="tok rq2">tok-A</span>
+        </div>
+        <div class="gauge sm2 track"><span class="w90 a runbar"></span></div>
+        <span class="num">1 round</span>
+      </div>
+    )}
+    {kind === "retry-fail" && (
+      <div class="row gap">
+        <div class="colr">
+          <span class="tok bad">fail</span>
+          <span class="tok rq2 ok2">ok</span>
+        </div>
+        <span class="op">entry dropped, next attempt runs</span>
+      </div>
+    )}
+    {kind === "retry-scope" && (
+      <div class="colr">
+        <div class="row"><span class="lane">player-a</span><span class="tok">k</span><i class="a"></i></div>
+        <div class="row"><span class="lane">player-b</span><span class="tok">k</span><i class="b"></i></div>
+      </div>
+    )}
+    {kind === "ops-decode" && (
+      <div class="row">
+        <i class="a uq1"></i><i class="a uq2"></i><i class="a uq3"></i><i class="faint"></i>
+        <span class="op">3 rendered, 1 passed through</span>
+      </div>
+    )}
+    {kind === "ops-total" && (
+      <div class="row gap">
+        <div class="row"><i class="a"></i><span class="num">2</span><span class="op">+</span><i class="a"></i><span class="num">1</span></div>
+        <span class="num big2">= 3x</span>
+      </div>
+    )}
+    {kind === "universal-probe" && (
+      <div class="colr">
+        <div class="row"><span class="lane">spin</span><span class="tok bad">INVALID_MODE</span></div>
+        <div class="row"><span class="lane">open</span><i class="a uq1"></i><i class="a uq2"></i><i class="a uq3"></i><span class="op">close</span></div>
+      </div>
+    )}
+
+  </div>
+  {caption && <figcaption set:html={caption} />}
+</figure>
+
+<style>
+  .anim {
+    border: 1px solid var(--fg-mute, #888);
+    padding: 1rem 1.1rem; margin: 0 0 0.9rem;
+    display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .stage { display: flex; align-items: center; gap: 0.9rem; min-height: 60px; flex-wrap: wrap; }
+  figcaption { font-family: var(--mono, monospace); font-size: 0.7rem; line-height: 1.5; color: var(--fg-mute, #888); }
+
+  i, span.w60, span.w30, span.w10, span.w50, span.w0, span.w94, span.w5, span.w1,
+  span.w22, span.w20, span.w18, span.w40, span.w80, span.w90, span.w7, span.w25,
+  span.w05, b { display: block; border-radius: 0; }
+  i { width: 20px; height: 20px; background: var(--bg-soft, #eee); border: 1px solid var(--fg-mute, #888); }
+  .row { display: flex; gap: 3px; align-items: center; }
+  .row.gap { gap: 1rem; }
+  .colr { display: flex; flex-direction: column; gap: 3px; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 20px); gap: 3px; }
+  .g3.sm { grid-template-columns: repeat(3, 13px); }
+  .g3.sm i { width: 13px; height: 13px; }
+  .g5 { display: grid; grid-template-columns: repeat(5, 20px); gap: 3px; }
+  .g2 { display: grid; grid-template-columns: repeat(2, 20px); gap: 0; }
+  .g2.blk i { border-width: 2px; border-color: #0E6B62; }
+  em { display: block; font-family: var(--mono, monospace); font-size: 0.65rem; color: var(--fg-mute, #888); margin-top: 4px; font-style: normal; }
+  .op { font-family: var(--mono, monospace); color: var(--fg-mute, #888); font-size: 0.85rem; }
+  .num { font-family: var(--mono, monospace); color: var(--fg, #ccc); font-size: 0.85rem; }
+  .num.big2 { font-size: 1.1rem; color: #0E6B62; }
+
+  .a { background: #0E6B62; border-color: #0E6B62; }
+  .b { background: #8A5A15; border-color: #8A5A15; }
+  .c { background: #4A6570; border-color: #4A6570; }
+  .hit { background: #0E6B62; border-color: #0E6B62; }
+  .sc { background: #8A5A15; border-color: #8A5A15; }
+  .wild { background: transparent; border: 2px solid #0E6B62; }
+  .faint { opacity: .25; }
+  .big { width: 26px; height: 26px; }
+
+
+  /* Retries, canonical ops, universal client. */
+  .tok {
+    font-family: var(--mono, monospace); font-size: 0.68rem;
+    border: 1px solid var(--fg-mute, #888); padding: 1px 5px; display: block;
+  }
+  .tok.bad { border-color: #8A5A15; color: #8A5A15; }
+  .tok.ok2 { border-color: #0E6B62; color: #0E6B62; }
+  .lane {
+    font-family: var(--mono, monospace); font-size: 0.68rem;
+    color: var(--fg-mute, #888); width: 62px;
+  }
+  .gauge.track { border: 1px solid var(--fg-mute, #888); }
+  /* Sequential highlight that never hides a square. popIn is invisible for the
+     first 55% of its cycle, which reads as a missing diagram in a still. */
+  .uq1, .uq2, .uq3 { animation: seqlit 2.7s infinite; opacity: .35; }
+  .uq2 { animation-delay: .3s; }
+  .uq3 { animation-delay: .6s; }
+  @keyframes seqlit { 0%, 12% { opacity: 1; } 40%, 100% { opacity: .35; } }
+  .rq2 { animation: coalesce 3.2s infinite; }
+  .runbar { animation: runbar 3.2s infinite; }
+  /* Never reaches 0: a frame where the second request is invisible reads as a
+     broken diagram rather than as a request that has not arrived yet. */
+  @keyframes coalesce {
+    0%, 20% { opacity: .18; }
+    38%, 70% { opacity: 1; }
+    86%, 100% { opacity: .35; }
+  }
+  @keyframes runbar {
+    0% { width: 8%; } 62%, 100% { width: 100%; }
+  }
+  /* Named to avoid the global .bar in BaseLayout: it is is:global, sets
+     align-items: baseline, and silently collapsed the fill inside these to
+     zero height. Anything defined here must not reuse a global class name. */
+  .gauge { position: relative; display: flex; width: 250px; height: 20px; }
+  .gauge.sm2 { width: 120px; height: 14px; }
+  .gauge span { height: 100%; }
+  .w60{width:60%}.w30{width:30%}.w10{width:10%}.w50{width:50%}.w0{width:0}
+  .w94{width:94%}.w5{width:5%}.w1{width:1%}.w22{width:22%}.w20{width:20%}
+  .w18{width:18%}.w40{width:40%}.w80{width:80%}.w90{width:90%}.w7{width:7%}
+  .w25{width:2.5%}.w05{width:0.5%}
+  .ghost { border: 1px dashed var(--fg-mute,#888); }
+  .dimb { background: var(--bg-soft,#eee); border: 1px solid var(--fg-mute,#888); }
+  .stop { background: #A32E28; }
+  .ptr { position: absolute; top: -6px; width: 2px; height: 32px; background: var(--fg,#222); animation: sweep 4s infinite ease-in-out; }
+  @keyframes sweep { 0%,100%{left:2%} 50%{left:97%} }
+  @keyframes openEnded { 0%,100%{opacity:.45} 50%{opacity:1} }
+  .open { animation: openEnded 2.4s infinite; }
+
+  @keyframes blink { 0%,45%{opacity:1} 55%,100%{opacity:.2} }
+  .blink { animation: blink 2.2s infinite; }
+  .d1 { animation-delay: .25s } .d2 { animation-delay: .5s }
+  .d3 { animation-delay: .75s } .d4 { animation-delay: 1s }
+
+  @keyframes seqOn { 0%,100%{background:var(--bg-soft,#eee)} 8%,16%{background:#0E6B62} }
+  .seq { animation: seqOn 4.8s infinite; }
+  .s0{animation-delay:0s}.s1{animation-delay:.2s}.s2{animation-delay:.4s}
+  .s3{animation-delay:.6s}.s4{animation-delay:.8s}.s5{animation-delay:1s}
+  .s6{animation-delay:1.2s}.s7{animation-delay:1.4s}.s8{animation-delay:1.6s}
+  .s9{animation-delay:1.8s}.s10{animation-delay:2s}.s11{animation-delay:2.2s}
+
+  @keyframes nbPulse { 0%,100%{background:var(--bg-soft,#eee)} 50%{background:#8A5A15;border-color:#8A5A15} }
+  .nb .up,.nb .dn,.nb .lf,.nb .rt { animation: nbPulse 2.4s infinite; }
+  .nb .dn { animation-delay:.15s } .nb .lf { animation-delay:.3s } .nb .rt { animation-delay:.45s }
+
+  @keyframes pickA { 0%,40%{background:var(--bg-soft,#eee)} 50%,90%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
+  .pick { animation: pickA 3s infinite; }
+  .pickseq { animation: pickA 3.2s infinite; }
+  .p0{animation-delay:0s}.p1{animation-delay:.35s}.p2{animation-delay:.7s}.p3{animation-delay:1.05s}
+  @keyframes randHop { 0%,20%{background:#0E6B62;border-color:#0E6B62} 21%,100%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
+  .randg i { animation: randHop 2.7s infinite; }
+  .randg i:nth-child(2){animation-delay:.3s}.randg i:nth-child(5){animation-delay:.6s}
+  .randg i:nth-child(7){animation-delay:.9s}.randg i:nth-child(9){animation-delay:1.2s}
+
+  @keyframes rollA {0%{background:#0E6B62;border-color:#0E6B62}33%{background:#8A5A15;border-color:#8A5A15}66%{background:#4A6570;border-color:#4A6570}}
+  @keyframes rollB {0%{background:#8A5A15;border-color:#8A5A15}33%{background:#4A6570;border-color:#4A6570}66%{background:#0E6B62;border-color:#0E6B62}}
+  @keyframes rollC {0%{background:#4A6570;border-color:#4A6570}33%{background:#0E6B62;border-color:#0E6B62}66%{background:#8A5A15;border-color:#8A5A15}}
+  .rollg i { animation: rollA 3s infinite steps(1,end); }
+  .rollg i:nth-child(3n+2){animation-name:rollB}.rollg i:nth-child(3n+3){animation-name:rollC}
+  .roll i { animation: rollA 4s infinite steps(1,end); }
+  .loose i:nth-child(2){animation-name:rollC}.loose i:nth-child(3){animation-name:rollB}
+  .loose i:nth-child(5){animation-name:rollC}.loose i:nth-child(6){animation-name:rollB}
+  .tight i:nth-child(1),.tight i:nth-child(2),.tight i:nth-child(3){animation-name:rollA}
+  .tight i:nth-child(4),.tight i:nth-child(5){animation-name:rollB}
+  .tight i:nth-child(6){animation-name:rollC}
+
+  @keyframes runFlash { 0%,30%{background:var(--bg-soft,#eee)} 40%,80%{background:#0E6B62;border-color:#0E6B62} 100%{background:var(--bg-soft,#eee)} }
+  .run { animation: runFlash 3s infinite; }
+  .arrowl { animation: blink 3s infinite; }
+
+  @keyframes waysPulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+  .hit { animation: waysPulse 2.4s infinite; }
+  .gapx i { opacity: .2 }
+
+  /* Multiways: reels always fill the SAME height however many symbols they
+     hold, so the board reads as one board reconfiguring rather than columns
+     growing and shrinking. Ten configurations cycle in sequence; the ways
+     count changes with them.
+
+     The frame classes are mwq1..mwq10 rather than f1..f10 on purpose - an
+     earlier version used f1/f2/f3, which already carry the hold-and-win
+     fill delays defined later in this file. The later rule won, every frame
+     got a delay under half a second, and all ten appeared at once. */
+  .mw { position: relative; width: 78px; height: 84px; }
+  .mwf {
+    position: absolute; inset: 0; display: flex; gap: 3px;
+    opacity: 0; animation: frameShow 12s infinite;
+  }
+  .mwc { display: flex; flex-direction: column; gap: 2px; flex: 1 1 0; height: 100%; }
+  .mwc i { flex: 1 1 0; width: auto; height: auto; min-height: 0; }
+  .mwn { position: relative; width: 74px; height: 1.1rem; }
+  .mwn .num { position: absolute; left: 0; top: 0; opacity: 0; animation: frameShow 12s infinite; }
+  /* Both selectors per frame: `.mwn .num` sets the `animation` shorthand and
+     outranks a bare `.mwqN`, which zeroed every readout's delay and left all
+     ten ways counts firing at once against a board that had moved on. */
+  .mw .mwq1, .mwn .mwq1 { animation-delay: 0.0s }
+  .mw .mwq2, .mwn .mwq2 { animation-delay: 1.2s }
+  .mw .mwq3, .mwn .mwq3 { animation-delay: 2.4s }
+  .mw .mwq4, .mwn .mwq4 { animation-delay: 3.6s }
+  .mw .mwq5, .mwn .mwq5 { animation-delay: 4.8s }
+  .mw .mwq6, .mwn .mwq6 { animation-delay: 6.0s }
+  .mw .mwq7, .mwn .mwq7 { animation-delay: 7.2s }
+  .mw .mwq8, .mwn .mwq8 { animation-delay: 8.4s }
+  .mw .mwq9, .mwn .mwq9 { animation-delay: 9.6s }
+  .mw .mwq10, .mwn .mwq10 { animation-delay: 10.8s }
+  /* 1.2s per configuration across a 12s loop: visible for one slot, faded
+     for the other nine. */
+  @keyframes frameShow { 0%{opacity:0} 2%,8%{opacity:1} 10%,100%{opacity:0} }
+
+  /* pay-ways uses the same reconfiguring board, with five frames over 6s
+     rather than ten over 12s. Its own frame classes for the reason spelled
+     out above: a shared name picks up whichever delay is defined last. */
+  /* Longhands, not the `animation` shorthand: this selector outranks the
+     .pwqN delay rules below, and the shorthand would reset their delay to 0
+     and stack all five frames on top of each other. */
+  .mwf.pwq1, .mwf.pwq2, .mwf.pwq3, .mwf.pwq4, .mwf.pwq5,
+  .mwn .num.pwq1, .mwn .num.pwq2, .mwn .num.pwq3, .mwn .num.pwq4, .mwn .num.pwq5 {
+    animation-name: frameShow5;
+    animation-duration: 6s;
+    animation-iteration-count: infinite;
+  }
+  /* Both selectors per frame: `.mwn .num` carries the multiways shorthand,
+     which zeroes the delay of anything it outranks, and the readouts have to
+     step in lockstep with the boards. */
+  .mw .pwq1, .mwn .pwq1 { animation-delay: 0.0s }
+  .mw .pwq2, .mwn .pwq2 { animation-delay: 1.2s }
+  .mw .pwq3, .mwn .pwq3 { animation-delay: 2.4s }
+  .mw .pwq4, .mwn .pwq4 { animation-delay: 3.6s }
+  .mw .pwq5, .mwn .pwq5 { animation-delay: 4.8s }
+  @keyframes frameShow5 { 0%{opacity:0} 4%,16%{opacity:1} 20%,100%{opacity:0} }
+
+  @keyframes scPulse { 0%,100%{background:#8A5A15;border-color:#8A5A15} 50%{background:var(--bg-soft,#eee);border-color:var(--fg-mute,#888)} }
+  .sc { animation: scPulse 2.6s infinite; }
+  @keyframes popIn { 0%,55%{opacity:0;transform:scale(.5)} 65%,100%{opacity:1;transform:scale(1)} }
+  .pop { animation: popIn 3s infinite; }
+  .d0{animation-delay:0s}
+  @keyframes strikeOut { 0%,45%{opacity:1} 55%,100%{opacity:.15} }
+  .strike { animation: strikeOut 2.6s infinite; }
+  @keyframes lockPulse { 0%,100%{border-color:#0E6B62} 50%{border-color:#A32E28} }
+  .lock { animation: lockPulse 2.4s infinite; }
+
+  @keyframes ringL {0%,45%{outline:3px solid #0E6B62;outline-offset:-3px}50%,100%{outline:0 solid transparent}}
+  @keyframes ringR {0%,45%{outline:0 solid transparent}50%,100%{outline:3px solid #8A5A15;outline-offset:-3px}}
+  .wgrid .lft{animation:ringL 3s infinite}.wgrid .rgt{animation:ringR 3s infinite}
+  .wgrid .both{animation:ringL 3s infinite,ringR 3s infinite}
+  @keyframes floodOn { 0%,100%{opacity:.2} 30%,90%{opacity:1} }
+  .fl0{animation:floodOn 3s infinite}.fl1{animation:floodOn 3s infinite .2s}
+  .fl2{animation:floodOn 3s infinite .4s}.fl3{animation:floodOn 3s infinite .6s}
+
+  .casc { position: relative; height: 92px; width: 20px; }
+  .casc i { position: absolute; left: 0; }
+  @keyframes fallOne {0%,22%{transform:translateY(0)}30%,100%{transform:translateY(23px)}}
+  @keyframes clearOne {0%,18%{opacity:1;outline:0 solid #0E6B62}22%{opacity:1;outline:3px solid #0E6B62;outline-offset:-3px}28%,92%{opacity:0}100%{opacity:0}}
+  @keyframes dropIn {0%,26%{opacity:0;transform:translateY(-23px)}36%,100%{opacity:1;transform:translateY(0)}}
+  .casc .s0{top:0;animation:dropIn 3.2s infinite ease-out}
+  .casc .s1{top:23px;animation:fallOne 3.2s infinite ease-in}
+  .casc .s2{top:46px;animation:fallOne 3.2s infinite ease-in}
+  .casc .s3{top:69px;animation:clearOne 3.2s infinite}
+  @keyframes stepUp { 0%,100%{opacity:.25} 50%{opacity:1;color:#0E6B62} }
+  .st1{animation:stepUp 4s infinite}.st2{animation:stepUp 4s infinite 1s}
+  .st3{animation:stepUp 4s infinite 2s}.st4{animation:stepUp 4s infinite 3s}
+
+  .meter { display: flex; gap: 3px; }
+  @keyframes burn3 {0%,24%{opacity:1}25%,66%{opacity:.15}67%,100%{opacity:1}}
+  @keyframes burn2 {0%,49%{opacity:1}50%,66%{opacity:.15}67%,100%{opacity:1}}
+  @keyframes coinLand {0%,60%{opacity:0;transform:translateY(-9px)}67%,100%{opacity:1;transform:translateY(0)}}
+  .meter .m3{animation:burn3 4s infinite steps(1,end)}
+  .meter .m2{animation:burn2 4s infinite steps(1,end)}
+  .landing{animation:coinLand 4s infinite}
+  @keyframes pullIn { 0%,100%{transform:scale(1)} 55%{transform:scale(1.35)} }
+  .pull { animation: pullIn 3s infinite; }
+  @keyframes drain { 0%,30%{opacity:1} 60%,100%{opacity:.12} }
+  .fade1{animation:drain 3s infinite}.fade2{animation:drain 3s infinite .12s}.fade3{animation:drain 3s infinite .24s}
+  @keyframes fillBoard { 0%,100%{opacity:.15} 40%,90%{opacity:1} }
+  .fillseq { animation: fillBoard 4s infinite; }
+  .f0{animation-delay:0s}.f1{animation-delay:.12s}.f2{animation-delay:.24s}
+  .f3{animation-delay:.36s}.f4{animation-delay:.48s}.f5{animation-delay:.6s}
+  .f6{animation-delay:.72s}.f7{animation-delay:.84s}.f8{animation-delay:.96s}
+
+  /* --- strips: a fixed reel, a window that slides over it ------------------ */
+  .strip { position: relative; display: flex; flex-direction: column; gap: 2px; }
+  .strip i {
+    width: 26px; height: 15px; border-radius: 2px; background: rgba(255,255,255,.06);
+    color: #9a9a9a; font-family: var(--mono, monospace); font-size: .62rem; font-style: normal;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .strip .win {
+    position: absolute; left: -3px; width: 32px; height: 55px; border: 2px solid #0E6B62;
+    border-radius: 3px; top: 0; animation: slideWin 6s infinite;
+  }
+  @keyframes slideWin { 0%{top:0} 30%{top:51px} 60%{top:17px} 100%{top:0} }
+
+  /* --- gamble: each rung risks the lot -------------------------------------- */
+  @keyframes gClimb { 0%,100%{opacity:.22} 20%{opacity:1;color:#0E6B62} }
+  .gstep { opacity: .22; }
+  .g1{animation:gClimb 5s infinite}.g2{animation:gClimb 5s infinite 1s}.g3{animation:gClimb 5s infinite 2s}
+  @keyframes gBust { 0%,58%{opacity:0} 68%,88%{opacity:1;color:#9E1C2F} 96%,100%{opacity:0} }
+  .gbust { opacity: 0; animation: gBust 5s infinite; }
+
+  /* --- meters: a bar that fills and pays what it passed --------------------- */
+  .gauge .mfill { display:block; height:100%; background:#0E6B62; width:0; animation: mFill 6s infinite; }
+  @keyframes mFill { 0%{width:0} 45%{width:55%} 70%{width:100%} 100%{width:100%} }
+  @keyframes mPay { 0%,40%{opacity:0} 48%,62%{opacity:1;color:#0E6B62} 70%,100%{opacity:0} }
+  @keyframes mPay2 { 0%,66%{opacity:0} 74%,92%{opacity:1;color:#0E6B62} 98%,100%{opacity:0} }
+  .mpay { opacity: 0; animation: mPay 6s infinite; }
+  .mpay.mp2 { animation: mPay2 6s infinite; }
+
+  /* --- symbols: the lows all become premiums at once ----------------------- */
+  @keyframes toPrem { 0%,45%{opacity:1} 55%,100%{opacity:1;background:#0E6B62;color:#041614} }
+  .hwc.tf { animation: toPrem 4s infinite; }
+  .t2{animation-delay:.05s}.t3{animation-delay:.1s}.t4{animation-delay:.15s}
+
+  /* --- free spins: the multiplier, the counter, the held cells ------------- */
+  @keyframes fsStep { 0%,100%{opacity:.22} 18%{opacity:1;color:#0E6B62} }
+  .fsx { opacity: .22; }
+  .x1{animation:fsStep 5s infinite}.x2{animation:fsStep 5s infinite 1.2s}
+  .x3{animation:fsStep 5s infinite 2.4s}.x4{animation:fsStep 5s infinite 3.6s}
+  .fsw { font-size: .7rem; color: var(--dim, #8a8a8a); }
+
+  @keyframes rtOpen { 0%,55%{opacity:.12} 65%,100%{opacity:1} }
+  .meter .rt3, .meter .rt4, .meter .rt5 { animation: rtOpen 4s infinite; }
+  .meter .rt4 { animation-delay: .08s } .meter .rt5 { animation-delay: .16s }
+  @keyframes rtLabel { 0%,52%{opacity:0} 62%,88%{opacity:1} 96%,100%{opacity:0} }
+  .rtlabel { color: #0E6B62; animation: rtLabel 4s infinite; }
+
+  /* the spun cells change, the held ones do not */
+  @keyframes reSpin { 0%,45%{opacity:1} 50%{opacity:.15} 55%,100%{opacity:1} }
+  .hwc.spun { background: rgba(255,255,255,.06); color: #9a9a9a; animation: reSpin 3s infinite; }
+  .hwc.spun.s2 { animation-delay: .06s } .hwc.spun.s3 { animation-delay: .12s }
+
+  /* --- picks: boxes open one at a time, a wheel lands on one segment ------- */
+  .hwc.box { background: rgba(255,255,255,.08); color: #b9b9b9; }
+  @keyframes boxOpen { 0%,20%{opacity:1} 30%,100%{opacity:.16} }
+  .b2{animation:boxOpen 5s infinite .6s}.b5{animation:boxOpen 5s infinite 1.4s}
+  .b3{animation:boxOpen 5s infinite 2.2s}
+  @keyframes segLand { 0%,100%{opacity:.25} 12%{opacity:1;color:#0E6B62} }
+  .wseg { opacity: .25; font-size: .72rem; }
+  .w1{animation:segLand 3.2s infinite}.w2{animation:segLand 3.2s infinite .8s}
+  .w3{animation:segLand 3.2s infinite 1.6s}.w4{animation:segLand 3.2s infinite 2.4s}
+
+  /* --- hold & win: a real board, with values on the cells ------------------ */
+  .hw { display: grid; grid-template-columns: repeat(3, 34px); gap: 4px; }
+  .hwc {
+    position: relative; height: 34px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono, monospace); font-size: .78rem;
+  }
+  .hwc.coin { background: rgba(14,107,98,.22); color: #7fd8cb; }
+  .hwc.hole { background: rgba(255,255,255,.05); }
+
+  /* landing: three cells take a coin, one after another */
+  @keyframes landIn { 0%,20%{opacity:0;transform:translateY(-8px)} 30%,100%{opacity:1;transform:none} }
+  .hwc.land { background: rgba(14,107,98,.22); color: #7fd8cb; opacity: 0; }
+  .l1{animation:landIn 5s infinite}.l2{animation:landIn 5s infinite 1.2s}.l3{animation:landIn 5s infinite 2.4s}
+
+  /* collector: the others empty out, its total climbs */
+  @keyframes eaten { 0%,25%{opacity:1} 45%,100%{opacity:.16;color:#6b6b6b} }
+  .hwc.eat { animation: eaten 4s infinite; }
+  .e2{animation-delay:.08s}.e3{animation-delay:.16s}.e4{animation-delay:.24s}
+  .e5{animation-delay:.32s}.e6{animation-delay:.4s}
+  .hwc.pot { background: #0E6B62; color: #041614; font-weight: 700; }
+  @keyframes potGrow { 0%,25%{transform:scale(1)} 55%{transform:scale(1.22)} 80%,100%{transform:scale(1)} }
+  .hwc.pot { animation: potGrow 4s infinite; }
+  .hwc.pot .tot {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #0E6B62; border-radius: 3px; opacity: 0; animation: show 4s infinite;
+  }
+
+  /* mystery: hidden cells flip together to one value */
+  .hwc.q { background: rgba(255,255,255,.09); color: #b9b9b9; }
+  .hwc.q .flip {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(14,107,98,.22); color: #7fd8cb; border-radius: 3px;
+    opacity: 0; animation: show 4.5s infinite;
+  }
+  .hwc.q .flip.f1 { animation-delay: .07s } .hwc.q .flip.f2 { animation-delay: .14s }
+
+  /* a factor printed on the cell, then a second one stacking onto it */
+  .hwc.xcell { background: rgba(14,107,98,.22); color: #7fd8cb; outline: 1px solid rgba(14,107,98,.55); outline-offset: 1px; }
+  .hwc .badge {
+    position: absolute; right: -6px; top: -7px; padding: 0 3px; border-radius: 2px;
+    background: #0E6B62; color: #041614; font-size: .6rem; font-weight: 700;
+  }
+  @keyframes badgeIn  { 0%,12%{opacity:0;transform:scale(.6)} 22%,58%{opacity:1;transform:none} 66%,100%{opacity:0} }
+  @keyframes badgeTwo { 0%,60%{opacity:0;transform:scale(.6)} 72%,100%{opacity:1;transform:none} }
+  .hwc .badge { animation: badgeIn 5s infinite; }
+  .hwc .badge.b2 { animation: badgeTwo 5s infinite; }
+
+  /* the board grows a row mid-cycle */
+  @keyframes rowOpen { 0%,45%{opacity:0;transform:scaleY(.2)} 60%,100%{opacity:1;transform:none} }
+  .hwc.new { transform-origin: top; animation: rowOpen 4.5s infinite; }
+  .n2{animation-delay:.08s}.n3{animation-delay:.16s}
+
+  @keyframes show { 0%,55%{opacity:0} 65%,100%{opacity:1} }
+
+  /* Empty cells that keep trying, and the one that takes. */
+  @keyframes tryLand { 0%,100%{opacity:.14} 46%{opacity:.14} 52%{opacity:1;background:#0E6B62} }
+  .empty { opacity: .14; }
+  .e0{animation:tryLand 4s infinite .0s}.e1{animation:tryLand 4s infinite 1.1s}
+  .e2{animation:tryLand 4s infinite 2.2s}.e3{animation:tryLand 4s infinite 3.0s}
+  .e4{animation:tryLand 4s infinite .6s}
+
+  /* Three hidden cells, one shared value. */
+  @keyframes hide  { 0%,55%{opacity:1} 62%,100%{opacity:0} }
+  @keyframes show  { 0%,58%{opacity:0} 66%,100%{opacity:1;color:#0E6B62} }
+  .myst { opacity: 1; }
+  .m0{animation:hide 4s infinite}.m1{animation:hide 4s infinite .06s}.m2{animation:hide 4s infinite .12s}
+  .reveal{animation:show 4s infinite}
+
+  /* A factor printed on the cell, not carried by the coin. */
+  @keyframes cellGlow { 0%,100%{outline:1px solid rgba(14,107,98,.35)} 50%{outline:2px solid #0E6B62} }
+  .cellx { outline: 1px solid rgba(14,107,98,.35); outline-offset: 1px; animation: cellGlow 3s infinite; }
+
+  .short i { opacity: .35 }
+  @keyframes blockPulse { 0%,100%{outline:0 solid transparent} 50%{outline:2px solid #0E6B62;outline-offset:-1px} }
+  .bigblk { animation: blockPulse 2.6s infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .anim :is(i, span, b, em) { animation: none !important; }
+    .casc .s3 { opacity: .3; }
+    /* With the motion gone, show each board's OUTCOME rather than the state it
+       starts from: the coin landed, the total collected, the mystery turned
+       over, both multipliers on the cell, the row open. A still of the
+       before-state would say nothing about the mechanic. */
+    .hwc.land, .hwc.new, .hwc.pot .tot, .hwc.q .flip, .hwc .badge { opacity: 1 !important; }
+    .fsx, .wseg, .meter .rt3, .meter .rt4, .meter .rt5, .rtlabel { opacity: 1 !important; }
+    .gstep, .mpay { opacity: 1 !important; }
+    .gbust { opacity: 0 !important; }
+    .gauge .mfill { width: 100% !important; }
+    .strip .win { top: 17px !important; }
+    .hwc.box.b2, .hwc.box.b3, .hwc.box.b5 { opacity: .16 !important; }
+    .hwc.eat { opacity: .16 !important; color: #6b6b6b !important; }
+    .hwc .badge { position: static; margin-left: 3px; }
+    .hwc.xcell .badge:not(.b2) { display: none; }
+  }
+</style>

@@ -7,7 +7,7 @@ games. Usable as a library or via the `open-rgs-sim` CLI.
 
 **Bun is required** (`engines.bun >= 1.0.0`). This package publishes raw
 TypeScript (no `dist/`) and its `bin` is a `.ts` file with a
-`#!/usr/bin/env bun` shebang, so run the CLI with **`bunx`**  - not
+`#!/usr/bin/env bun` shebang, so run the CLI with **`bunx`**, not
 `npm install -g` on a Node-only machine. See ADR-001 for why.
 
 ## Install
@@ -24,7 +24,7 @@ bunx open-rgs-sim <manifest-module> [--spins N] [--seed N] [--bet N] \
 ```
 
 `<manifest-module>` is a path to a module that exports a `GameManifest`
-(from `defineGame`)  - as `default`, `manifest`, or `buildManifest`; a
+(from `defineGame`), as `default`, `manifest`, or `buildManifest`; a
 function export is called with `{ seed }` so it can seed the math RNG.
 Reports are written to `--out` (default `./reports`) in the chosen
 `--format` (default `all`).
@@ -33,7 +33,7 @@ Reports are written to `--out` (default `./reports`) in the chosen
 
 For big certification runs, `--shards N` splits the spins across **N
 independently-seeded worker processes** (one per core) and merges the
-results  - near-linear speedup with core count:
+results: near-linear speedup with core count:
 
 ```bash
 bunx open-rgs-sim ./src/manifest.ts --spins 8000000 --shards 8
@@ -46,7 +46,7 @@ re-seeded; a static manifest export is **refused** with a clear error,
 because every shard would otherwise replay the identical stream and the
 result would be a bogus, over-confident number.
 
-The merged report is **exact** for the cert-critical numbers  - measured
+The merged report is **exact** for the cert-critical numbers, measured
 RTP, standard error, 95% CI, verdict, hit rate, outcome-type counts, RTP
 contributions, deviations, and the multiplier mean / stdDev / min / max.
 The only approximated values are the distribution **percentiles**
@@ -60,11 +60,11 @@ Write a `simulate.ts` next to your game's `index.ts`:
 
 ```ts
 import { simulate, mdReportSet, mulberry32 } from "@open-rgs/simulator";
-import { loadLuaMath } from "@open-rgs/core";
+import { loadTsMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 
 // Seed the MATH's rng so spins are reproducible.
-const math = await loadLuaMath("./maths/spin.lua", {
+const math = await loadTsMath("./maths/spin.ts", {
   rng: mulberry32(42),
 });
 
@@ -83,7 +83,7 @@ Run it: `bun src/simulate.ts > report.md`.
 
 ## Fast batch simulation (WASM + native Zig)
 
-`simulate()` above runs the math one spin at a time (the Lua path). When the
+`simulate()` above runs the math one spin at a time. When the
 math is a **WASM kernel** that exports `sim_batch`, the whole spin loop runs
 *inside* the kernel - 100M+ spins incur no per-spin `JS<->WASM` boundary, just
 one crossing per chunk. It uses a seeded in-VM PRNG and the same `decide`
@@ -142,7 +142,7 @@ Zig kernel exercised through both tiers.
 One [`SimulationReport`](src/report.ts) per mode:
 
 ```
-# Simulation  - hello-spin / default
+# Simulation: hello-spin / default
 
 math hello-spin@0.2.0 (simple)
 
@@ -178,16 +178,16 @@ math hello-spin@0.2.0 (simple)
 
 The simulator's own `seed` option only drives its **complex-round step
 strategy** ("random" / "first"). To make the *math's* spins
-reproducible, seed the math at `loadLuaMath` time:
+reproducible, seed the math at `loadTsMath` time:
 
 ```ts
 import { mulberry32 } from "@open-rgs/simulator/rng";
-const math = await loadLuaMath("./maths/spin.lua", { rng: mulberry32(42) });
+const math = await loadTsMath("./maths/spin.ts", { rng: mulberry32(42) });
 ```
 
 > ⚠️ **Simulation/dev only.** `mulberry32` is a 32-bit, fully-predictable
-> PRNG  - never route it into a production `loadLuaMath({ rng })`. It is
-> tagged so `loadLuaMath` throws if it sees it under `NODE_ENV=production`.
+> PRNG, never route it into a production `loadTsMath({ rng })`. It is
+> tagged so `loadTsMath` throws if it sees it under `NODE_ENV=production`.
 > Production outcome determination requires a certified CSPRNG (Spec 03).
 
 The same `mulberry32` is exported from both `@open-rgs/simulator` and
@@ -205,7 +205,7 @@ simulator picks actions via:
 | `"random"` | Picks uniformly from `awaiting.options` using the simulator's seeded rng. |
 
 Bespoke strategies (e.g., always-gamble, always-take) aren't first-
-class yet  - write your own loop using the orchestrator's
+class yet: write your own loop using the orchestrator's
 `OrchestratorAPI` if you need them.
 
 ## Caveats
@@ -213,7 +213,7 @@ class yet  - write your own loop using the orchestrator's
 - `next_mode` and `carry` are recorded but **not followed**. Each
   mode is simulated in isolation. Cross-mode session RTP needs a
   different harness; this one measures per-mode math behaviour.
-- Free-round campaigns aren't simulated either  - those are platform-
+- Free-round campaigns aren't simulated either: those are platform-
   side, and the simulator skips the platform adapter entirely.
 - The whole reel-distribution is held in memory (`number[]` of length
   `spinsPerMode`) **per process** so percentile and stddev can be

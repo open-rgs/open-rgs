@@ -1,12 +1,12 @@
 // Minimal open-rgs game. Boots an RGS with the in-memory MockPlatform
-// (no external wallet needed), serves a single Lua math on a binary-
+// (no external wallet needed), serves a single TypeScript math on a binary-
 // msgpack WebSocket. Hit ws://localhost:8080/wss with @open-rgs/client.
 //
 // Read this file top-to-bottom for a 60-second tour of the surface.
 
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer, binaryTransport, loadLuaMath, cryptoRng } from "@open-rgs/core";
+import { createServer, binaryTransport, loadTsMath, cryptoRng } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 
@@ -16,7 +16,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 // system CSPRNG (`cryptoRng`, WebCrypto -> BoringSSL)  - never Math.random  -
 // and fails closed in production unless you choose a source explicitly. We
 // pass it here; a production deployment wires its certified/approved RNG.
-const math = await loadLuaMath(resolve(here, "../maths/spin.lua"), { rng: cryptoRng });
+const math = await loadTsMath(resolve(here, "../maths/spin.ts"), { rng: cryptoRng });
 
 const manifest = defineGame({
   id:               "hello-spin",

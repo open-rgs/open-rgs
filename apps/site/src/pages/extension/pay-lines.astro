@@ -1,0 +1,45 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/pay-lines, Runs along a line"
+  description="Pay-lines: Longest run, paid once."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/pay-lines</h1>
+
+    <p class="lede">Longest run, paid once.</p>
+
+    <h2 data-section="&sect; 1">Anchored, and paid once</h2>
+
+    <p>A payline is a row index per column. Evaluation walks it left to right and pays the longest qualifying run - paying every prefix as well roughly doubles a game's RTP.</p>
+
+    <Anim kind="pay-lines-run" caption="A run must be anchored at the leftmost reel." />
+
+    <Code code={`import { evalLines, rowLines } from "@open-rgs/pay-lines";
+import { totalMultiplier } from "@open-rgs/paytable";
+
+const LINES = rowLines(5, 3);
+
+const wins = evalLines(grid, LINES, PAY, { roles });
+totalMultiplier(wins);`} />    <h2 data-section="&sect; 2">A wild-opening run is ambiguous</h2>
+
+    <p>It can be read as the wild's own symbol or as whatever it substitutes for further along. The convention is to pay whichever is worth more; reading it only as the wild silently underpays the best board in the game.</p>
+
+    <Anim kind="pay-lines-wildopen" caption="The reading worth more is the one that pays." />
+
+    <Code code={``} />    <h2 data-section="&sect; 3">Both ways compete</h2>
+
+    <p>A game paying from either end evaluates both directions and keeps the better one. Paying both would double-count a run that spans the whole grid.</p>
+
+    <Anim kind="pay-lines-bothways" caption="The two directions compete rather than accumulate." />
+
+    <Code code={`const wins = evalLines(grid, LINES, PAY, { roles, bothWays: true });
+
+evalLine(grid, [2, 2, 2, 2, 2], PAY, { roles });`} />
+  </main>
+</BaseLayout>

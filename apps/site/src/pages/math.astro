@@ -3,8 +3,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="Simple math  - open-rgs"
-  description="Write a single-call math module in Lua for open-rgs. Used by slots, instant-win, dice, plinko, scratchers  - any round that resolves in one response."
+  title="Simple math, open-rgs"
+  description="Write a single-call math module in TypeScript for open-rgs. Used by slots, instant-win, dice, plinko, scratchers, any round that resolves in one response."
 >
   <main>
     <h1>Math . simple</h1>
@@ -17,7 +17,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
     <h2 data-section="§ 1">Module shape</h2>
 
-    <pre><code>{`-- maths/spin.lua
+    <pre><code>{`// maths/spin.ts
 return {
   kind    = "simple",
   name    = "hello",
@@ -61,16 +61,14 @@ return {
     <h2 data-section="§ 4">Host helpers</h2>
 
     <p>
-      Two helpers are injected into every math VM. Extensions registered
-      via <code>loadLuaMath(path, &#123; extensions: [...] &#125;)</code> add more.
-    </p>
+      Two helpers are injected into every math VM. Extensions registered</p>
 
     <table>
       <thead><tr><th>Helper</th><th>Behaviour</th></tr></thead>
       <tbody>
         <tr><td><code>host.rng_next()</code></td><td>returns a float in <code>[0, 1)</code> from the orchestrator's RNG (a secure CSPRNG by default; <code>Math.random</code> is never used)</td></tr>
         <tr><td><code>host.log_debug(msg)</code></td><td>writes a debug line tagged with the math file path</td></tr>
-        <tr><td><code>host.mark.count(name)</code></td><td>increments a named counter  - inert in production, recorded by the simulator</td></tr>
+        <tr><td><code>host.mark.count(name)</code></td><td>increments a named counter, inert in production, recorded by the simulator</td></tr>
         <tr><td><code>host.mark.observe(name, v)</code></td><td>appends a value to a named histogram</td></tr>
         <tr><td><code>host.mark.tag(name)</code></td><td>tags the current spin under <code>name</code></td></tr>
         <tr><td><code>host.mark.contribute(name, m)</code></td><td>adds a multiplier to a named RTP-attribution bucket</td></tr>
@@ -88,11 +86,9 @@ return {
 
     <h2 data-section="§ 6">Loading</h2>
 
-    <pre><code>{`import { loadLuaMath } from "@open-rgs/core";
-import reels from "@open-rgs/ext-reels";
+    <pre><code>{`import { loadTsMath } from "@open-rgs/core";
 
-const math = await loadLuaMath("./maths/spin.lua", {
-  extensions: [reels],   // optional native + Lua helpers, see open-rgs-ext-*
+const math = await loadTsMath("./maths/spin.ts", {
   marks:      false,     // true to wire the simulator's mark collector
 });`}</code></pre>
 
@@ -108,9 +104,9 @@ const math = await loadLuaMath("./maths/spin.lua", {
     <p>
       For production-grade or certification-bound math, compile a kernel to
       WebAssembly - typically in <strong>Zig</strong> (Rust, TinyGo, C also
-      work) - and load it instead of Lua. Same <code>MathModule</code>
+      work) - and load it instead. Same <code>MathModule</code>
       contract; the orchestrator can't tell the difference. A WASM kernel runs
-      ~14x faster than the equivalent Lua (measured; reproduce with
+      Sandboxed and bit-deterministic (reproduce the benchmark with
       <code>examples/twin-slot/src/bench.ts</code>) and ships as one hashable artifact.
     </p>
 
@@ -138,7 +134,7 @@ const pooled = await createMathPool({
       platform-dependent - keep WASM kernels trusted. See <code>examples/hold-and-win</code> for a
       worked Zig kernel (with its <code>zig build-exe</code> commands and a
       native multithreaded sim), and <code>examples/twin-slot</code> /
-      <code>examples/twin-gamble</code> for the same math written in both Lua and
+      <code>examples/twin-gamble</code> for the same math written in both Tya and
       Zig, with a test proving the two runtimes are 1:1.
     </p>
 

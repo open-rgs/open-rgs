@@ -1,0 +1,48 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/markov, Stacking"
+  description="Markov: Changes how clumpy reels look. Provably does not change frequency."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/markov</h1>
+
+    <p class="lede">Changes how clumpy reels look. Provably does not change frequency.</p>
+
+    <h2 data-section="&sect; 1">One knob for feel</h2>
+
+    <p>Independent draws give exact frequency and no adjacency, so reels never feel like reels. Strips give adjacency but tangle it with frequency. A Markov chain over each column gives both, separately.</p>
+
+    <Anim kind="markov-pair" caption="Two columns, same symbols, same rates. Only the runs differ." />
+
+    <Code code={`import { stackyFill } from "@open-rgs/markov";
+
+const BASE = { LOW: 60, MID: 30, HIGH: 10 };
+
+const flat   = stackyFill(SHAPE, BASE, 0);
+const stacky = stackyFill(SHAPE, BASE, 0.8);`} />    <h2 data-section="&sect; 2">Frequency does not move</h2>
+
+    <p>Under sticky(base, s) the chain's stationary distribution is exactly base, for every s below 1. So stickiness is a pure feel knob - turn it up for stacks and your RTP does not shift.</p>
+
+    <Anim kind="markov-stationary" caption="The chain settles on the base distribution, whatever the stickiness." />
+
+    <Code code={`import { sticky, stationary } from "@open-rgs/markov";
+
+stationary(sticky(BASE, 0.9));`} />    <h2 data-section="&sect; 3">How tall are the stacks</h2>
+
+    <p>Run length is what stickiness is actually tuned against, and guessing it from spin footage is slow. It is a geometric distribution, so it has a closed form.</p>
+
+    <Anim kind="markov-runs" caption="High stickiness produces natural stacks, the one thing a strip gave you." />
+
+    <Code code={`import { meanRunLength, transitions } from "@open-rgs/markov";
+
+meanRunLength(BASE, 0.35, "HIGH");
+
+transitions({ A: { A: 75, B: 25 }, B: { A: 75, B: 25 } });`} />
+  </main>
+</BaseLayout>

@@ -17,29 +17,30 @@ bun add @open-rgs/core @open-rgs/contract @open-rgs/platform-mock
 ## Boot
 
 ```ts
-import { createServer, binaryTransport, loadLuaMath } from "@open-rgs/core";
+import { createServer, binaryTransport, loadTsMath } from "@open-rgs/core";
 import { defineGame } from "@open-rgs/contract";
 import { MockPlatform } from "@open-rgs/platform-mock";
 
 await createServer({
   manifest: defineGame({
     id: "hello", declaredRtp: 0.95, defaultMode: "default",
-    modes: { default: { math: await loadLuaMath("./maths/spin.lua"), stakeMultiplier: 1 } },
+    modes: { default: { math: await loadTsMath("./maths/spin.ts"), stakeMultiplier: 1 } },
   }),
   platform:  new MockPlatform({ startingBalance: 100_000 }),
-  transport: binaryTransport({ port: 80 }),
+  transport: binaryTransport({ port: 8080 }),
 });
 ```
 
 ## Math runtimes
 
 A game's math is a `MathModule` (`@open-rgs/contract`). Core loads it from
-one of three source forms - same contract, swappable by a manifest entry:
+one of two source forms, and runs a WASM kernel either inline or in a worker
+pool. Same contract in every case, swappable by a manifest entry:
 
 | Loader | Source | Use case |
 |--------|--------|----------|
-| `loadLuaMath(path, opts?)` | `.lua` via wasmoon (Lua 5.4 -> WASM) | Default. Cheap to write, hot-reloadable. Per-call watchdog (`debug.sethook`). |
-| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Production-grade, certification-friendly, ~14x faster than Lua (measured - `examples/twin-slot/src/bench.ts`). Simple or complex. |
+| `loadTsMath(path, opts?)` | `.ts` / `.js` module, purity-gated | default |
+| `loadWasmMath(path, opts?)` | `.wasm` kernel (typically **Zig** or Rust) | Sandboxed, bit-deterministic floats, hashable artifact for certification. Simple or complex. |
 | `createMathPool(opts)` | the same `.wasm` kernel, in a Worker pool | Off the I/O thread; **fails the round** closed on a per-call timeout. Worker-kill is best-effort/platform-dependent (see below). |
 
 ### Compiled (WASM / Zig) math
@@ -90,16 +91,15 @@ Guarantee 5). It is **not a portable no-DoS sandbox**, though: whether
 leak. Treat WASM kernels as **trusted and bounded** regardless; a hard
 cross-platform no-DoS kill needs process isolation (SIGKILL), not implemented.
 The pool's win over bare `loadWasmMath` is off-thread concurrency + round-level
-failure. v1 is simple (single `play`) math. (Only the Lua loader's in-VM
-watchdog preempts a tight loop on any platform.)
+failure. v1 is simple (single `play`) math.
 
 **Complex rounds.** A kernel with `kind=1` and `open` / `step` / `is_terminal` /
 `close` (+ optional `autoclose`) exports loads as complex math. Core threads the
 kernel's serialized `state` (base64) back into each call; the kernel keeps
 nothing between calls. See `examples/cash-ladder` for a worked Zig kernel and
 `specs/03-math-runtime.md` for the ABI. (The pool is simple-only today; and even
-for simple math its worker-kill is platform-dependent — it fails the *round* on
-timeout but isn't a portable no-DoS sandbox — so keep all WASM kernels trusted.)
+for simple math its worker-kill is platform-dependent, it fails the *round* on
+timeout but isn't a portable no-DoS sandbox, so keep all WASM kernels trusted.)
 
 Why Zig for kernels: comptime RTP invariants, no GC pauses, no JIT warmup,
 tiny hashable output, and one source that compiles to **both** WASM (server)
@@ -122,15 +122,44 @@ Outcome randomness is injected by the host; the math never ships its own PRNG.
   simulation only; it is tagged and **refused** in production.
 
 ```ts
-import { loadLuaMath, cryptoRng } from "@open-rgs/core";
+import { loadTsMath, cryptoRng } from "@open-rgs/core";
 
 // Production: choose the RNG explicitly.
-const math = await loadLuaMath("./maths/spin.lua", { rng: cryptoRng });
+const math = await loadTsMath("./maths/spin.ts", { rng: cryptoRng });
 ```
+
+## Retries pay once
+
+A resent `spin`, `openRound`, `stepRound` or `closeRound` carrying the same
+client token returns the first call's result without running the round again.
+
+```ts
+await createServer({ manifest, platform });                       // on
+await createServer({ manifest, platform, requestCache: false });  // off
+await createServer({ manifest, platform, requestCache: { ttlMs: 120_000, max: 10_000 } });
+```
+
+The wallet idempotency key already covers this WHEN the wallet honours it.
+Some wallet protocols have no field for the key at all, and against those a
+client retry after a timeout ran the math and moved money twice. This closes
+that without depending on the wallet.
+
+The entry is created before the work starts, so a repeat arriving while the
+first is still running coalesces onto it rather than starting a second round -
+which is the retry a client timeout actually produces. Failures clear their own
+entry, so a transient wallet blip cannot poison a token permanently. Entries
+are scoped by session and tagged by phase, so two players cannot collide and
+one token cannot collapse a spin into a close.
+
+It is per process: a retry reaching a different pod finds an empty cache and
+runs for real, so the wallet's own dedupe is still the cross-pod guarantee. A
+call with no client token is not cached: there is nothing stable to
+deduplicate on.
 
 ## Also exported
 
 `createOrchestrator` (drive rounds without a transport), `binaryTransport`,
+`restTransport`, `withDeferredClose`, `createRequestCache`,
 `startAdmin` + admin/probe handlers, `createAuditLog` / `verifyChain` (hash-
 chained audit log), `createRgsMetrics` + a Prometheus-style `Registry`,
 `settleAmount` / `roundHalfEven` (integer minor-unit money), `uuidV4` /

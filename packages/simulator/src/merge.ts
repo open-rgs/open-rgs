@@ -56,7 +56,7 @@ function blend(parts: ReadonlyArray<{ n: number; v: number }>): number {
 }
 
 /** Merge N per-shard reports for the SAME mode into one. `expected` is the
- *  mode's `math.expected` (the parent has the manifest), used to recompute
+ *  mode's `math.expected` (the parent has the manifest), which recomputes
  *  deviations exactly from the merged series. Single-element input is
  *  returned unchanged. */
 export function mergeReports(reports: readonly SimulationReport[], expected?: MathExpectations): SimulationReport {
@@ -148,7 +148,27 @@ export function mergeReports(reports: readonly SimulationReport[], expected?: Ma
     spins,
     bet: { unitsPerSpin: betPerSpin, totalUnits: totalBet },
     win: { totalUnits: totalWin, maxMultiplier: Math.max(...reports.map(r => r.win.maxMultiplier)) },
-    rtp: { measured, declared, delta: measured - declared, standardError, ci95: [measured - 1.96 * standardError, measured + 1.96 * standardError], verdict },
+    rtp: {
+      measured,
+      // Shards run the same manifest, so they share a cap; the uncapped total
+      // and the clip counts add up across them the same way the wins do.
+      measuredUncapped: totalBet === 0 ? 0 : sum(reports.map(r => r.rtp.measuredUncapped * r.bet.totalUnits)) / totalBet,
+      maxWinMultiplier: base.rtp.maxWinMultiplier,
+      capped: {
+        rounds: sum(reports.map(r => r.rtp.capped.rounds)),
+        share: spins === 0 ? 0 : sum(reports.map(r => r.rtp.capped.rounds)) / spins,
+        rtpRemoved: totalBet === 0 ? 0 : sum(reports.map(r => r.rtp.capped.rtpRemoved * r.bet.totalUnits)) / totalBet,
+      },
+      declared,
+      delta: measured - declared,
+      standardError,
+      ci95: [measured - 1.96 * standardError, measured + 1.96 * standardError],
+      verdict,
+      // One shard carrying state is enough to make the merged interval
+      // optimistic; shards are independent of each other, spins inside one are
+      // not.
+      correlatedSpins: reports.some(r => r.rtp.correlatedSpins),
+    },
     hitRate,
     multiplier,
     outcomeTypes,

@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/fill, Frequency"
+  description="Fill: Weighted draws, one cell at a time."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/fill</h1>
+
+    <p class="lede">Weighted draws, one cell at a time.</p>
+
+    <h2 data-section="&sect; 1">The strip replacement</h2>
+
+    <p>Every cell drawn independently from one weighted set. This deliberately does not do adjacency - that belongs to markov, layered on top - because most balancing work is frequency work and should not require thinking about neighbours.</p>
+
+    <Anim kind="fill-roll" caption="Every cell drawn independently from the same weighted set." />
+
+    <Code code={`import { fillWeights } from "@open-rgs/fill";
+
+const reels = fillWeights(SHAPE, { LOW: 55, MID: 25, HIGH: 12, WILD: 5, SC: 3 });
+
+const board = reels(host.rng_next);`} />    <h2 data-section="&sect; 2">Per-column sets</h2>
+
+    <p>The classic way to differentiate reels: a wild that can only land on the middle three. A short list is an authoring mistake that would otherwise surface as an undefined symbol mid-spin, so it throws at build time.</p>
+
+    <Anim kind="fill-percolumn" caption="Per-column sets let a wild land only on the middle reels." />
+
+    <Code code={`import { fillWeightsPerColumn } from "@open-rgs/fill";
+
+const gated = fillWeightsPerColumn(SHAPE, [
+  { LOW: 60, HIGH: 12, WILD: 0 },
+  { LOW: 55, HIGH: 12, WILD: 5 },
+  { LOW: 55, HIGH: 12, WILD: 5 },
+  { LOW: 55, HIGH: 12, WILD: 5 },
+  { LOW: 60, HIGH: 12, WILD: 0 },
+]);`} />    <h2 data-section="&sect; 3">Counting without simulating</h2>
+
+    <p>Cells are independent under these generators, so expectation is the sum of per-cell probabilities. That makes a whole class of questions arithmetic rather than a simulation run.</p>
+
+    <Anim kind="fill-expected" caption="How many scatters per spin, computed rather than measured." />
+
+    <Code code={`import { expectedCount, cellProbability } from "@open-rgs/fill";
+
+expectedCount(SHAPE, sets, "SC");
+cellProbability(sets, 0, "WILD");`} />
+  </main>
+</BaseLayout>

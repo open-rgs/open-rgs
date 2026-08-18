@@ -3,7 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="Admin endpoints & probes  - open-rgs"
+  title="Admin endpoints & probes, open-rgs"
   description="open-rgs HTTP endpoints: /livez, /readyz, /healthz, /admin/logs, /admin/metrics, /admin/sessions, /admin/manifest, /admin/modes, /admin/autoclose."
 >
   <main>
@@ -20,7 +20,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <table>
       <thead><tr><th class="mono">Path</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td class="mono">GET /livez</td><td>process alive  - always 200</td></tr>
+        <tr><td class="mono">GET /livez</td><td>process alive, always 200</td></tr>
         <tr><td class="mono">GET /readyz</td><td>200 if the platform adapter is connected, else 503</td></tr>
         <tr><td class="mono">GET /healthz</td><td>JSON diagnostics: core / game version, math identity per mode, platform diagnostics. 503 if unhealthy</td></tr>
         <tr><td class="mono">GET /admin/logs</td><td>ring buffer of recent log lines. Query <code>?level=&amp;limit=</code></td></tr>
@@ -70,7 +70,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 { "closed": false, "reason": "no_round_open" }`}</code></pre>
 
     <p class="mute">
-      Autoclose is never timer-driven inside the RGS  - every autoclose
+      Autoclose is never timer-driven inside the RGS, every autoclose
       is initiated by an external signal (this endpoint, or a wallet
       <code>autocloseRequested</code> event). Keeps policy decisions
       where they belong: upstream.

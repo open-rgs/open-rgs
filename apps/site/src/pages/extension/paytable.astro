@@ -1,0 +1,48 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/paytable, What things are worth"
+  description="Paytable: One shared notion of payout, wild and scatter."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/paytable</h1>
+
+    <p class="lede">One shared notion of payout, wild and scatter.</p>
+
+    <h2 data-section="&sect; 1">One table, four evaluators</h2>
+
+    <p>Lines, ways, anywhere and cluster all read this, so a symbol means the same thing in each. When each carried its own idea of a wild, a game using two of them could disagree with itself and the two RTPs would quietly differ.</p>
+
+    <Anim kind="paytable-wild" caption="A wild substitutes for anything except a scatter." />
+
+    <Code code={`import { paytable, substitutes } from "@open-rgs/paytable";
+
+const PAY   = paytable({ HIGH: { 3: 10, 4: 50, 5: 200 } });
+const roles = { wilds: ["WILD"], scatters: ["SC"] };
+
+substitutes("WILD", "HIGH", roles);
+substitutes("WILD", "SC",   roles);`} />    <h2 data-section="&sect; 2">Bands for cluster games</h2>
+
+    <p>Cluster games pay by size range while a paytable stores exact counts, so there is never interpolation to reason about. bands() bridges the two.</p>
+
+    <Anim kind="paytable-bands" caption="Size ranges expanded into the exact counts a paytable stores." />
+
+    <Code code={`import { bands } from "@open-rgs/paytable";
+
+const CLUSTER = paytable(bands({
+  HIGH: [[5, 2], [9, 6], [12, 22], [15, 90]],
+}, 49));`} />    <h2 data-section="&sect; 3">Watch the top band</h2>
+
+    <p>The top band is open-ended: it runs from its start all the way to maxCount. On a five-reel grid seven scatters is impossible, so the intuition is that it is a lottery ticket. On 49 cells it is not.</p>
+
+    <Anim kind="paytable-topband" caption="The top band runs all the way to maxCount." />
+
+    <Code code={`PAY.maxCount("HIGH");
+PAY.best("HIGH");`} />
+  </main>
+</BaseLayout>

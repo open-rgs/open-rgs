@@ -1,0 +1,82 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/symbols, Symbol mechanics"
+  description="Mystery reveals, transforms and upgrades, walking wilds, wilds that carry a multiplier, and symbols that count more than once."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/symbols</h1>
+
+    <p class="lede">What a symbol turns into after the board is drawn.</p>
+
+    <p>A generator decides what lands. These decide what it means: the tile that flips, the lows that upgrade, the wild that walks, the wild that multiplies, the tall symbol that counts twice. They run in the same place, after the draw and before the evaluator, and each has one rule that decides whether the game is priced correctly.</p>
+
+    <h2 data-section="&sect; 1">Mystery tiles reveal together</h2>
+
+    <p>Reveal before evaluating: a mystery tile is not a paying symbol, so an evaluator that sees one reads a board the player never had. All tiles turning over to the same symbol is the convention, and it is a variance decision rather than a cosmetic one, since it correlates the cells perfectly.</p>
+
+    <Anim kind="holdwin-mystery" caption="Hidden tiles turn over together, to one symbol." />
+
+    <Code code={`import { revealMystery } from "@open-rgs/symbols";
+
+const { grid, revealed, cells } = revealMystery(board, "MYSTERY", SYMBOLS, host.rng_next);
+
+// one draw per tile instead
+revealMystery(board, "MYSTERY", SYMBOLS, host.rng_next, { shared: false });`} />
+
+    <h2 data-section="&sect; 2">Transforms happen in order</h2>
+
+    <p>Order is the whole behaviour. <code>LOW -&gt; HIGH</code> followed by <code>HIGH -&gt; WILD</code> turns the lows into wilds, which is rarely what the paytable was priced for. <code>upgradeLadder</code> walks the ladder from the top down, so one call moves every symbol exactly one rung and the top rung stays put rather than wrapping.</p>
+
+    <Anim kind="symbols-transform" caption="Every low on the board becomes a premium, in one call." />
+
+    <Code code={`import { transform, transformAll, upgradeLadder } from "@open-rgs/symbols";
+
+transform(grid, "LOW", "PREM");                       // and the cells it touched
+transformAll(grid, [["L1", "L2"], ["L2", "L3"]]);     // in this order
+upgradeLadder(grid, ["L1", "L2", "L3", "L4"]);        // each moves one rung`} />
+
+    <h2 data-section="&sect; 3">Walking wilds are re-applied, then stepped</h2>
+
+    <p>Same rule as a sticky cell: written onto every fresh board, or it does not walk. Stepping drops the ones that left the board, so "the feature ends when the last wild walks off" is the length of the list rather than a counter kept in step with it.</p>
+
+    <Code code={`import { applyWalkers, stepWalkers } from "@open-rgs/symbols";
+
+let walkers = [{ pos: { col: 4, row: 1 }, symbol: "WILD", step: -1 }];
+
+const board = applyWalkers(drawBoard(next), walkers);   // before evaluating
+walkers = stepWalkers(board, walkers);                  // after
+const featureOver = walkers.length === 0;`} />
+
+    <p>A walker moving onto a shorter reel lands on that reel's lowest row rather than falling off, which is what a ragged board needs and what a rectangle-shaped implementation gets wrong.</p>
+
+    <h2 data-section="&sect; 4">Multipliers on one win multiply</h2>
+
+    <p>Two 2x wilds in the same line pay 4x, not 3x. That is the convention, and the difference shows up at the top of the distribution, which is the part that gets checked last.</p>
+
+    <Code code={`import { noFactors, withFactor, winFactor } from "@open-rgs/symbols";
+
+let factors = noFactors();
+factors = withFactor(factors, { col: 0, row: 1 }, 2);
+factors = withFactor(factors, { col: 2, row: 1 }, 3);
+
+win.multiplier * winFactor(grid, factors, win.positions);   // x6 when both are in it`} />
+
+    <p>A win that touches no multiplier is unchanged, and a second factor landing on the same cell multiplies with the first.</p>
+
+    <h2 data-section="&sect; 5">Splits count without occupying</h2>
+
+    <p>A split symbol counts twice in its column, which doubles that column's ways. <code>pay-ways</code> counts cells and cannot know a cell means two, so the counting lives here. A symbol that <em>occupies</em> the cells it counts is a block instead, and that is <a href="/extension/big-symbols">big-symbols</a>.</p>
+
+    <Code code={`import { splits, waysWithSplits } from "@open-rgs/symbols";
+
+const COUNTS = splits([["A2", 2], ["A3", 3]]);
+
+waysWithSplits(grid, (s) => s === "A" || s === "A2", COUNTS);   // { ways, columns }`} />
+  </main>
+</BaseLayout>

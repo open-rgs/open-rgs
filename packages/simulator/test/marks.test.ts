@@ -5,7 +5,7 @@ import type { GameManifest, SimpleMath, MarkCollector } from "@open-rgs/contract
 import { simulate, htmlReportSet, mulberry32 } from "../src/index.js";
 
 // A tiny SimpleMath that uses a fake collector. We need to plumb the
-// collector ourselves because there's no Lua VM in this test.
+// collector ourselves because no loader runs in this test.
 function math(opts: {
   multiplier: number;
   marks: MarkCollector;

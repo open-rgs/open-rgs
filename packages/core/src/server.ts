@@ -27,24 +27,24 @@ export interface ServerConfig {
   transport: ClientTransport;
   /** Version of the consumer service (the game server). Surfaced in
    *  /healthz as game_version. Pass your package.json version. Default
-   *  "unknown"  - pass it so /healthz doesn't lie about what's deployed. */
+   *  "unknown": pass it so /healthz doesn't lie about what's deployed. */
   version?: string;
   /** Unique id of THIS running instance. Every instance generates its own
    *  at boot (`rgs-<8 hex>`); the `OPEN_RGS_INSTANCE_ID` env var overrides
    *  the generation (e.g. the pod name via the k8s downward API), and an
    *  explicit value here wins over both. Surfaced as the `instance_id`
    *  label on `rgs_build_info`, as `instance_id` in /healthz, and as
-   *  `service.instance.id` on every log line  - so per-instance metrics,
+   *  `service.instance.id` on every log line, so per-instance metrics,
    *  logs, and health all correlate on one key. */
   instanceId?: string;
   /** HTTP admin port. Default: same as transport port (single-port mode,
    *  routes mounted under /admin/* + /livez + /readyz + /healthz). Set
-   *  to a distinct port to spin up a separate admin Bun.serve  - ideally on
+   *  to a distinct port to spin up a separate admin Bun.serve, ideally on
    *  a private interface behind a default-deny NetworkPolicy. */
   adminPort?: number;
   /** Bearer token required on /admin/* and the detailed /healthz. Falls back
    *  to the OPEN_RGS_ADMIN_TOKEN env var. In production, if neither is set,
-   *  those routes fail closed (403)  - admin shares the public client port in
+   *  those routes fail closed (403): admin shares the public client port in
    *  single-port mode, so it must not be open. */
   adminToken?: string;
   /** CORS origin allowlist for browser operator dashboards hitting /admin/*.
@@ -53,7 +53,7 @@ export interface ServerConfig {
   /** Exact base path your ingress serves admin under (one declared rewrite,
    *  e.g. "/api"). Default "" -> exact canonical routes. */
   adminRouteBasePath?: string;
-  /** Serve /healthz WITHOUT auth  - for operator dashboards or external
+  /** Serve /healthz WITHOUT auth, for operator dashboards or external
    *  uptime probers that can't inject an admin token. /admin/* stays
    *  gated. Default false. See AdminConfig.publicHealthz for the
    *  trade-offs. Prefer /readyz for plain "is it up?" checks. */
@@ -118,7 +118,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   // Forced-outcome cheats: fail closed. Require an explicit opt-in AND a
   // non-production NODE_ENV. The old gate keyed off `isDev`, which defaults
   // to ON whenever NODE_ENV is anything other than exactly "production"
-  // (unset, "prod", "staging", a typo)  - so a misconfigured env shipped a
+  // (unset, "prod", "staging", a typo), so a misconfigured env shipped a
   // live forced-win path. Now the env can't enable cheats; only a
   // deliberate opt-in can, and never in production.
   const isProduction = process.env["NODE_ENV"] === "production";
@@ -137,7 +137,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     "service.environment": isDev ? "development" : "production",
   });
 
-  // Math identity per mode  - log so operators can verify the live
+  // Math identity per mode, log so operators can verify the live
   // source matches what the simulator validated.
   for (const [id, mode] of Object.entries(cfg.manifest.modes)) {
     log.info("Math loaded", {
@@ -170,6 +170,25 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
       });
     }
   }
+  // A 0-stake mode is legitimate - an internal free-spins mode whose winnings
+  // accumulate into the parent round's carry - and it is also the one shape
+  // that fails mid-round rather than at boot: a 0 effective bet times any
+  // multiplier settles to 0, so the engine refuses to pay it (assertFundedWin).
+  // Say so at boot, where the author is watching, rather than at settle, where
+  // the player is.
+  for (const [id, mode] of Object.entries(cfg.manifest.modes)) {
+    if (mode.stakeMultiplier === 0) {
+      log.warn("Mode has stakeMultiplier 0  - it can never pay a win directly", {
+        "event.category": "process",
+        "event.action":   "zero_stake_mode",
+        "mode.id":        id,
+        "detail":         "a 0-bet round that produces a win is refused (INVALID_BET). " +
+                          "Accumulate the feature's winnings into the parent round's carry, " +
+                          "or fund the rounds with a promo pool, which carries a non-zero bet.",
+      });
+    }
+  }
+
   const modeKeys = Object.keys(cfg.manifest.modes);
   if (modeKeys.length === 1) {
     const onlyMode = cfg.manifest.modes[modeKeys[0]!]!;
@@ -222,13 +241,11 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const finLogMs = cfg.financialLogIntervalMs ?? 600_000;
   const finLog = finLogMs > 0 ? setInterval(() => {
     const byCurrency = new Map<string, Record<string, number>>();
-    const fold = (rows: ReadonlyArray<{ labels: string; value: number }>, kind: "bets" | "wins") => {
-      for (const { labels, value } of rows) {
-        // label key format: `k="v",k="v"` in label-name order
-        const l = Object.fromEntries(labels.split(",").map((kv) => {
-          const eq = kv.indexOf("=");
-          return [kv.slice(0, eq), kv.slice(eq + 1).replace(/^"|"$/g, "")] as [string, string];
-        }));
+    const fold = (rows: ReadonlyArray<{ values: Readonly<Record<string, string>>; value: number }>, kind: "bets" | "wins") => {
+      for (const { values: l, value } of rows) {
+        // The label map comes straight from the registry. Re-parsing the
+        // rendered `k="v",k="v"` string would mean splitting on commas, which
+        // a label value containing one turns into nonsense.
         const cur = l["currency"] ?? "?";
         const slot = byCurrency.get(cur) ?? { bets_real: 0, bets_promo: 0, wins_real: 0, wins_promo: 0 };
         slot[`${kind}_${l["funding"] ?? "real"}`] = (slot[`${kind}_${l["funding"] ?? "real"}`] ?? 0) + value;
@@ -299,7 +316,10 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     ...(canKick ? { kickConnection: (connectionId: string, reason: string) =>
       cfg.transport.closeConnection!(connectionId, "SESSION_IN_USE", reason) } : {}),
     ...(cfg.idempotency ? { idempotency: cfg.idempotency } : {}),
-    ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink) } : {}),
+    // Name the chain after the instance: sequence numbers and prevHash links
+    // only mean something within one process, so a collector merging pods needs
+    // the id to split them again before verifying.
+    ...(cfg.auditSink ? { auditLog: createAuditLog(cfg.auditSink, { chainId: instanceId }) } : {}),
     ...(cfg.auditMode ? { auditMode: cfg.auditMode } : {}),
   });
 
@@ -307,7 +327,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   // Bun.serve. Only kicks in for the bundled binaryTransport (which
   // is the one >99% of consumers use). A custom transport that
   // wasn't built with extraFetch in mind just won't expose admin
-  // on its port  - the caller can still pass adminPort to get the
+  // on its port, the caller can still pass adminPort to get the
   // legacy separate-port behaviour.
   const singlePort = cfg.adminPort === undefined;
   let separateAdmin: { stop: () => void } | undefined;

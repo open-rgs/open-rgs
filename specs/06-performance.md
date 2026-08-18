@@ -1,4 +1,4 @@
-# Spec 06  - Performance
+# Spec 06: Performance
 
 ## Goal
 
@@ -15,17 +15,25 @@ trips to the wallet and to the client.
 |-------|-----|-----|----------|
 | WS frame in + msgpack decode | 5 uss | 20 uss | 100 uss |
 | Session lookup + mode resolve + bet compute | 1 uss | 5 uss | 50 uss |
-| Math call (Lua via wasmoon) | 50 uss | 150 uss | 1 ms |
 | Math call (Zig->WASM) | 5 uss | 20 uss | 100 uss |
-| Math call (TS in-process) | 1 uss | 5 uss | 50 uss |
+| Math call (TS in-process) | 0.02 uss | 5 uss | 50 uss |
 | msgpack encode + WS frame out | 5 uss | 20 uss | 100 uss |
-| **Total server compute (Lua)** | **~60 uss** | **~200 uss** | **1.5 ms** |
 | **Total server compute (Zig->WASM)** | **~15 uss** | **~50 uss** | **300 uss** |
 
 End-to-end latency observed by the player is dominated by the wallet
 RPC (typically 5-50 ms one-way to WebSocket-based providers) and the
 client's WebSocket distance (5-100 ms). Server compute is rounding
 error.
+
+**This is why the math tier is chosen for SIMULATION, not for serving.** Every
+tier above clears the serving budget with room to spare; picking one on
+serving latency would be optimising 0.2% of a round. The tier that matters is
+the one a math author iterates on: measured on identical math
+(`examples/twin-slot/src/bench.ts`), the Zig/WASM kernel runs
+850k, and in-process TS **78M** - so a 1M-spin tuning run is 17 seconds, 1.2
+seconds, or 13 milliseconds depending only on which tier the math was written
+in. That, not p99 serving latency, is the number that decides how a game gets
+built.
 
 ## Throughput budget
 
@@ -34,8 +42,8 @@ Zen4):
 
 | Workload | Target | Stretch |
 |----------|--------|---------|
-| Simple spins / sec / core (Lua) | 5,000 | 20,000 |
 | Simple spins / sec / core (Zig WASM) | 30,000 | 100,000 |
+| Simple spins / sec / core (TS in-process) | 10,000,000 | 50,000,000 |
 | Concurrent WS connections / process | 10,000 | 50,000 |
 | Mid-round step calls / sec / core (in-process) | 100,000 | 500,000 |
 
@@ -50,16 +58,16 @@ is exact for RTP / CI / verdict / hit-rate / contributions / deviations
 and the multiplier mean / stdDev / min / max; only the distribution
 percentiles are count-weighted across shards (flagged in the report).
 Sharding requires a seedable factory manifest so each shard draws an
-independent substream  - a static manifest is refused.
+independent substream: a static manifest is refused.
 
 For a WASM math kernel, `simulateWasmBatch(wasmPath, opts)` runs the whole
 spin loop INSIDE the kernel (its `sim_batch` export: a seeded in-VM
 xoshiro256++ + the same `decide` logic as `play`), so there is no per-spin
-JS<->WASM boundary  - only one crossing per chunk. Measured **~216M
+JS<->WASM boundary: only one crossing per chunk. Measured **~216M
 spins/sec single-threaded (100M spins in ~0.46s)**, ~250x the per-spin WASM
 path, and it's the SAME sandboxed artifact you serve (nothing to re-certify).
 It returns a focused RTP report (measured RTP + CI + verdict, hit-rate,
-multiplier mean/stdDev/min/max  - exact from the kernel's count/sum/sumsq/
+multiplier mean/stdDev/min/max: exact from the kernel's count/sum/sumsq/
 min/max/hits aggregate). Combine with `--shards` for multicore.
 
 The **native "extreme" tier** (`sim.zig` + `simulateNativeBatch`) compiles the
@@ -71,17 +79,17 @@ on a **byte-parity test**: a native single slice is byte-identical to WASM
 parity test (skipped where zig is absent) whenever the kernel changes; use the
 native tier for offline certification of your own math only.
 
-## Bun usage  - what makes the orchestrator fast
+## Bun usage: what makes the orchestrator fast
 
 ### Runtime choice rationale
 
-- **uWebSockets** under the hood for `Bun.serve`  - multi-thousand WS
+- **uWebSockets** under the hood for `Bun.serve`: multi-thousand WS
   per core with negligible overhead.
 - **Native MessagePack** via `@msgpack/msgpack` (JS impl, but Bun's V8
   optimizes it well). No transcode overhead.
-- **No Node.js loader tax**  - Bun starts modules in milliseconds,
+- **No Node.js loader tax**: Bun starts modules in milliseconds,
   imports `.ts` directly, no transpile step.
-- **`bun:ffi`** for native interop when needed (e.g., LuaJIT, custom RNG).
+- **`bun:ffi`** for native interop when needed (e.g., custom RNG).
 
 ### Patterns we use
 
@@ -89,24 +97,23 @@ native tier for offline certification of your own math only.
   it with a pending-RPC `Map<corrId, promise>`. No connection-per-session.
 - **In-memory `Map<sid, LocalSession>`** as the session store. O(1)
   lookup. No DB on the hot path.
-- **Sync math calls** via Bun's WASM bridge. Wasmoon's `lua.call()`
-  returns synchronously for sync Lua functions; we don't wrap it in
+- **Sync math calls** via Bun's WASM bridge. A kernel call
+  returns synchronously; we don't wrap it in
   unnecessary `await`s.
 - **No per-request allocation** in the orchestrator's mode-resolve and
   bet-compute paths. Object literals returned to the transport are the
   only allocations.
-- **Pre-warmed Lua VMs**  - every math file gets one VM at boot, reused
-  for every call. No per-spin VM creation.
+- **Pre-loaded math modules**: every math file is loaded once at boot.
 
 ### Patterns we avoid
 
-- **Promise.all without need**  - adds microtask overhead. Sequential
+- **Promise.all without need**: adds microtask overhead. Sequential
   awaits where dependencies are real.
-- **JSON in hot paths**  - MessagePack throughout. JSON only for admin
+- **JSON in hot paths**: MessagePack throughout. JSON only for admin
   endpoints.
 - **Chained `Array.prototype` methods** in hot loops (`.map().filter()`)
    - explicit `for` loops where they matter.
-- **String concatenation for ops**  - math returns ops as objects; no
+- **String concatenation for ops**: math returns ops as objects; no
   string serialization until the msgpack encoder runs at the boundary.
 
 ### Bun-specific APIs we lean on
@@ -116,11 +123,11 @@ native tier for offline certification of your own math only.
 | `Bun.serve` | Both transport WS and admin HTTP |
 | `Bun.serve<WsData>` | Per-WS state attached at upgrade time |
 | `Bun.file` | Static assets when serving the demo client |
-| `crypto.randomUUID()` | Native, fast  - used for round / connection IDs |
+| `crypto.randomUUID()` | Native, fast, used for round / connection IDs |
 | `performance.now()` | High-res timing for diagnostics |
 | `bun --watch` | Dev hot-reload |
 | `bun:test` | Unit tests (planned) |
-| `bun:ffi` | Native interop (planned, e.g., LuaJIT path) |
+| `bun:ffi` | Native interop (planned) |
 
 ### Bun versions we target
 
@@ -130,18 +137,18 @@ native tier for offline certification of your own math only.
   is fine in core; alternative runtimes can implement equivalent
   shims if needed.
 
-## Zig usage  - where it fits
+## Zig usage: where it fits
 
 ### When to reach for Zig
 
 In rough order of likelihood:
 
 1. **Production-grade math kernels going to certification.** Same
-   contract as a Lua math, compiled to WASM, hashable artifact for
-   regulators. The math designer writes Zig instead of Lua.
+   contract as a TypeScript math, compiled to WASM, hashable artifact for
+   regulators. The math designer writes Zig instead of TypeScript.
 2. **Simulator binary for billion-spin runs.** A standalone Zig CLI
    that loads the same WASM artifact and runs millions of spins per
-   second. Used by `@open-rgs/cli`.
+   second. Driven by `open-rgs-sim` (`@open-rgs/simulator`).
 3. **Custom RNG sources.** A Zig-built RNG sidecar (e.g., wrapping a
    certified DLL via FFI) is small and predictable.
 4. **Performance-critical orchestrator hot paths.** If profiling shows
@@ -151,10 +158,10 @@ In rough order of likelihood:
 ### Why Zig specifically
 
 - **Comptime evaluation.** Reel-strip weights, paytables, RTP-target
-  invariants  - all checkable at build time. The compiler refuses to
+  invariants, all checkable at build time. The compiler refuses to
   emit a binary that fails the invariants.
 - **No GC pauses.** A math kernel runs the same ~5 uss every call,
-  every time, forever. Lua-on-WASM is fast but has occasional GC
+  every time, forever. A garbage-collected runtime has occasional GC
   spikes; Zig has none.
 - **No JIT warmup.** First call is as fast as the millionth. Matters
   for cold-start scenarios and for predictability.
@@ -163,7 +170,7 @@ In rough order of likelihood:
   behaviour byte-for-byte.
 - **Tiny output.** A typical math kernel WASM is 50-200 KB. Easy to
   ship, easy to hash, easy to audit.
-- **Honest interop.** Zig's C ABI is clean. A Lua math can call into a
+- **Honest interop.** Zig's C ABI is clean. A TypeScript math can call into a
   Zig-built helper if needed, with no marshalling fuss.
 
 ### Zig math kernel: minimum shape
@@ -186,7 +193,7 @@ comptime {
     var ev:  f64 = 0;
     for (WEIGHTS, 0..) |w, i| { sum += w; ev += @as(f64, @floatFromInt(w)) * PAYS[i]; }
     if (ev / @as(f64, @floatFromInt(sum)) > 0.96) {
-        @compileError("declared RTP exceeded by paytable  - retune");
+        @compileError("declared RTP exceeded by paytable, retune");
     }
 }
 
@@ -209,7 +216,7 @@ export fn play(prev_p: [*]const u8, prev_l: usize,
     const mult = PAYS[idx];
 
     // Encode { multiplier, ops, type } as MessagePack into out_p.
-    // (Skipping the encoder code here for brevity  - reference impl in repo.)
+    // (Skipping the encoder code here for brevity, reference impl in repo.)
     return msgpack_encode_outcome(out_p, out_max, mult, idx);
 }
 
@@ -217,17 +224,17 @@ export fn alloc(n: usize) [*]u8 { /* bump allocator */ }
 export fn free(p: [*]u8) void   { /* no-op for bump */ }
 ```
 
-The `comptime` block is the killer feature  - *that paytable cannot
+The `comptime` block is the killer feature: *that paytable cannot
 ship if it would exceed 96% RTP*. Math labs would normally catch this
 in simulation; Zig catches it in CI.
 
 ### Bun <-> Zig WASM bridge
 
-- Build artifact: `play.wasm` placed alongside the Lua maths.
+- Build artifact: `play.wasm` placed alongside the TypeScript maths.
 - Manifest entry references it: `math: "./maths/zig-slot/play.wasm"`.
 - Loader (`@open-rgs/core` `loadWasmMath`): instantiates with imports
   `host.rng_next`, `host.log_debug`. Calls exports via the typed wrapper.
-- Same `MathModule` interface  - orchestrator can't tell.
+- Same `MathModule` interface: orchestrator can't tell.
 
 ### Where Zig is NOT recommended
 
@@ -235,7 +242,7 @@ in simulation; Zig catches it in CI.
   iteration speed matter more than the marginal speedup.
 - The platform adapter. I/O-bound; FFI overhead doesn't help.
 - The transport layer. Same.
-- Demo / prototype maths. Lua is faster to write and debug. Port to Zig
+- Demo / prototype maths. TypeScript is faster to write and debug. Port to Zig
   when the math goes to certification.
 
 ## RNG performance
@@ -248,7 +255,6 @@ that calls `rng_next` 50 times per spin). Budget:
 | `Math.random` | ~10 ns |
 | Seeded xoshiro256** (TS) | ~15 ns |
 | Certified .NET sidecar (HTTP, buffered) | ~50 ns amortized |
-| LuaJIT `math.random` (FFI) | ~5 ns |
 
 The buffered certified sidecar pre-fetches batches of 100 ints and
 serves them synchronously from a JS array. Refill happens in the
@@ -267,20 +273,20 @@ background when the buffer drops below threshold. A spin that consumes
 ## Acceptance criteria
 
 - A simple-round spin against the mock wallet completes server-side in
-  <= 200 uss at p99 on a modern x86 core, using the Lua reference math.
+  <= 200 uss at p99 on a modern x86 core, using the TypeScript reference math.
 - Throughput on a 16-core machine >= 80,000 simple spins/sec for a
-  trivial Lua math, >= 400,000 spins/sec for a Zig->WASM math.
+  trivial TypeScript math, >= 400,000 spins/sec for a Zig->WASM math.
 - A complex-round step (no wallet call) completes in <= 80 uss at p99
-  with Lua, <= 30 uss with Zig WASM.
+  with TypeScript, <= 30 uss with Zig WASM.
 - WS connection capacity >= 10,000 concurrent per process at idle.
 - Cold start (process up to first SPIN response) <= 500 ms.
 
 ## Open questions
 
-- Is wasmoon's per-call FFI overhead the actual bottleneck? Bench it
+- Is per-call FFI overhead the actual bottleneck? Bench it
   once we have the harness. **Pending data.**
-- Is LuaJIT-via-`bun:ffi` worth the deployment complexity? Probably
-  yes for math houses that want Lua + native speed without compiling
+- Is a native FFI loader worth the deployment complexity? Probably
+  yes for math houses that want native speed without compiling
   to WASM. **Pending evaluation.**
 - Should we bundle a Zig toolchain in the deploy template, or expect
   builders to bring their own? Right now we expect built `.wasm`

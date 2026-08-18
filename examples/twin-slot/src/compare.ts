@@ -1,4 +1,4 @@
-// Run the SAME seeded RNG stream through the Lua slot and the Zig/WASM slot and
+// Run the SAME seeded RNG stream through the TS slot and the Zig/WASM slot and
 // watch them produce identical outcomes - to the engine they're interchangeable.
 //
 //   bun examples/twin-slot/src/compare.ts
@@ -6,7 +6,7 @@
 // (This is the human-readable demo; test/twin-slot.test.ts is the CI proof.)
 
 import { resolve } from "node:path";
-import { loadLuaMath, loadWasmMath } from "../../../packages/core/src/index.js";
+import { loadTsMath, loadWasmMath } from "../../../packages/core/src/index.js";
 import type { SimpleMath, RoundOutcome } from "../../../packages/contract/src/index.js";
 
 // Deterministic DEMO-ONLY PRNG so both runtimes draw the same stream. Real
@@ -32,13 +32,13 @@ const here = import.meta.dir;
 const seed = 12345;
 const ctx = { mode: "default" } as const;
 
-const lua = (await loadLuaMath(resolve(here, "../maths/slot.lua"), { rng: mulberry32(seed), timeoutMs: 0 })) as SimpleMath;
+const ts = (await loadTsMath(resolve(here, "../maths/slot.ts"), { rng: mulberry32(seed) })) as SimpleMath;
 const wasm = (await loadWasmMath(resolve(here, "../maths/slot.wasm"), { rng: mulberry32(seed) })) as SimpleMath;
 
 console.log(`twin-slot - same game in two runtimes, same RNG stream (seed ${seed})\n`);
-console.log(`  spin   lua          wasm         match`);
+console.log(`  spin   ts           wasm         match`);
 for (let i = 0; i < 12; i++) {
-  const a = await lua.play(undefined, ctx);
+  const a = await ts.play(undefined, ctx);
   const b = await wasm.play(undefined, ctx);
   console.log(`  #${String(i + 1).padStart(2)}    ${fmt(a)}  ${fmt(b)}  ${same(a, b) ? "yes" : "NO <-- DIFF"}`);
 }
@@ -48,10 +48,10 @@ let identical = 0;
 let sum = 0;
 const N = 100_000;
 for (let i = 0; i < N; i++) {
-  const a = await lua.play(undefined, ctx);
+  const a = await ts.play(undefined, ctx);
   const b = await wasm.play(undefined, ctx);
   if (same(a, b)) identical++;
   sum += a.multiplier;
 }
 console.log(`\n  ${identical.toLocaleString()}/${N.toLocaleString()} further spins identical`);
-console.log(`  measured RTP (lua) over ${N.toLocaleString()} spins: ${(sum / N).toFixed(4)}  (target 0.96)`);
+console.log(`  measured RTP (ts) over ${N.toLocaleString()} spins: ${(sum / N).toFixed(4)}  (target 0.96)`);

@@ -1,14 +1,22 @@
 ---
+// Self-hosted so the site looks the same everywhere. The old stack was system
+// fonts only, which meant it rendered as New York on macOS and fell through to
+// Georgia or a generic serif everywhere else.
+import "@fontsource-variable/literata";
+// wght-italic, not opsz-italic: index.css is the wght roman, and pairing it
+// with the optical-size italic mixes two different axes of the same family.
+import "@fontsource-variable/literata/wght-italic.css";
+import "@fontsource-variable/jetbrains-mono";
 interface Props {
   title?: string;
   description?: string;
-  /** Optional schema.org @type  - "TechArticle" for doc pages, "WebSite" for landing. */
+  /** Optional schema.org @type, "TechArticle" for doc pages, "WebSite" for landing. */
   ogType?: string;
 }
 
 const {
   title = "open-rgs",
-  description = "MIT-licensed Remote Game Server. Bun-native orchestrator, snap-in Lua maths, pluggable wallets, binary-msgpack transport.",
+  description = "MIT-licensed Remote Game Server. Bun-native orchestrator, snap-in TypeScript maths, pluggable wallets, binary-msgpack transport.",
   ogType = "article",
 } = Astro.props;
 
@@ -24,7 +32,7 @@ const jsonLd = isLanding
       "description": description,
       "url":      canonical,
       "codeRepository": "https://github.com/open-rgs/open-rgs",
-      "programmingLanguage": ["TypeScript", "Lua"],
+      "programmingLanguage": ["TypeScript", "Zig"],
       "license":  "https://opensource.org/licenses/MIT",
       "runtimePlatform": "Bun",
       "applicationCategory": "DeveloperTool",
@@ -63,7 +71,7 @@ const jsonLd = isLanding
     <meta name="twitter:title"       content={title} />
     <meta name="twitter:description" content={description} />
 
-    {/* Structured data  - helps SEO and LLM/GEO indexing. */}
+    {/* Structured data, helps SEO and LLM/GEO indexing. */}
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
     <script is:inline>
@@ -103,10 +111,10 @@ const jsonLd = isLanding
       })();
     </script>
 
-    {/* Mermaid loader  - lazy-imports the lib from a CDN only when the
+    {/* Mermaid loader, lazy-imports the lib from a CDN only when the
         page actually has a diagram, then re-renders on theme toggle so
         colors track the site palette. SVG output is unframed so
-        diagrams blend seamlessly into the reading column. */}
+        diagrams sit in the reading column without a frame. */}
     <script is:inline>
       (function () {
         var diagrams = document.querySelectorAll("[data-mermaid]");
@@ -187,7 +195,7 @@ const jsonLd = isLanding
               themeVariables: themeVars(),
               fontFamily:    cssVar("--sans"),
               /* "antiscript": HTML tags in labels (we use <br/>) are still
-                 allowed, but any <script> element is stripped  - defense in
+                 allowed, but any <script> element is stripped, defense in
                  depth even though the diagram source is authored by us, never
                  user input. That's the only difference from "loose" here (the
                  diagrams use no script in labels), so rendered output is
@@ -251,12 +259,12 @@ const jsonLd = isLanding
 
     <style is:global>
       :root {
-        --serif: ui-serif, Charter, "Iowan Old Style", "Source Serif 4", "Source Serif Pro", Georgia, serif;
-        --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+        --serif: "Literata Variable", ui-serif, Charter, "Iowan Old Style", Georgia, serif;
+        --mono:  "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
 
-      /* Light theme  - warm paper, oxblood accent. */
+      /* Light theme, warm paper, oxblood accent. */
       :root[data-theme="light"] {
         --bg:        #fbf9f3;
         --bg-soft:   #f3f0e6;
@@ -270,7 +278,7 @@ const jsonLd = isLanding
         --accent-soft: #b56b4a;
       }
 
-      /* Dark theme  - warm charcoal, terracotta accent. */
+      /* Dark theme, warm charcoal, terracotta accent. */
       :root[data-theme="dark"] {
         --bg:        #16140f;
         --bg-soft:   #1d1b16;
@@ -308,7 +316,7 @@ const jsonLd = isLanding
         padding: 4rem 1.5rem 2rem;
       }
 
-      /* Footer bar (no header  - landing + page link lists do navigation). */
+      /* Footer bar (no header, landing + page link lists do navigation). */
       .bar {
         max-width: 36rem;
         margin: 0 auto;
@@ -436,7 +444,7 @@ const jsonLd = isLanding
       }
       pre.diagram .accent { color: var(--accent); }
 
-      /* Mermaid diagram  - seamless, no frame, blends into the page.
+      /* Mermaid diagram: no frame, sits in the page.
          Source is shown briefly as a styled pre until the JS renderer
          swaps in the SVG. If JS or the lib fails, the source remains
          readable. */
@@ -515,8 +523,8 @@ const jsonLd = isLanding
         background-color: var(--bg) !important;
         color: var(--fg) !important;
       }
-      /* Code-style chunks inside labels  - for things like
-         openSession . settleSimple  - pick up the mono face. */
+      /* Code-style chunks inside labels, for things like
+         openSession . settleSimple, pick up the mono face. */
       figure.mermaid-diagram svg .nodeLabel code,
       figure.mermaid-diagram svg .edgeLabel code,
       figure.mermaid-diagram svg .messageText code,
@@ -556,7 +564,7 @@ const jsonLd = isLanding
       }
       li { margin: 0.25rem 0; }
 
-      /* Topic-list on landing  - link + dim one-line description per row. */
+      /* Topic-list on landing, link + dim one-line description per row. */
       ul.topics { list-style: none; padding-left: 0; }
       ul.topics li { margin: 0.5rem 0; }
       ul.topics .dim { color: var(--fg-faint); font-size: 0.9rem; }

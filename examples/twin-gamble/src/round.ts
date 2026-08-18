@@ -1,5 +1,5 @@
 // Drive one full COMPLEX round - open -> step -> step -> close - through BOTH the
-// Lua twin and the Zig/WASM twin with the same RNG, and watch them stay in sync.
+// TS twin and the Zig/WASM twin with the same RNG, and watch them stay in sync.
 // Shows how the host threads the opaque `state` back into every call (and how
 // each runtime encodes that state differently while the OUTCOMES stay identical).
 //
@@ -9,7 +9,7 @@
 // seeds and policies.)
 
 import { resolve } from "node:path";
-import { loadWasmMath, loadLuaMath } from "../../../packages/core/src/index.js";
+import { loadWasmMath, loadTsMath } from "../../../packages/core/src/index.js";
 import type { ComplexMath, PlayerAction } from "../../../packages/contract/src/index.js";
 
 const here = import.meta.dir;
@@ -40,7 +40,7 @@ async function playRound(m: ComplexMath, label: string): Promise<void> {
 }
 
 console.log("twin-gamble - one round, two runtimes, same RNG (base win, double, double, collect)\n");
-await playRound((await loadLuaMath(resolve(here, "../maths/gamble.lua"), { rng: script(), timeoutMs: 0 })) as ComplexMath, "Lua  ");
+await playRound((await loadTsMath(resolve(here, "../maths/gamble.ts"), { rng: script() })) as ComplexMath, "TS   ");
 await playRound((await loadWasmMath(resolve(here, "../maths/gamble.wasm"), { rng: script() })) as ComplexMath, "Zig/WASM");
 console.log("Same ops, same awaiting, same payout - only the opaque `state` encoding differs");
-console.log("(Lua: a \"g,d,w\" string; Zig: an 8-byte blob base64'd by the host).");
+console.log("(TS: a \"g,d,w\" string; Zig: an 8-byte blob base64'd by the host).");

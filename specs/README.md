@@ -18,26 +18,26 @@ before implementation.** When a spec and the code disagree, the spec wins
 
 | #  | Spec | Status | Owner |
 |----|------|--------|-------|
-| 00 | [The Seven Guarantees](./00-guarantees.md)  - the safety properties open-rgs holds **by construction** (read first) | living | core |
-| 00 | [Overview](./00-overview.md)  - what we're building, who for | draft | core |
-| 01 | [Public Contracts](./01-public-contracts.md)  - MathModule, PlatformAdapter, ClientTransport, GameManifest | draft | core |
-| 02 | [Orchestrator](./02-orchestrator.md)  - round flows, sessions, promo, autoclose | draft | core |
-| 03 | [Math Runtime](./03-math-runtime.md)  - Lua via wasmoon, Zig->WASM, RNG seam | draft | runtime |
-| 04 | [Wire Protocol](./04-wire-protocol.md)  - binary-msgpack frames, error codes | draft | transport |
-| 05 | [Wallet Protocol](./05-platform-protocol.md)  - canonical operations, error vocab | draft | wallet |
-| 06 | [Performance](./06-performance.md)  - Bun + Zig, latency budgets, throughput | draft | perf |
-| 07 | [Deployment](./07-deployment.md)  - math bundling, Docker, K8s, env vars | draft | ops |
-| 08 | [Testing & Certification](./08-testing.md)  - simulator, fuzzer, RTP reports | draft | qa |
-| 09 | [Roadmap](./09-roadmap.md)  - done, in-flight, deferred, sequencing | living | core |
-| 10 | [Design Philosophy](./10-design-philosophy.md)  - KISS + anti-rot principles | living | core |
-| 12 | [Adapter Cookbook](./12-adapter-cookbook.md)  - step-by-step guide to writing a PlatformAdapter | living | core |
+| 00 | [The Seven Guarantees](./00-guarantees.md). The safety properties open-rgs holds **by construction** (read first) | living | core |
+| 00 | [Overview](./00-overview.md), what we're building, who for | draft | core |
+| 01 | [Public Contracts](./01-public-contracts.md), MathModule, PlatformAdapter, ClientTransport, GameManifest | draft | core |
+| 02 | [Orchestrator](./02-orchestrator.md), round flows, sessions, promo, autoclose | draft | core |
+| 03 | [Math Runtime](./03-math-runtime.md), TypeScript via the TypeScript loader, Zig->WASM, RNG seam | draft | runtime |
+| 04 | [Wire Protocol](./04-wire-protocol.md), binary-msgpack frames, error codes | draft | transport |
+| 05 | [Wallet Protocol](./05-platform-protocol.md), canonical operations, error vocab | draft | wallet |
+| 06 | [Performance](./06-performance.md), Bun + Zig, latency budgets, throughput | draft | perf |
+| 07 | [Deployment](./07-deployment.md), math bundling, Docker, K8s, env vars | draft | ops |
+| 08 | [Testing & Certification](./08-testing.md), simulator, fuzzer, RTP reports | draft | qa |
+| 09 | [Roadmap](./09-roadmap.md), done, in-flight, deferred, sequencing | living | core |
+| 10 | [Design Philosophy](./10-design-philosophy.md), KISS + anti-rot principles | living | core |
+| 12 | [Adapter Cookbook](./12-adapter-cookbook.md), step-by-step guide to writing a PlatformAdapter | living | core |
 
 ## Sub-corpora
 
-- [adr/](./adr/)  - Architectural Decision Records (six seeded: Bun
+- [adr/](./adr/): Architectural Decision Records (six seeded: Bun
   runtime, integer minor units, external autoclose, adapter owns
   state, RGS-generated round IDs, stateless RGS).
-- `adapters/`  - reserved for per-provider analysis as real wallet /
+- `adapters/`: reserved for per-provider analysis as real wallet /
   external-API specs arrive (none committed yet; examples must stay
   neutral, so any entry describes a generic wallet shape, not a named
   provider's wire protocol).
@@ -47,7 +47,7 @@ before implementation.** When a spec and the code disagree, the spec wins
 Each spec follows the same shape:
 
 ```
-# Spec NN  - <area>
+# Spec NN: <area>
 
 ## Goal
 
@@ -88,6 +88,6 @@ Things we know we don't know. Decisions deferred with reasons.
   spec-affecting; removing one is a breaking change.
 - **Performance budgets** are stated in microseconds for hot paths and
   milliseconds for end-to-end. Numbers are measured, not aspirational.
-- **"Math" always means a single math module** (a `.lua`, `.wasm`, or
+- **"Math" always means a single math module** (a `.ts`, `.wasm`, or
   `.ts` file implementing the contract). A "game" is the manifest that
   composes maths into modes.

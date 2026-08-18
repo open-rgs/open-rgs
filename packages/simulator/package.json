@@ -44,5 +44,8 @@
   "dependencies": {
     "@open-rgs/contract": "1.2.0",
     "handlebars": "^4.7.9"
+  },
+  "devDependencies": {
+    "@open-rgs/core": "1.7.0"
   }
 }

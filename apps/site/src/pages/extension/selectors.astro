@@ -1,0 +1,48 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/selectors, Which cells?"
+  description="Selectors: One primitive serving placement and hold-and-win targeting."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/selectors</h1>
+
+    <p class="lede">One primitive serving placement and hold-and-win targeting.</p>
+
+    <h2 data-section="&sect; 1">Naming cells</h2>
+
+    <p>Placement and hold-and-win targeting are the same shape: pick some positions, then act on them. Only the first half varies, so it lives here once.</p>
+
+    <Anim kind="selectors-pick" caption="A selector names cells. Everything else does something to them." />
+
+    <Code code={`import { all, cols, rows, holding } from "@open-rgs/selectors";
+
+cols([0, 1])(grid, host.rng_next);
+holding("WILD")(grid, host.rng_next);`} />    <h2 data-section="&sect; 2">They compose</h2>
+
+    <p>Set operations rather than options. Adding a rule means combining selectors, not growing a config object.</p>
+
+    <Anim kind="selectors-compose" caption="Union, intersect, except, not." />
+
+    <Code code={`import { except, union, not } from "@open-rgs/selectors";
+
+const target = except(cols([0, 1]), holding("WILD"));
+
+union(cols([0]), holding("SC"));`} />    <h2 data-section="&sect; 3">Random draws are stable</h2>
+
+    <p>Order is column-major and stable. A selector returning set-iteration order would make a seeded replay diverge between engine versions - a bug that only surfaces in a certification rerun.</p>
+
+    <Anim kind="selectors-random" caption="randomN draws without replacement and throws rather than under-delivering." />
+
+    <Code code={`import { randomN, upTo, oneOf } from "@open-rgs/selectors";
+
+randomN(3, target);
+upTo(3, target);
+oneOf(target);`} />
+  </main>
+</BaseLayout>

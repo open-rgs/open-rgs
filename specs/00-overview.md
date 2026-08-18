@@ -1,4 +1,4 @@
-# Spec 00  - Overview
+# Spec 00: Overview
 
 ## Goal
 
@@ -19,18 +19,18 @@ target without learning a vendor's framework.
 
 open-rgs separates three concerns that have historically been tangled:
 
-- **Game math**  - paytables, weights, RTP, feature triggers. Written by
+- **Game math**: paytables, weights, RTP, feature triggers. Written by
   math designers, certified by math labs, owned by studios.
-- **Wallet integration**  - Hello/Welcome handshakes, op_seq counters,
+- **Wallet integration**: Hello/Welcome handshakes, op_seq counters,
   audit logs, promo payloads. Operator-specific.
-- **Orchestration**  - session caching, mode resolution, bet computation,
+- **Orchestration**: session caching, mode resolution, bet computation,
   round lifecycle, observability. Universal.
 
 This project owns the third. The first two plug in.
 
 ## Audience
 
-- **Math designers** writing `.lua` (or `.wasm`) game files.
+- **Math designers** writing `.ts` (or `.wasm`) game files.
 - **Studios** assembling games from one or more math files into a
   deployable server.
 - **Wallet integrators** writing one `PlatformAdapter` per operator.
@@ -44,7 +44,7 @@ This project owns the third. The first two plug in.
 - A round-lifecycle orchestrator (simple + complex rounds).
 - Pluggable platform adapters via `PlatformAdapter`.
 - Pluggable client transports via `ClientTransport`.
-- Snap-in math modules via `MathModule`, default runtime Lua-on-wasmoon.
+- Snap-in math modules via `MathModule`, default runtime TypeScript-on-the TypeScript loader.
 - A reference binary-MessagePack WS transport.
 - Free-round promo handling driven by wallet events.
 - External-triggered autoclose (no in-process timers).
@@ -59,11 +59,11 @@ This project owns the third. The first two plug in.
 
 - Wallet implementations themselves (each operator writes their own).
 - Game UI/client rendering.
-- Player identity, KYC, AML, GDPR  - these belong upstream of the wallet.
-- Funds movement / cashier  - also upstream.
+- Player identity, KYC, AML, GDPR: these belong upstream of the wallet.
+- Funds movement / cashier: also upstream.
 - Persistent storage of any kind. The wallet is the source of truth.
 - Game-specific math (we ship examples; real math is per-studio).
-- Cross-operator promotional tooling (jackpots, tournaments)  - those
+- Cross-operator promotional tooling (jackpots, tournaments), those
   live above the RGS.
 
 ## Architecture in one sentence
@@ -88,7 +88,7 @@ See `docs/architecture.drawio` for the colour-coded diagrams (six tabs).
   game-outcome log (see audit-log.ts) that streams to an operator-provided
   durable sink and is tamper-evident and reconstructable for which math
   produced each outcome. RGS operational logs remain separate.
-- We do not couple the math contract to any particular language. Lua is
+- We do not couple the math contract to any particular language. TypeScript is
   the default loader because the embedding cost is near-zero; Zig->WASM,
   Rust->WASM, AssemblyScript and TypeScript-in-process are all valid
   alternatives implementing the same `MathModule` shape.
@@ -97,12 +97,12 @@ See `docs/architecture.drawio` for the colour-coded diagrams (six tabs).
 
 - Repository on GitHub, public.
 - `@open-rgs/contract`, `@open-rgs/core`, `@open-rgs/platform-mock` (and
-  future `@open-rgs/cli`, transports, etc.) published to npm under the
+  future transports, etc.) published to npm under the
   MIT license.
-- Reference example examples (`lucky-digits`, `gamble-cherry`) live in
+- Reference examples (`hello-spin`, `gamble-slot`, `hold-and-win`, ...) live in
   `examples/` and are MIT.
 - Reference deployment template (`deploy/`) is MIT.
-- Math files written by third parties are NOT MIT by association  - each
+- Math files written by third parties are NOT MIT by association, each
   studio's math is whatever license they choose. The orchestrator
   doesn't impose anything on what runs on top of it.
 
@@ -126,10 +126,10 @@ open-rgs/
 |   +-- contract/              @open-rgs/contract  - types only
 |   +-- core/                  @open-rgs/core  - runtime
 |   +-- platform-mock/           @open-rgs/platform-mock  - dev/test wallet
-|   +-- cli/                   @open-rgs/cli  - simulator/fuzzer (planned)
+|   +-- simulator/             @open-rgs/simulator  - RTP simulator + `open-rgs-sim` CLI
 +-- examples/
-|   +-- lucky-digits/          example: simple round + buyable FS
-|   +-- gamble-cherry/         example: complex round with gamble
+|   +-- hello-spin/            example: the smallest working server
+|   +-- gamble-slot/           example: complex round with a gamble
 +-- deploy/
     +-- docker/                reference Dockerfile + compose
     +-- k8s/                   reference K8s manifests

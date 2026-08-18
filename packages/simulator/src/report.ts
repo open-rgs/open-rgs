@@ -1,5 +1,5 @@
 // SimulationReport shape + markdown renderer. Keep this file readable
-//  - the markdown output is what most users will look at; the typed
+//. The markdown output is what most users will look at; the typed
 // object is what an LLM eats.
 
 import type { TargetDeviation } from "./deviation.js";
@@ -47,7 +47,20 @@ export interface SimulationReport {
     maxMultiplier: number;
   };
   rtp: {
-    measured: number;   // total_win / total_bet
+    /** What the server would PAY: total_win / total_bet with the manifest's
+     *  max-win cap applied, exactly as the orchestrator applies it. This is the
+     *  number to certify against. */
+    measured: number;
+    /** The same run WITHOUT the cap - what the math produces before the engine
+     *  clips it. Equal to `measured` when no cap is configured, or when the
+     *  distribution never reached it. */
+    measuredUncapped: number;
+    /** The cap that was applied (mode override, else game-wide), or null. */
+    maxWinMultiplier: number | null;
+    /** Rounds whose multiplier was clipped, and what share of spins that was.
+     *  A cap that never fires costs nothing; one that fires often is carrying
+     *  real RTP and belongs in the conversation with the regulator. */
+    capped: { rounds: number; share: number; rtpRemoved: number };
     declared: number;   // from manifest
     delta: number;      // measured - declared
     /** Standard error of the measured RTP (stdDev of per-spin return / sqrtn). */
@@ -57,6 +70,12 @@ export interface SimulationReport {
     /** Certification verdict: declared within CI95 -> pass; within CI99 -> warn;
      *  outside -> fail (measured RTP significantly differs from declared). */
     verdict: "pass" | "warn" | "fail";
+    /** True when spins in this run were NOT independent - the math threaded a
+     *  carry from one spin into the next, which is how the orchestrator runs
+     *  it. The interval above assumes independence, so with this set it is
+     *  narrower than the data supports and the verdict is more confident than
+     *  it should be. Reported rather than silently trusted. */
+    correlatedSpins: boolean;
   };
   /** Fraction of spins with multiplier > 0. */
   hitRate: number;
@@ -130,7 +149,23 @@ export function mdReport(r: SimulationReport): string {
   lines.push("");
   const verdictIcon = r.rtp.verdict === "pass" ? "✓" : r.rtp.verdict === "warn" ? "⚠" : "✗";
   lines.push(`- **Measured RTP:** ${pct(r.rtp.measured)} (declared ${pct(r.rtp.declared)}, delta ${sign(r.rtp.delta)})`);
+  if (r.rtp.maxWinMultiplier !== null) {
+    lines.push(
+      `- **Max-win cap:** ${num(r.rtp.maxWinMultiplier)}x  - ` +
+      (r.rtp.capped.rounds === 0
+        ? "never reached in this run, so it carries no RTP"
+        : `${r.rtp.capped.rounds.toLocaleString()} round(s) clipped (${pct(r.rtp.capped.share)} of spins), ` +
+          `holding back ${pct(r.rtp.capped.rtpRemoved)} RTP (uncapped ${pct(r.rtp.measuredUncapped)})`),
+    );
+  }
   lines.push(`- **RTP certification:** ${verdictIcon} ${r.rtp.verdict.toUpperCase()}  - 95% CI [${pct(r.rtp.ci95[0])}, ${pct(r.rtp.ci95[1])}], SE ${pct(r.rtp.standardError)}`);
+  if (r.rtp.correlatedSpins) {
+    lines.push(
+      "- **Interval caveat:** this math carries state between spins, so spins are not independent. " +
+      "The interval above is computed as if they were, which makes it narrower than the data supports  - " +
+      "read the verdict as indicative, and widen the run before certifying on it.",
+    );
+  }
   lines.push(`- **Hit rate:** ${pct(r.hitRate)}`);
   lines.push(`- **Spins:** ${r.spins.toLocaleString()} . **Bet:** ${r.bet.unitsPerSpin}u/spin . **Time:** ${r.elapsedMs}ms`);
   lines.push(`- **Stake multiplier:** ${r.mode.stakeMultiplier}x . **Internal:** ${r.mode.internal ? "yes" : "no"}`);

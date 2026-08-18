@@ -1,4 +1,4 @@
-# Spec 01  - Public Contracts
+# Spec 01: Public Contracts
 
 ## Goal
 
@@ -61,7 +61,7 @@ type MathModule = SimpleMath | ComplexMath;
   win amount. It receives an opaque `prev` carry blob and a `SpinContext`
   (mode + optional cheat). It returns a *dimensionless* multiplier.
 - **RNG injection**: math does not own its RNG. The host provides
-  `host.rng_next()` (Lua) or an equivalent import (WASM). Same source
+  `host.rng_next()` (TypeScript) or an equivalent import (WASM). Same source
   file produces same outputs given same inputs.
 - **No I/O**: math has no filesystem, network, clock, or environment
   access. Pure-ish: `(prev, ctx, rng_seq) -> outcome`.
@@ -107,6 +107,31 @@ interface CloseOutcome {        // complex / close + autoclose
 `Op` is `unknown` to core. Math owns the format; the client knows the
 format. Core forwards untouched.
 
+### The canonical op vocabulary (opt in)
+
+`Op` staying `unknown` is deliberate and is not changing. Its cost is that
+nothing generic can render a game it has never seen, so smoke tests,
+replay tools and integration harnesses end up game-specific too.
+
+`@open-rgs/contract/ops` is the opt-in middle ground: nine shapes covering
+what a slot needs to say: `board`, `win`, `cascade`, `respin`, `coin`,
+`award`, `feature`, `meter`, `message`, plus `isCanonicalOp`,
+`canonicalOps` and `opsTotal`. A game emitting these can be driven by any
+client that understands them, including `@open-rgs/client`'s
+`UniversalClient`.
+
+Three rules keep this from becoming a second contract:
+
+- **Core never reads it.** Nothing in the engine validates, transforms or
+  depends on op shape. The module is types plus a type guard.
+- **Mixing is expected.** Canonical and game-specific ops travel in one
+  stream; a generic client renders what it recognises and passes the rest
+  through, so adoption is not all-or-nothing.
+- **Ops describe, they never pay.** This is a visual log, not a settlement
+  record: the round's `multiplier` is what pays. `opsTotal` exists to
+  CHECK a presentation against the settled multiplier in a test, and a
+  mismatch is a presentation bug, never a reason to move money.
+
 ### Breaking-change policy
 
 - Adding a new optional field to `MathModule` or its outcomes is non-breaking.
@@ -145,10 +170,10 @@ Every implementation MUST guarantee:
 - `settleSimple` is the ONLY money-mover for simple rounds (one debit +
   credit atomically).
 - `openComplex` debits the bet; `closeComplex` credits the win.
-- `updateComplex` NEVER moves money  - it is pure audit/state-persistence
+- `updateComplex` NEVER moves money: it is pure audit/state-persistence
   for jurisdictions that require server-side action logs.
 - `PlatformEvent` notifications are best-effort but the wallet is the
-  source of truth  - RGS treats local balance as a cache.
+  source of truth, RGS treats local balance as a cache.
 
 ### PlatformEvent
 
@@ -167,7 +192,7 @@ MUST treat unknown types as no-ops, not errors.
 
 Wallet adapters translate native error codes into the canonical
 `RGSErrorCode` vocabulary at the boundary. The orchestrator never sees
-`"InsufficientFunds"`  - only `"INSUFFICIENT_BALANCE"`.
+`"InsufficientFunds"`: only `"INSUFFICIENT_BALANCE"`.
 
 ## 3. ClientTransport
 

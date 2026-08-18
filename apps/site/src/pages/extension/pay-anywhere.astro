@@ -1,0 +1,44 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/pay-anywhere, Scatters"
+  description="Pay-anywhere: Total count, position irrelevant."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/pay-anywhere</h1>
+
+    <p class="lede">Total count, position irrelevant.</p>
+
+    <h2 data-section="&sect; 1">Counted anywhere</h2>
+
+    <p>The simplest evaluator and the one with the largest effect on a game's shape, because it is almost always what starts the feature - and feature frequency is usually the biggest single term in RTP.</p>
+
+    <Anim kind="pay-anywhere-scatter" caption="Counted anywhere on the board, in any arrangement." />
+
+    <Code code={`import { evalScatters, countAnywhere } from "@open-rgs/pay-anywhere";
+
+const wins = evalScatters(grid, PAY, { roles });
+
+countAnywhere(grid, "SC");`} />    <h2 data-section="&sect; 2">A wild never counts</h2>
+
+    <p>Scatter substitution would manufacture triggers, and the trigger rate you balanced would not be the one you shipped. Only literal matches count here.</p>
+
+    <Anim kind="pay-anywhere-nowild" caption="A wild never counts. Substitution here would manufacture triggers." />
+
+    <Code code={`countAnywhere(grid, "SC");`} />    <h2 data-section="&sect; 3">Triggering is not paying</h2>
+
+    <p>Plenty of games trigger on three scatters while paying nothing for them, and plenty pay for two without triggering. The two questions stay separate.</p>
+
+    <Anim kind="pay-anywhere-trigger" caption="Triggering is a separate question from paying." />
+
+    <Code code={`import { triggersOn, shortOfTrigger } from "@open-rgs/pay-anywhere";
+
+triggersOn(grid, "SC", 3);
+shortOfTrigger(grid, "SC", 3);`} />
+  </main>
+</BaseLayout>

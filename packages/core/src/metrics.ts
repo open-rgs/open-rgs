@@ -7,10 +7,12 @@ export interface LabelMap { readonly [k: string]: string }
 
 export interface Counter {
   inc(value?: number, labels?: LabelMap): void;
-  /** Read back current values per label-set (key = `k=v,k=v` in label-name
-   *  order, "" for unlabelled). For in-process consumers - e.g. the
-   *  financial snapshot log - that want the totals without scraping. */
-  snapshot(): ReadonlyArray<{ labels: string; value: number }>;
+  /** Read back current values per label-set. `values` is the label map itself;
+   *  `labels` is the rendered `k="v",k="v"` form for display. In-process
+   *  consumers - e.g. the financial snapshot log - read `values`: the rendered
+   *  string is for display; parsing it means splitting on commas, which a
+   *  label value containing one breaks. */
+  snapshot(): ReadonlyArray<{ labels: string; values: LabelMap; value: number }>;
 }
 export interface Gauge {
   set(value: number, labels?: LabelMap): void;
@@ -78,20 +80,40 @@ export const DEFAULT_BUCKETS: readonly number[] = [
 
 // --- Implementations -------------------------------------------------------
 
+// The series key is a JSON array of the label VALUES in label-name order.
+// Storing it as `name="value",name="value"` would mean every reader (the
+// exposition, the financial snapshot) splits on commas, and one label value
+// containing a comma produces a malformed metric line. A JSON array is
+// unambiguous to build and to read back, and nothing has to guess where a
+// value ends.
 function labelKey(labels: LabelMap | undefined, names: readonly string[]): string {
   if (!names.length) return "";
   const l = labels ?? {};
-  return names.map(n => `${n}=${JSON.stringify(l[n] ?? "")}`).join(",");
+  return JSON.stringify(names.map(n => l[n] ?? ""));
 }
 
-function renderLabels(key: string): string {
+/** Label map for a series key - the inverse of labelKey. */
+function labelValues(key: string, names: readonly string[]): LabelMap {
+  if (!key) return {};
+  const parsed = JSON.parse(key) as string[];
+  const out: Record<string, string> = {};
+  names.forEach((n, i) => { out[n] = parsed[i] ?? ""; });
+  return out;
+}
+
+/** `name="value",...` - the inside of a label set. JSON.stringify escapes the
+ *  three characters Prometheus requires escaping (backslash, quote, newline)
+ *  the same way Prometheus does. */
+function labelPairs(key: string, names: readonly string[]): string {
   if (!key) return "";
-  // labelKey returns name=jsonValue,name=jsonValue; turn into {name="value",...}
-  const parts = key.split(",").map(kv => {
-    const eq = kv.indexOf("=");
-    return `${kv.slice(0, eq)}=${kv.slice(eq + 1)}`;
-  });
-  return `{${parts.join(",")}}`;
+  const parsed = JSON.parse(key) as string[];
+  return names.map((n, i) => `${n}=${JSON.stringify(parsed[i] ?? "")}`).join(",");
+}
+
+/** `{name="value",...}` for the exposition; empty string when unlabelled. */
+function renderLabels(key: string, names: readonly string[]): string {
+  const pairs = labelPairs(key, names);
+  return pairs ? `{${pairs}}` : "";
 }
 
 class CounterImpl implements Counter, Metric {
@@ -104,14 +126,18 @@ class CounterImpl implements Counter, Metric {
     this.values.set(k, (this.values.get(k) ?? 0) + value);
   }
 
-  snapshot(): ReadonlyArray<{ labels: string; value: number }> {
-    return [...this.values].map(([labels, value]) => ({ labels, value }));
+  snapshot(): ReadonlyArray<{ labels: string; values: LabelMap; value: number }> {
+    return [...this.values].map(([key, value]) => ({
+      labels: labelPairs(key, this.labelNames),
+      values: labelValues(key, this.labelNames),
+      value,
+    }));
   }
 
   expose(): string {
     const out: string[] = [];
     for (const [k, v] of this.values) {
-      out.push(`${this.name}${renderLabels(k)} ${v}`);
+      out.push(`${this.name}${renderLabels(k, this.labelNames)} ${v}`);
     }
     if (out.length === 0) out.push(`${this.name} 0`);
     return out.join("\n");
@@ -137,7 +163,7 @@ class GaugeImpl implements Gauge, Metric {
   expose(): string {
     const out: string[] = [];
     for (const [k, v] of this.values) {
-      out.push(`${this.name}${renderLabels(k)} ${v}`);
+      out.push(`${this.name}${renderLabels(k, this.labelNames)} ${v}`);
     }
     if (out.length === 0) out.push(`${this.name} 0`);
     return out.join("\n");
@@ -186,7 +212,7 @@ class HistogramImpl implements Histogram, Metric {
   expose(): string {
     const out: string[] = [];
     for (const [k, s] of this.series) {
-      const labelsRendered = renderLabels(k);
+      const labelsRendered = renderLabels(k, this.labelNames);
       // Per Prom spec, bucket counts are cumulative-le. We already
       // incremented every bucket whose le >= value at observe time,
       // so these are ready to print as-is.

@@ -78,7 +78,7 @@ import { HttpClient } from "@open-rgs/adapter-kit";
 const http = new HttpClient({
   baseUrl: "https://platform.example/api/v1",
   headers: { "x-game-id": "g1", authorization: `Bearer ${token}` },
-  retries: 2,        // budget  - applies ONLY to calls marked idempotent
+  retries: 2,        // budget; applies only to calls marked idempotent
   diagnostics: diag,
 });
 
@@ -92,14 +92,14 @@ return await http.request<RoundReceipt>("settleSimple", req);
 ```
 
 Events on HTTP platforms typically arrive via SSE, long-poll, or a
-separate WS  - the kit doesn't standardise that yet, but `WsClient` is
+separate WS: the kit doesn't standardise that yet, but `WsClient` is
 fine for the event channel even when RPC is HTTP.
 
 ## Tests
 
 ```bash
 bun install
-bun test    # 18 cases  - ErrorMap, Diagnostics, HttpClient
+bun test    # 18 cases: ErrorMap, Diagnostics, HttpClient
 ```
 
 `WsClient` is covered by the `@open-rgs/adapter-test-kit` conformance

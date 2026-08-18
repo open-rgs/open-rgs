@@ -1,0 +1,59 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/scatters, Spawned as an event"
+  description="Scatters: The trigger rate is a parameter, not an emergent property."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/scatters</h1>
+
+    <p class="lede">The trigger rate is a parameter, not an emergent property.</p>
+
+    <h2 data-section="&sect; 1">Declared, not discovered</h2>
+
+    <p>With a natural scatter the trigger rate emerges from per-cell probability and grid size, and you tune it by guessing a weight and re-simulating. Draw the board with the scatter at weight zero and spawn instead, and the count distribution becomes the trigger rate.</p>
+
+    <Anim kind="spawn-count" caption="The count distribution is declared, so the trigger rate is written down." />
+
+    <Code code={`import { withScatters, oneInFor, probabilityOfAtLeast } from "@open-rgs/scatters";
+
+const config = {
+  symbol: "SC",
+  count:  { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
+};
+
+oneInFor(config, 3);
+probabilityOfAtLeast(config, 3);`} />    <h2 data-section="&sect; 2">One per reel, and which reels</h2>
+
+    <p>At most one per reel is the genre norm, and it is what makes the count distribution exactly controllable. Excluded reels never receive one.</p>
+
+    <Anim kind="spawn-onereel" caption="At most one per reel by default; excluded reels never receive one." />
+
+    <Code code={`const config = {
+  symbol:     "SC",
+  count:      { 0: 9000, 1: 700, 2: 250, 3: 45, 4: 5 },
+  reels:      [1, 2, 3],
+  onePerReel: true,
+};
+
+const board = withScatters(reels, config);`} />    <h2 data-section="&sect; 3">Protected symbols stay</h2>
+
+    <p>A wild the player can see is about to pay must not be eaten. If protections leave too few legal cells, the spawn places what it can and reports both numbers - throwing would crash a legitimate spin, and silence would break the declared rate with nothing to notice it.</p>
+
+    <Anim kind="spawn-protect" caption="Protected symbols are never eaten - a wild about to pay stays put." />
+
+    <Code code={`import { spawnOn, assertFeasible } from "@open-rgs/scatters";
+
+const result = spawnOn(grid, { ...config, protects: ["WILD"] }, host.rng_next);
+
+result.wanted;
+result.spawned;
+
+assertFeasible(config, 5);`} />
+  </main>
+</BaseLayout>

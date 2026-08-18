@@ -1,4 +1,4 @@
-# Example: gamble-slot — the simplest complex round that fits the model
+# Example: gamble-slot: the simplest complex round that fits the model
 
 A slot with a **gamble feature**: spin, then double-or-nothing your win on a fair
 coin up to 8 times (max **256×** the win), or collect. It's the easiest way to
@@ -9,18 +9,18 @@ start writing and **testing interactive (multi-decision) math** on open-rgs.
 open-rgs takes **one bet at open** (price × stake × betIndex) and moves money at
 most twice (open debit, close credit). A gamble feature respects that: you only
 ever risk the **won amount** (the multiplier), never a second bet. So the payout
-stays `multiplier × bet` with `multiplier ≥ 0` — you can lose the win (down to 0)
+stays `multiplier × bet` with `multiplier ≥ 0`, you can lose the win (down to 0)
 but never more than your bet. No mid-round debit.
 
 Blackjack's double/split *add a wager mid-round* (you can lose more than the
-initial bet), which this model deliberately doesn't allow — so they can't be a
+initial bet), which this model deliberately doesn't allow, so they can't be a
 faithful served game here. A gamble can. That's the whole reason this example
 exists instead of blackjack.
 
 ## The testable invariant: a fair gamble is pure variance
 
 The gamble is **fair** (×2 at p=0.5), so it's EV-neutral. The game's RTP equals
-the base slot's (~96%) **under any gamble policy** — gambling only moves
+the base slot's (~96%) **under any gamble policy**, gambling only moves
 variance, never the edge:
 
 ```
@@ -34,7 +34,7 @@ gamble-slot: same game, different gamble policy  (1,000,000 rounds each)
 ```
 
 RTP barely budges; stddev explodes (1.81 → 33.57) and the top win grows 25× →
-6400×. That's a sharp, checkable property — and a nice contrast with
+6400×. That's a sharp, checkable property, and a nice contrast with
 [`cash-ladder`](../cash-ladder), whose **unfair** gamble bleeds RTP per rung.
 
 ## See how it was played

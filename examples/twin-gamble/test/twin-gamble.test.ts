@@ -1,5 +1,5 @@
 // CI gate for the twin-gamble pair. Three claims:
-//   1. PARITY - the Lua math (maths/gamble.lua) and the Zig/WASM math
+//   1. PARITY - the TS math (maths/gamble.ts) and the Zig/WASM math
 //      (maths/gamble.wasm) produce IDENTICAL open -> step* -> close lifecycles
 //      for the same RNG stream, across many seeds and gamble policies.
 //   2. FAIR GAMBLE - the round's RTP is policy-invariant (~0.96 whether you
@@ -16,11 +16,11 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
-import { loadLuaMath, loadWasmMath } from "../../../packages/core/src/index.js";
+import { loadTsMath, loadWasmMath } from "../../../packages/core/src/index.js";
 import type { ComplexMath, PlayerAction } from "../../../packages/contract/src/index.js";
 
-const LUA = resolve(import.meta.dir, "../maths/gamble.lua");
 const WASM = resolve(import.meta.dir, "../maths/gamble.wasm");
+const TS = resolve(import.meta.dir, "../maths/gamble.ts");
 const ctx = { mode: "default" } as const;
 const GAMBLE: PlayerAction = { type: "gamble" };
 
@@ -42,7 +42,7 @@ function seq(vals: number[]): () => number {
 
 // Drive a full round under the policy "gamble up to maxSteps times, then close".
 // Returns only OBSERVABLE outcomes - never the opaque `state`, which each runtime
-// encodes its own way (Lua: a "g,d,w" string; Zig: an 8-byte blob).
+// encodes its own way (TS: a "g,d,w" string; Zig: an 8-byte blob).
 async function drive(m: ComplexMath, maxSteps: number): Promise<unknown[]> {
   const trace: unknown[] = [];
   const o = await m.open(undefined, ctx);
@@ -68,25 +68,25 @@ interface SimExports {
   sim_gamble(spins: number, seedHi: number, seedLo: number, stopAfter: number, outP: number): void;
 }
 
-describe("twin-gamble: Lua and Zig are 1:1", () => {
+describe("twin-gamble: TS and Zig are 1:1", () => {
   test("identical lifecycles for the same RNG stream (16 seeds x 5 policies)", async () => {
     for (const seed of [1, 2, 3, 7, 11, 42, 99, 123, 777, 1000, 5, 8, 13, 21, 314, 2718]) {
       for (const maxSteps of [0, 1, 3, 8, 99]) {
         // Fresh, identically-seeded generators: open draws 1, each step draws 1,
         // close/is_terminal draw 0 - so both runtimes consume the same stream.
-        const lua = (await loadLuaMath(LUA, { rng: mulberry32(seed), timeoutMs: 0 })) as ComplexMath;
+        const ts = (await loadTsMath(TS, { rng: mulberry32(seed) })) as ComplexMath;
         const wasm = (await loadWasmMath(WASM, { rng: mulberry32(seed) })) as ComplexMath;
-        expect(await drive(lua, maxSteps)).toEqual(await drive(wasm, maxSteps));
+        expect(await drive(ts, maxSteps)).toEqual(await drive(wasm, maxSteps));
       }
     }
   });
 
   test("both declare the same metadata", async () => {
-    const lua = (await loadLuaMath(LUA, { rng: mulberry32(1) })) as ComplexMath;
+    const ts = (await loadTsMath(TS, { rng: mulberry32(1) })) as ComplexMath;
     const wasm = (await loadWasmMath(WASM, { rng: mulberry32(1) })) as ComplexMath;
-    expect(lua.kind).toBe("complex");
+    expect(ts.kind).toBe("complex");
     expect(wasm.kind).toBe("complex");
-    expect(lua.name).toBe("twin-gamble");
+    expect(ts.name).toBe("twin-gamble");
     expect(wasm.name).toBe("twin-gamble");
   });
 });

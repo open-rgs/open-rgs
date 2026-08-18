@@ -1,6 +1,6 @@
-// Shared math-outcome adapters: normalise a raw outcome object (from a Lua
-// table via wasmoon, or msgpack-decoded from a WASM kernel) into the canonical
-// @open-rgs/contract shapes. No runtime dependency  - used by both loadLuaMath
+// Shared math-outcome adapters: normalise a raw outcome object (returned by a
+// TypeScript math, or msgpack-decoded from a WASM kernel) into the canonical
+// @open-rgs/contract shapes. No runtime dependency, used by both loadTsMath
 // and loadWasmMath so they normalise identically (e.g. snake_case `next_mode`
 // -> `nextMode`, 1-indexed arrays -> JS arrays, defaults).
 
@@ -50,7 +50,7 @@ function adaptTargetMap(raw: unknown): Record<string, MathTarget> | undefined {
   return out;
 }
 
-// Outcomes come back as plain objects. Arrays may be 1-indexed objects (Lua)
+// Outcomes come back as plain objects. Arrays may be 1-indexed objects
 // or proper arrays (msgpack/WASM); we normalise both.
 function asArray<T = unknown>(v: unknown): T[] {
   if (Array.isArray(v)) return v as T[];

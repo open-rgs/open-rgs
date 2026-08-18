@@ -1,4 +1,4 @@
-# ADR 006  - RGS is stateless modulo session cache
+# ADR 006: RGS is stateless modulo session cache
 
 **Status:** Accepted
 **Date:** 2026-05-08
@@ -44,7 +44,7 @@ operator runs N replicas behind a load balancer:
   only for performance.
 - No DB to operate, back up, replicate, or migrate.
 - K8s rolling restarts are "kill, restart, sessions re-INIT
-  themselves"  - short blip, no data loss because there was nothing
+  themselves", short blip, no data loss because there was nothing
   to lose.
 - GDPR-light by construction: no PII at rest in the RGS.
 - Easy to reason about: one process, one Map, one orchestrator.

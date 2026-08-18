@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// open-rgs-sim  - CLI front-end for @open-rgs/simulator.
+// open-rgs-sim, CLI front-end for @open-rgs/simulator.
 //
 // Usage:
 //   bunx open-rgs-sim <manifest-module> [--spins N] [--seed N] [--out DIR]

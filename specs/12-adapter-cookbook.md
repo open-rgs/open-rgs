@@ -1,4 +1,4 @@
-# Spec 12  - Adapter cookbook
+# Spec 12: Adapter cookbook
 
 Patterns for writing a `PlatformAdapter` against a new upstream. The
 contract is one interface (`PlatformAdapter` from `@open-rgs/contract`);
@@ -20,11 +20,11 @@ into the matching skeleton in the appendix.
 | REST endpoints (POST per call), polled events  | `HttpClient` + a small poller   | Most legacy operator APIs. See "REST + polled events" skeleton.            |
 | REST endpoints + SSE event channel             | `HttpClient` + EventSource      | Common in newer aggregators. See "REST + SSE" skeleton.                    |
 | REST endpoints + WS event channel              | `HttpClient` + `WsClient` (events only) | Two-channel design. Money over REST, events over WS.                    |
-| Sequence-numbered upstream (must replay missed) | Wrap `WsClient`; track lastSeq | Don't fight it  - accept a `lastSeq` extra in diagnostics and replay on reconnect. |
+| Sequence-numbered upstream (must replay missed) | Wrap `WsClient`; track lastSeq | Don't fight it, accept a `lastSeq` extra in diagnostics and replay on reconnect. |
 | No promo free-rounds                           | Implement methods without promo fields | Return `promo: undefined` on openSession; never set `promoId` on round calls. |
 | No `updateComplex` (no audit checkpoint)       | Omit the method                | It's optional in the contract; orchestrator falls back silently.            |
 | No carry / nextMode persistence                | Implement openSession to always return `carry: undefined` | Orchestrator handles the absence. Math files that need carry will see a fresh start each session. |
-| Throttled / rate-limited platform              | `HttpClient` + add token-bucket wrapper | Adapter-kit doesn't ship a bucket yet  - TODO.                          |
+| Throttled / rate-limited platform              | `HttpClient` + add token-bucket wrapper | Adapter-kit doesn't ship a bucket yet, TODO.                          |
 | Pay-per-action billing model                   | Same as standard but flag in `diagnostics.extras` | Use `diag.setExtra("billing.bytes_out", n)` so it surfaces on `/healthz`. |
 
 ---
@@ -36,7 +36,7 @@ into the matching skeleton in the appendix.
    `updateComplex`? Write them in a comment at the top of `index.ts`.
 2. **Identify the event mapping.** Which upstream events translate to
    `balanceChanged` / `sessionClosed` / `promoGranted` /
-   `autocloseRequested`? (Use the exact `PlatformEvent.type` strings  - an
+   `autocloseRequested`? (Use the exact `PlatformEvent.type` strings, an
    unknown type is dropped; `promoGranted`, not `campaignGranted`.)
 3. **Guarantee an autoclose backstop (mandatory).** RGS runs no idle
    timers (ADR-003), so an open complex round closes only on an external
@@ -64,7 +64,7 @@ into the matching skeleton in the appendix.
 
 ## Skeleton: WS + correlation-id RPC
 
-This is the most common wallet shape  - the kit's `WsClient` does ~all of it.
+This is the most common wallet shape: the kit's `WsClient` does ~all of it.
 
 ```ts
 import { WsClient, ErrorMap, createDiagnostics, type Decoded } from "@open-rgs/adapter-kit";
@@ -119,7 +119,7 @@ export class MyAdapter implements PlatformAdapter {
 ## Skeleton: REST + polled events
 
 When the platform is HTTP-only and pushes events via long-poll or "GET
-since=N"  - common with older operators and most aggregators.
+since=N": common with older operators and most aggregators.
 
 ```ts
 import { HttpClient, createDiagnostics } from "@open-rgs/adapter-kit";
@@ -164,7 +164,7 @@ export class MyAdapter implements PlatformAdapter {
         }
         this.diag.setExtra("events.last_seq", this.lastEventSeq);
       } catch (e) {
-        // Log but keep polling  - single failures shouldn't tear us down.
+        // Log but keep polling: single failures shouldn't tear us down.
       }
     }, this.pollMs);
   }
@@ -235,7 +235,7 @@ declare RTP under the no-carry assumption.
 
 Similar: omit `promo` from `openSession` results, ignore `promoId`
 on round calls, and don't emit `promoGranted` events. The
-orchestrator handles the absence  - free rounds just aren't offered to players.
+orchestrator handles the absence: free rounds just aren't offered to players.
 
 ### Sequence-numbered upstream
 
@@ -271,7 +271,7 @@ When you hit a platform that needs this, lift it into adapter-kit.
 ### Two-step settlement
 
 Some platforms split settle into "reserve" then "commit". Map both
-into a single `settleSimple` call  - do the reserve, then the commit,
+into a single `settleSimple` call: do the reserve, then the commit,
 inside the same method. Idempotency keys cover the retry case.
 
 ---
@@ -286,7 +286,7 @@ sandboxed wallet only):
   balance (the cross-session parallelism the orchestrator's per-session
   lock does NOT shield the adapter from)
 - The same idempotencyKey fired twice CONCURRENTLY settling exactly
-  once  - the in-flight duplicate race the sequential dedupe check never
+  once. The in-flight duplicate race the sequential dedupe check never
   exercised
 - Concurrent reversals of two stacked rounds staying latest-first:
   the latest round reverses, an older round under a newer one is
@@ -300,20 +300,20 @@ These are real concerns that still fall outside `runConformance(adapter)`
 - Idempotency dedupe on the upstream side (kit-only assertion is "the
   key field is passed; upstream behaviour with it is the upstream's
   problem")
-- Cross-PROCESS duplicate keys  - two RGS pods retrying the same settle
+- Cross-PROCESS duplicate keys: two RGS pods retrying the same settle
   against one upstream; the kit races duplicates inside one process,
   which says nothing about an adapter whose dedupe lives in per-process
-  memory (the contract's DURABILITY rule  - restarts and multi-pod need
+  memory (the contract's DURABILITY rule, restarts and multi-pod need
   an external store, and only an integration rig proves it)
 - Durability of reversed-round tracking across adapter restarts (same
-  rule  - the kit can't restart your process mid-run)
+  rule, the kit can't restart your process mid-run)
 - Currency precision edge cases (kit assumes integer minor units)
 - Concurrent open rounds for the same session (the orchestrator
   serializes client traffic per session by design; the kit doesn't
   simulate a misbehaving orchestrator)
 - Bet ladder boundary enforcement (orchestrator enforces; kit doesn't
   exercise)
-- Network resilience under specific failure modes  - fault injection,
+- Network resilience under specific failure modes: fault injection,
   dropped responses mid-settle, reconnect storms (use chaos tests)
 
 ---

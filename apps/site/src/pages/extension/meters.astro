@@ -1,0 +1,62 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/meters, Collection meters"
+  description="Count symbols across a feature, award at thresholds, carry progress between spins, and tune the cadence with arithmetic."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/meters</h1>
+
+    <p class="lede">Collect five of these and something happens.</p>
+
+    <p>The counter under the fisherman, the coin meter, the bar that fills across a feature. It is bookkeeping, which is exactly why it belongs in one place: every bug in it is about <em>when</em>, not what.</p>
+
+    <h2 data-section="&sect; 1">One spin can cross two thresholds</h2>
+
+    <p>A spin that collects three at once passes every threshold in between, and each one pays, in ascending order. Awarding only the highest is the common bug, and it stays invisible until someone reconciles a big spin against the paytable.</p>
+
+    <Anim kind="meter-fill" caption="The bar fills, and everything it passed is paid." />
+
+    <Code code={`import { meter, collect } from "@open-rgs/meters";
+
+const CFG = {
+  thresholds: [{ at: 3, award: "MINI" }, { at: 6, award: "MINOR" }, { at: 10, award: "MAJOR" }],
+};
+
+let m = meter();
+const { meter: next, awards } = collect(m, 7, CFG);   // ["MINI", "MINOR"]`} />
+
+    <p>A threshold never fires twice, because what has been awarded is part of the meter rather than something the caller has to remember.</p>
+
+    <h2 data-section="&sect; 2">Filling it keeps the remainder</h2>
+
+    <p>Under <code>repeat</code>, a spin that overshoots the top starts the next lap with what was left over, and a remainder that already reaches the first threshold pays it straight away: the player collected those symbols, so making them wait for a spin that adds nothing would be losing a prize.</p>
+
+    <Code code={`const REPEAT = { ...CFG, repeat: true };
+
+collect(meter(), 13, REPEAT);
+// awards: MINI, MINOR, MAJOR, then MINI again on the carried 3
+// meter:  { count: 3, awarded: [3], laps: 1 }`} />
+
+    <h2 data-section="&sect; 3">What a client shows</h2>
+
+    <Code code={`import { toNext, progress, isFull } from "@open-rgs/meters";
+
+toNext(m, CFG);      // symbols to the next threshold
+progress(m, CFG);    // 0..1 between the last threshold and the next, for the bar
+isFull(m, CFG);      // every threshold awarded`} />
+
+    <h2 data-section="&sect; 4">The cadence is arithmetic</h2>
+
+    <p>A meter at 10 that collects 0.4 per spin on average fills in 25 spins, so a ten-spin feature fills it about four times in ten. That is worth knowing before a simulation, because it is the number you are actually choosing when you set the threshold.</p>
+
+    <Code code={`import { spinsToFill } from "@open-rgs/meters";
+
+spinsToFill(CFG, 0.4);   // 25`} />
+  </main>
+</BaseLayout>

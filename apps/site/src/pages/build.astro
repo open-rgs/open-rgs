@@ -3,14 +3,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="You can build (slot, Mines, Chicken Road, crash, gamble)  - open-rgs"
+  title="You can build (slot, Mines, Chicken Road, crash, gamble), open-rgs"
   description="Recipes for each common game shape: slots, instant-win, Mines, Chicken Road, Tower, crash games, gamble features, feature buys. The math file changes; the boot file stays."
 >
   <main>
     <h1>You can build...</h1>
 
     <p class="lede">
-      Each game shape is one Lua file with a different return shape.
+      Each game shape is one TypeScript file with a different return shape.
       The boot file, transport, adapter, and admin stay the same.
     </p>
 
@@ -22,7 +22,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       anything where the outcome is decided by a single roll.
     </p>
 
-    <pre><code>{`-- maths/spin.lua
+    <pre><code>{`-- maths/spin.ts
 return {
   kind = "simple", name = "spin", version = "0.1.0", rtp = 0.95,
   play = function(prev, ctx)
@@ -37,8 +37,8 @@ return {
 }`}</code></pre>
 
     <p class="mute">
-      Reel-based slots? Add the <code>@open-rgs/ext-reels</code>
-      extension for strip / payline / book-of helpers.
+      Reel-based slots? The <a href="/extension">slot libraries</a> cover
+      grids, weighted reels, four pay evaluators, cascades and hold &amp; win.
       Deeper: <a href="/math">simple math reference</a>.
     </p>
 
@@ -48,7 +48,7 @@ return {
       The bomb layout is rolled at <code>open</code> and committed to
       state. Each <code>step</code> reveals one cell or advances one
       lane. <code>close</code> cashes out the current multiplier. A
-      bomb hit makes the round terminal  - the client then sends CLOSE
+      bomb hit makes the round terminal, the client then sends CLOSE
       to settle the bust.
     </p>
 
@@ -164,7 +164,7 @@ autoclose   = function(s) return { multiplier = 0, type = "crash", ... } end,`}<
 
     <p class="mute">
       <code>internal: true</code> hides the mode from the client's mode
-      catalog  - it's only reachable when another math returns
+      catalog, it's only reachable when another math returns
       <code>next_mode = "freespins"</code>. Deeper:
       <a href="/boot">boot reference</a>.
     </p>
@@ -174,7 +174,7 @@ autoclose   = function(s) return { multiplier = 0, type = "crash", ... } end,`}<
     <ul>
       <li>The boot file (<code>createServer</code> + <code>defineGame</code>) is identical regardless of game shape.</li>
       <li>The wire protocol is the same set of frame codes for every game.</li>
-      <li>The wallet adapter is unchanged  - it doesn't care what the math does.</li>
+      <li>The wallet adapter is unchanged, it doesn't care what the math does.</li>
       <li>Admin, probes, metrics, logs, autoclose: all wired by core.</li>
     </ul>
 

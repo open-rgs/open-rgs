@@ -2,11 +2,11 @@
 //
 // open-rgs internally uses INTEGER MINOR UNITS for every amount
 // (balance, bet, win, multiplier x bet, etc.). The currency's number of
-// fractional digits is carried on SessionInfo.currencyDecimals  - sourced
+// fractional digits is carried on SessionInfo.currencyDecimals, sourced
 // by the adapter from its upstream platform.
 //
 // Adapters whose upstream platform speaks integer minor units don't need
-// these helpers  - pass amounts through. Adapters facing platforms that
+// these helpers, pass amounts through. Adapters facing platforms that
 // expect decimal strings ("150.50") or floats (150.5) use toWireAmount on
 // outbound and fromWireAmount on inbound, with an explicit rounding
 // policy.
@@ -20,24 +20,24 @@
  *  (decimal strings with more digits than the currency permits, or
  *  floats) into integer minor units.
  *
- *  - `half_even` (default): banker's rounding. Rounds to nearest; ties
+ *, `half_even` (default): banker's rounding. Rounds to nearest; ties
  *    go to the even neighbor. Statistically unbiased over many
- *    conversions  - the regulator-friendly choice.
- *  - `half_up`: rounds to nearest; ties go away from zero (1.5 -> 2,
+ *    conversions: the regulator-friendly choice.
+ *, `half_up`: rounds to nearest; ties go away from zero (1.5 -> 2,
  *    -1.5 -> -2). Familiar but slightly biased upward.
- *  - `half_down`: rounds to nearest; ties go toward zero.
- *  - `floor`: always rounds toward negative infinity.
- *  - `ceiling`: always rounds toward positive infinity.
+ *, `half_down`: rounds to nearest; ties go toward zero.
+ *, `floor`: always rounds toward negative infinity.
+ *, `ceiling`: always rounds toward positive infinity.
  */
 export type RoundingMode = "half_even" | "half_up" | "half_down" | "floor" | "ceiling";
 
 /** What shape the upstream platform expects amounts in.
  *
- *  - `integer`: minor units as integers. e.g. `15050` for $150.50.
- *    (Conversion is identity  - pass through.)
- *  - `decimal_string`: decimal-formatted strings. e.g. `"150.50"`.
+ *, `integer`: minor units as integers. e.g. `15050` for $150.50.
+ *    (Conversion is identity: pass through.)
+ *, `decimal_string`: decimal-formatted strings. e.g. `"150.50"`.
  *    Stable, lossless, regulator-preferred.
- *  - `float`: IEEE-754 doubles. e.g. `150.5`. Lossy at scale, avoid
+ *, `float`: IEEE-754 doubles. e.g. `150.5`. Lossy at scale, avoid
  *    when possible.
  */
 export type WireFormat = "integer" | "decimal_string" | "float";
@@ -84,7 +84,7 @@ export function toWireAmount(
     return minorUnits / Math.pow(10, decimals);
   }
 
-  // decimal_string  - lossless, the safe default
+  // decimal_string, lossless, the safe default
   if (decimals === 0) return String(minorUnits);
   const sign = minorUnits < 0 ? "-" : "";
   const abs = Math.abs(minorUnits);
@@ -100,7 +100,7 @@ export function toWireAmount(
  *  When the wire value has more fractional precision than the currency
  *  permits (decimal "1.005" with decimals=2, or a float that doesn't
  *  fit cleanly), `rounding` decides how the tie is broken. Default
- *  is `half_even`  - the statistically unbiased choice.
+ *  is `half_even`: the statistically unbiased choice.
  *
  *  @returns  integer in minor units
  *
@@ -149,12 +149,12 @@ export function fromWireAmount(
   const [whole, fracRaw = ""] = body.split(".");
   // Pad or trim the fractional part to the currency's precision.
   if (fracRaw.length <= decimals) {
-    // No precision loss  - the wire value fits within the currency's grid.
+    // No precision loss, the wire value fits within the currency's grid.
     const padded = fracRaw.padEnd(decimals, "0");
     const exact = Number(whole + padded);
     return safeMinor(negative ? -exact : exact);
   }
-  // Wire value has more precision than the currency  - round from the dropped
+  // Wire value has more precision than the currency, round from the dropped
   // tail. Decide the tie by STRING comparison, never by reparsing the tail as
   // a float: `Number("0." + "4999999999999999999") === 0.5`, which would make
   // half-even/half-up break at exactly the boundary they exist to handle.
@@ -164,7 +164,7 @@ export function fromWireAmount(
 
 /** Guard a converted minor-unit amount: `number` silently loses integer
  *  precision past 2^53, so a value beyond the safe range is a corruption, not
- *  an amount. Reject it loudly  - high-decimal currencies (BTC sats) or huge
+ *  an amount. Reject it loudly: high-decimal currencies (BTC sats) or huge
  *  balances need bigint money (audit H1 / ADR-002). */
 function safeMinor(n: number): number {
   if (!Number.isSafeInteger(n)) {
@@ -177,7 +177,7 @@ function safeMinor(n: number): number {
 }
 
 /** Round a magnitude `base` up or down based on the dropped decimal `tail`
- *  (a non-empty digit string) and sign, deciding ties from the string  - no
+ *  (a non-empty digit string) and sign, deciding ties from the string, no
  *  float. Returns the signed integer. */
 function roundFromTail(base: number, tail: string, negative: boolean, mode: RoundingMode): number {
   const tailHasNonZero = /[1-9]/.test(tail);
@@ -219,7 +219,7 @@ function applyRounding(x: number, mode: RoundingMode): number {
       const diff = x - floor;
       if (diff < 0.5) return floor;
       if (diff > 0.5) return floor + 1;
-      // Tie exactly  - pick the even side
+      // Tie exactly, pick the even side
       return floor % 2 === 0 ? floor : floor + 1;
     }
   }

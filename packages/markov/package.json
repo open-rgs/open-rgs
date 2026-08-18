@@ -1,0 +1,42 @@
+{
+  "name": "@open-rgs/markov",
+  "version": "0.1.0",
+  "description": "Markov-chain reel generation: natural symbol stacking with one stickiness knob, while the long-run symbol frequency stays exactly where you set it.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rgs/open-rgs.git",
+    "directory": "packages/markov"
+  },
+  "homepage": "https://open-rgs.dev/extension/markov",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "open-rgs",
+    "slot",
+    "markov",
+    "stacking",
+    "reels",
+    "math"
+  ],
+  "dependencies": {
+    "@open-rgs/grid": "0.1.0",
+    "@open-rgs/weights": "0.1.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  }
+}

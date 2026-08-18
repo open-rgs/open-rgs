@@ -1,4 +1,4 @@
-# ADR 003  - External-triggered autoclose, no in-process timers
+# ADR 003: External-triggered autoclose, no in-process timers
 
 **Status:** Accepted
 **Date:** 2026-05-08
@@ -8,7 +8,7 @@
 Complex rounds open and stay open until the player closes them or
 a deadline expires. The natural reflex is to run an idle timer
 in the RGS that fires autoclose after N minutes. But that puts
-policy in the wrong place  - the wallet/operator owns "when has this
+policy in the wrong place: the wallet/operator owns "when has this
 session been idle long enough to settle?" not the game server.
 
 ## Decision
@@ -19,7 +19,7 @@ triggered by an external signal. Three entry points:
 1. **PlatformEvent** `{ type: "autocloseRequested", sessionId, roundId?,
    reason }` pushed by the platform adapter.
 2. **Implicit cascade** when the wallet emits `sessionClosed` and the
-   session has an open round  - orchestrator autocloses first, then
+   session has an open round, orchestrator autocloses first, then
    drops the local cache.
 3. **Admin HTTP** `POST /api/autoclose` for operator scripts.
 
@@ -33,7 +33,7 @@ resolver, RGS closes with multiplier 0.
 **Upsides:**
 
 - Policy lives where it belongs (operator/wallet).
-- RGS stays simple  - no scheduler, no per-session timer leak risk,
+- RGS stays simple: no scheduler, no per-session timer leak risk,
   no time-zone bugs.
 - Same code path on K8s rolling restart: when wallet says "close it,"
   RGS closes; when it doesn't, the round stays open until a real
@@ -42,7 +42,7 @@ resolver, RGS closes with multiplier 0.
 
 **Costs:**
 
-- Every adapter MUST guarantee an autoclose backstop  - without an
+- Every adapter MUST guarantee an autoclose backstop, without an
   in-process timer, an open round closes only on an external signal, so
   the adapter is responsible for ensuring one always eventually arrives
   (a wallet-native deadline, a `sessionClosed` cascade, or an
@@ -64,4 +64,4 @@ resolver, RGS closes with multiplier 0.
   Player tabs sleep; round shouldn't.
 - **Math-driven autoclose** ("math has its own clock, decides when
   to autoclose"). Requires math to have access to time, which we
-  don't want  - pure-function math is a property worth preserving.
+  don't want, pure-function math is a property worth preserving.

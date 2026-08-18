@@ -18,6 +18,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "bin": {
+    "open-rgs-play": "./src/cli.ts"
+  },
   "publishConfig": {
     "access": "public",
     "provenance": true

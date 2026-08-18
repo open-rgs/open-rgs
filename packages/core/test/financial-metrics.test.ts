@@ -68,9 +68,17 @@ describe("financial counters (bets/wins minor units)", () => {
     await orch.spin({ betIndex: 0 }, conn);
 
     const bets = metrics.betsMinor.snapshot();
-    expect(bets).toEqual([{ labels: 'currency="USD",mode="base",funding="real"', value: 100 }]);
+    expect(bets).toEqual([{
+      labels: 'currency="USD",mode="base",funding="real"',
+      values: { currency: "USD", mode: "base", funding: "real" },
+      value: 100,
+    }]);
     const wins = metrics.winsMinor.snapshot();
-    expect(wins).toEqual([{ labels: 'currency="USD",mode="base",funding="real"', value: 50 }]);
+    expect(wins).toEqual([{
+      labels: 'currency="USD",mode="base",funding="real"',
+      values: { currency: "USD", mode: "base", funding: "real" },
+      value: 50,
+    }]);
   });
 
   test("zero-win rounds increment bets only", async () => {

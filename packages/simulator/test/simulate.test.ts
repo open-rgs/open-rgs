@@ -1,5 +1,5 @@
 // Smoke test: simulate a tiny synthetic manifest and verify the report
-// numbers add up. No lua/wasmoon involved  - we hand-roll a SimpleMath
+// numbers add up. No loader involved  - we hand-roll a SimpleMath
 // so the test is pure TS.
 
 import { describe, expect, test } from "bun:test";

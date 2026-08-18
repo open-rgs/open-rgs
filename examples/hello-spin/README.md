@@ -1,6 +1,6 @@
 # hello-spin
 
-Minimal open-rgs game. One Lua math, MockPlatform wallet, binary-msgpack
+Minimal open-rgs game. One TypeScript math, MockPlatform wallet, binary-msgpack
 on the wire. ~50 lines of code; boots in ~50 ms.
 
 ## Run
@@ -34,8 +34,8 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 
 | File | Purpose |
 |---|---|
-| `src/index.ts` | One file  - boots `createServer` with `MockPlatform` + binary transport |
-| `maths/spin.lua` | One file  - returns multiplier + ops per spin |
+| `src/index.ts` | One file, boots `createServer` with `MockPlatform` + binary transport |
+| `maths/spin.ts` | One file, returns multiplier + ops per spin |
 | `package.json` | Three deps: `core`, `contract`, `platform-mock` |
 | `tsconfig.json` | Inherits the workspace strict config |
 
@@ -43,10 +43,10 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 
 - Real wallet adapter (use `MockPlatform` for dev; implement
   `PlatformAdapter` for a real platform)
-- Reel-based math (this is a single-roll RNG; use the
-  [`@open-rgs/ext-reels`](https://github.com/open-rgs/ext-reels)
-  extension for strip + payline + book-of helpers)
-- Complex rounds (Mines, Chicken-Road, crash)  - see the docs at
+- Reel-based math (this is a single-roll RNG; see the
+  [slot libraries](https://open-rgs.dev/extension) for grids, weighted
+  reels and pay evaluators)
+- Complex rounds (Mines, Chicken-Road, crash): see the docs at
   <https://open-rgs.dev/build>
 - Promo free-rounds, autoclose (supported by core; not
   exercised here)
@@ -55,7 +55,7 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 
 - Read [`apps/site` docs](https://open-rgs.dev) for the full
   picture
-- Run the `@open-rgs/simulator` against `maths/spin.lua` to validate
+- Run the `@open-rgs/simulator` against `maths/spin.ts` to validate
   RTP and hit rate
 - Swap `MockPlatform` for your own `PlatformAdapter` implementation
   when you're ready to face a real wallet

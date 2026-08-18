@@ -2,11 +2,11 @@
 // host.mark.* lifecycle, and produces a SimulationReport for each mode
 // (with deviation entries when the math declares an `expected` block).
 //
-// Determinism note: the math's RNG is wired at loadLuaMath time, not
+// Determinism note: the math's RNG is wired at loadTsMath time, not
 // here. To get reproducible reports across runs, seed the math:
 //
 //   import { mulberry32 } from "@open-rgs/simulator/rng";
-//   const math = await loadLuaMath("./maths/spin.lua", { rng: mulberry32(42) });
+//   const math = await loadTsMath("./maths/spin.ts", { rng: mulberry32(42) });
 //
 // The simulator's `seed` option only seeds the complex-round step strategy.
 
@@ -23,7 +23,28 @@ import { computeDeviations, narrate, type TargetDeviation } from "./deviation.js
 import type { SimulationReport, DistributionStats } from "./report.js";
 import { createFlowRecorder, type FlowLabel, type FlowRecorder } from "./flow.js";
 
-/** Round to nearest integer, ties to even (banker's rounding)  - the money
+/** Apply the engine's max-win cap to a raw math multiplier.
+ *
+ *  The orchestrator clips every settle at `mode.maxWinMultiplier ??
+ *  manifest.maxWinMultiplier`, so an RTP measured off the raw multiplier
+ *  describes a game the server does not pay. It is overstated by exactly the
+ *  distribution's mass above the cap, which is invisible unless you already
+ *  suspect it.
+ *
+ *  Mirrors applyMaxWinCap in @open-rgs/core, including its sanitization order:
+ *  a non-finite multiplier is a math fault (the engine fails the round; here we
+ *  count it as 0 rather than pretending it paid), a negative one clamps to 0,
+ *  and only then does the cap clip. Duplicated rather than imported because the
+ *  simulator deliberately has no core dependency - `cap-parity.test.ts` pins
+ *  the two implementations together. */
+export function applyCap(multiplier: number, maxMultiplier: number | undefined): number {
+  if (!Number.isFinite(multiplier)) return 0;
+  const m = multiplier < 0 ? 0 : multiplier;
+  if (maxMultiplier == null) return m;
+  return m > maxMultiplier ? maxMultiplier : m;
+}
+
+/** Round to nearest integer, ties to even (banker's rounding), the money
  *  boundary rule from ADR-002. Mirrors @open-rgs/core's `roundHalfEven`;
  *  duplicated here because the simulator deliberately has no core dep. */
 function roundHalfEven(x: number): number {
@@ -62,17 +83,17 @@ export interface SimulateOptions {
   /** Units bet per spin BEFORE the mode's stakeMultiplier. Default 1. */
   betUnits?: number;
   /** Include `internal: true` modes (those only reachable via nextMode).
-   *  Defaults to true  - you usually want the internal-mode RTP measured
+   *  Defaults to true: you usually want the internal-mode RTP measured
    *  independently for math review. */
   includeInternal?: boolean;
   /** Complex-round step strategy. Default "first".
-   *  - "first":  always pick awaiting.options[0]
-   *  - "random": pick from awaiting.options uniformly (seeded  - see seed)
-   *  - a StrategyFn: your own policy, called at each decision with the public
+   *, "first":  always pick awaiting.options[0]
+   *, "random": pick from awaiting.options uniformly (seeded, see seed)
+   *. A StrategyFn: your own policy, called at each decision with the public
    *    context (awaiting + latest public ops + step index + the sim rng). */
   complexStrategy?: ComplexStrategy;
   /** Seed for the simulator's *own* PRNG (drives "random" strategy and
-   *  any tie-breaking). Does NOT seed the math  - see top-of-file note. */
+   *  any tie-breaking). Does NOT seed the math: see top-of-file note. */
   seed?: number;
   /** Safety cap on steps per complex round to avoid infinite loops in
    *  buggy maths. Default 1000. */
@@ -92,7 +113,7 @@ export interface SimulateOptions {
    *  pass the sessionId, and disconnect after simulate() returns.
    *  Spin loop runs at math speed (~= microseconds per spin), so
    *  using a real adapter implies real wallet movements at the
-   *  upstream  - only point this at a sandbox account. */
+   *  upstream: only point this at a sandbox account. */
   adapter?: PlatformAdapter;
   /** Session id to thread through adapter calls. Required when
    *  `adapter` is set. */
@@ -131,17 +152,27 @@ async function simulateMode(
   const flowRec: FlowRecorder | undefined = opts.flow && mode.math.kind === "complex" ? createFlowRecorder() : undefined;
   const marks: MarkCollector | undefined = mode.math.marks;
 
+  // The cap the ORCHESTRATOR would apply to this mode: per-mode override first,
+  // then the game-wide figure.
+  const maxWinMultiplier = mode.maxWinMultiplier ?? manifest.maxWinMultiplier;
+
   const multipliers: number[] = new Array<number>(spins);
   const outcomeTypes: Record<string, number> = {};
   const nextModeRoutes: Record<string, number> = {};
   let totalWin = 0;
+  let totalWinUncapped = 0;
+  let cappedRounds = 0;
   let totalSteps = 0;
   // Cross-round carry threaded spin-to-spin, exactly as the orchestrator does
-  // it. Passing `undefined` every spin (the old behaviour) made any stateful
-  // game's measured RTP wrong. (H7)
+  // it. A stateful game measured with a fresh `undefined` carry every spin
+  // reports an RTP its own players would never see.
   let carry: CarryState | undefined;
+  // Set once the math threads state from one spin into the next. Spins are then
+  // NOT independent, which the confidence interval below assumes - so the run
+  // says so rather than letting the verdict imply a precision it does not have.
+  let correlatedSpins = false;
 
-  // Optional adapter integration  - when set, each spin is settled via
+  // Optional adapter integration, when set, each spin is settled via
   // the real adapter so wire-protocol bugs (validator mismatches, auth
   // drift, envelope shape errors) surface during sim instead of prod.
   const adapter        = opts.adapter;
@@ -173,6 +204,7 @@ async function simulateMode(
       type = outcome.type;
       nextMode = outcome.nextMode;
       carry = outcome.carry;
+      if (carry !== undefined) correlatedSpins = true;
     } else {
       const m = mode.math as ComplexMath;
       const ctx: SpinContext = { mode: modeId };
@@ -198,11 +230,21 @@ async function simulateMode(
       type = close.type;
       nextMode = close.nextMode;
       carry = close.carry;
+      if (carry !== undefined) correlatedSpins = true;
       if (flowRec) flowRec.round(path, type);
     }
 
+    // Everything downstream - the distribution, the percentiles, the RTP - is
+    // measured on what the ENGINE would pay, so the report describes the live
+    // game. The uncapped total is kept alongside it so the cap's contribution
+    // is a number rather than a footnote.
+    const rawMultiplier = multiplier;
+    multiplier = applyCap(rawMultiplier, maxWinMultiplier);
+    if (multiplier !== rawMultiplier) cappedRounds += 1;
+
     multipliers[i] = multiplier;
     totalWin += multiplier * betPerSpin;
+    totalWinUncapped += rawMultiplier * betPerSpin;
     outcomeTypes[type] = (outcomeTypes[type] ?? 0) + 1;
     if (nextMode) nextModeRoutes[nextMode] = (nextModeRoutes[nextMode] ?? 0) + 1;
 
@@ -211,7 +253,7 @@ async function simulateMode(
       adapterRpcsSent += 1;
       // The adapter is a real wallet expecting integer minor units, so the
       // settled win must be rounded exactly as core's orchestrator does
-      // (round half to even, ADR-002)  - not the raw float `multiplier x
+      // (round half to even, ADR-002), not the raw float `multiplier x
       // bet`. (The theoretical `totalWin` above stays exact on purpose: it
       // measures RTP, not what a wallet would actually credit.)
       const winMinor = roundHalfEven(multiplier * betPerSpin);
@@ -254,6 +296,7 @@ async function simulateMode(
 
   const totalBet = spins * betPerSpin;
   const measuredRtp = totalBet === 0 ? 0 : totalWin / totalBet;
+  const measuredRtpUncapped = totalBet === 0 ? 0 : totalWinUncapped / totalBet;
   const declaredRtp = mode.declaredRtp ?? mode.math.rtp;
 
   // RTP certification verdict. The measured RTP is the mean per-spin return;
@@ -380,11 +423,19 @@ async function simulateMode(
     win: { totalUnits: totalWin, maxMultiplier: muMax },
     rtp: {
       measured: measuredRtp,
+      measuredUncapped: measuredRtpUncapped,
+      maxWinMultiplier: maxWinMultiplier ?? null,
+      capped: {
+        rounds: cappedRounds,
+        share: spins === 0 ? 0 : cappedRounds / spins,
+        rtpRemoved: measuredRtpUncapped - measuredRtp,
+      },
       declared: declaredRtp,
       delta: measuredRtp - declaredRtp,
       standardError,
       ci95,
       verdict: rtpVerdict,
+      correlatedSpins,
     },
     hitRate,
     multiplier: multiplierStats,

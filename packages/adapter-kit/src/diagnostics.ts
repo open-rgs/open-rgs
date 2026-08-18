@@ -3,7 +3,7 @@
 // and humans see consistent shapes across providers.
 
 export interface DiagnosticsOptions {
-  /** Adapter identity  - your own short name for the wallet this adapter
+  /** Adapter identity, your own short name for the wallet this adapter
    *  targets (e.g. "acme-wallet"). Surfaced in diagnostics/logs. */
   adapter: string;
   /** Adapter version (semver). */
@@ -57,7 +57,7 @@ export function createDiagnostics(opts: DiagnosticsOptions): DiagnosticsHandle {
 
   // The handle exposes every DiagnosticsState field as a live getter over
   // the captured `state` (so `handle.connected` reflects the latest value,
-  // not a snapshot). Note: do NOT spread `...state` here  - it would add own
+  // not a snapshot). Note: do NOT spread `...state` here, it would add own
   // data properties that the getters below immediately shadow, which only
   // misleads readers into thinking the spread supplies the values.
   return {

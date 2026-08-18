@@ -1,4 +1,4 @@
-# ADR 002  - Integer minor units for amounts
+# ADR 002: Integer minor units for amounts
 
 **Status:** Accepted
 **Date:** 2026-05-08
@@ -24,7 +24,7 @@ currency's minimal unit**. Examples:
 
 The session's currency comes from the adapter via `SessionInfo.currency`.
 Per-currency precision (cents for USD, satoshis for BTC) is implicit
-in the integer convention  - RGS doesn't need a precision lookup.
+in the integer convention: RGS doesn't need a precision lookup.
 
 ## Consequences
 
@@ -33,11 +33,11 @@ in the integer convention  - RGS doesn't need a precision lookup.
 - No float drift, no rounding bugs in the hot path.
 - Integer arithmetic for `win = multiplier x bet` is fast and exact
   (subject to one float multiply if multiplier is non-integer; we round
-  once at the boundary  - half to even, see below  - not throughout).
+  once at the boundary, half to even, see below, not throughout).
   Implemented in `@open-rgs/core`'s `settleAmount` (`money.ts`).
 - Adapters can persist as float in their own DB if they prefer; the
   conversion happens at the adapter boundary, not in core.
-- Crypto-friendly out of the box  - no special-cased "is this BTC?"
+- Crypto-friendly out of the box: no special-cased "is this BTC?"
   logic.
 
 **Costs:**
@@ -59,8 +59,8 @@ in the integer convention  - RGS doesn't need a precision lookup.
 `number` holds every integer exactly up to `2^53 − 1`; beyond that the
 representable integers thin out (2^53 + 1 is not representable) and an
 amount would be silently corrupted. For the currencies/limits this RGS
-targets  - fiat in cents, crypto where stake and win sit far below the
-ceiling  - 9e15 minor units is comfortably out of range (that's ~90
+targets: fiat in cents, crypto where stake and win sit far below the
+ceiling: 9e15 minor units is comfortably out of range (that's ~90
 trillion USD, or ~90M BTC in satoshis). But "comfortable" is not
 "guaranteed": a misconfigured currency precision, a runaway multiplier,
 or an aggregate counter can cross it.
@@ -69,11 +69,11 @@ The decision is to **fail loud, not corrupt silently**. Every amount is
 required to be a *safe* integer (`Number.isSafeInteger`), and the two
 boundaries enforce it:
 
-- `@open-rgs/core` `money.ts`  - `assertSafeAmount` guards `settleAmount`
+- `@open-rgs/core` `money.ts`: `assertSafeAmount` guards `settleAmount`
   and is reused for balances; a win past the safe range throws
   `INTERNAL_ERROR` rather than reaching a wallet. The orchestrator's
   computed-bet check likewise uses `Number.isSafeInteger`.
-- `@open-rgs/adapter-kit` `currency.ts`  - `fromWireAmount` rejects any
+- `@open-rgs/adapter-kit` `currency.ts`: `fromWireAmount` rejects any
   wire value that converts to an unsafe integer (a high-decimal
   currency or huge balance), so corruption is caught at the adapter
   boundary, not deep in the ledger.
@@ -83,15 +83,15 @@ money (see Alternatives), not relaxing the guard.
 
 ## Alternatives considered
 
-- **Decimal strings** (e.g., "1.00")  - string ops are slow and
+- **Decimal strings** (e.g., "1.00"): string ops are slow and
   error-prone, and arithmetic requires decimal-arithmetic library.
-- **`bigint` everywhere**  - accurate at any magnitude but verbose at JS
+- **`bigint` everywhere**: accurate at any magnitude but verbose at JS
   sites; mixed arithmetic with float multipliers is awkward (a win is
   `multiplier x bet`, float x int). Deferred, not rejected: it is the
   designated path if a deployment ever needs amounts past 2^53. Until
   then the safe-integer guard (above) makes the limit explicit instead
   of silent.
-- **Per-currency precision lookup**  - adds a stateful registry the
+- **Per-currency precision lookup**: adds a stateful registry the
   contract has to know about; minor-unit convention sidesteps it.
-- **Float with documented precision discipline**  - works in theory,
+- **Float with documented precision discipline**: works in theory,
   fails in practice on crypto and edge sums.

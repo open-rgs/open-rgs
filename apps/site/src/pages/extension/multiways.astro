@@ -1,0 +1,47 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/multiways, Variable reel heights"
+  description="Multiways: Each reel draws its own height, every spin."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/multiways</h1>
+
+    <p class="lede">Each reel draws its own height, every spin.</p>
+
+    <h2 data-section="&sect; 1">Heights are the mechanic</h2>
+
+    <p>Each reel independently draws a height, and the ways available that spin are the product. Six reels at two to seven span 64 ways to 117,649. Because a shape is already a list of column heights, this needed almost no code.</p>
+
+    <Anim kind="multiways-heights" caption="Reels grow and shrink independently, so the ways count moves with them." />
+
+    <Code code={`import { heights, multiwaysFillWeights } from "@open-rgs/multiways";
+
+const H = heights({ 2: 20, 3: 25, 4: 25, 5: 15, 6: 10, 7: 5 }, 6);
+
+const reels = multiwaysFillWeights(H, { LOW: 55, HIGH: 12, WILD: 5 });`} />    <h2 data-section="&sect; 2">The marketing number</h2>
+
+    <p>Reel heights are drawn independently, so the expected board ways is the product of the per-reel expectations. Correlate the reels and that stops being true.</p>
+
+    <Anim kind="multiways-product" caption="Ways is the product of the heights the spin drew." />
+
+    <Code code={`import { expectedWays, minWays, maxWays } from "@open-rgs/multiways";
+
+minWays(H);
+maxWays(H);
+expectedWays(H);`} />    <h2 data-section="&sect; 3">Do not rescale by ways</h2>
+
+    <p>A k-column win carries a multiplier scaling as h to the k, while the board scales as h to the reel count. Only a paytable weighted entirely on full-length runs tracks board ways; everything shorter scales slower, and short runs hold most of the expected value.</p>
+
+    <Anim kind="pay-ways-cols" caption="pay-ways needs no change: it multiplies match counts, never heights." />
+
+    <Code code={`import { expectedWaysPayout } from "@open-rgs/multiways";
+
+expectedWaysPayout(H, 0.25, (k) => PAY.pay("HIGH", k));`} />
+  </main>
+</BaseLayout>

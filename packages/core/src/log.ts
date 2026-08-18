@@ -1,5 +1,5 @@
 // Singleton logger for @open-rgs/core. Thin wrapper around the
-// instantiable @open-rgs/log package  - gives the rest of core a fixed
+// instantiable @open-rgs/log package, gives the rest of core a fixed
 // import path while keeping the heavy lifting in a peer package.
 //
 // Game integrators who want their own Logger (per-request scopes,
