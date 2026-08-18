@@ -47,7 +47,19 @@ export interface Paytable<S = string> {
  * A payout of exactly 0 IS allowed: declaring `{ 2: 0 }` documents that two of
  * a kind is a real outcome worth nothing, which reads better than omitting it.
  */
-export function paytable<S extends string>(spec: PaytableSpec): Paytable<S> {
+export interface PaytableOptions {
+  /** Allow a symbol's paying counts to skip a value (3 and 5 pay, 4 does not).
+   *
+   *  Off by default, and the default is the point. Evaluators look up the EXACT
+   *  run length, so a gap does not fall back to the next paying count below it:
+   *  it pays zero. The board that pays nothing is the LONGER one - four of a
+   *  kind on a table that jumps 3 to 5 - which is the player's better board and
+   *  the one nobody tests. It reads as an authoring slip in every real
+   *  paytable, so it fails here, at build, rather than on that spin. */
+  readonly allowGaps?: boolean;
+}
+
+export function paytable<S extends string>(spec: PaytableSpec, opts: PaytableOptions = {}): Paytable<S> {
   const table = new Map<string, Map<number, number>>();
   for (const [symbol, counts] of Object.entries(spec)) {
     const inner = new Map<number, number>();
@@ -60,6 +72,23 @@ export function paytable<S extends string>(spec: PaytableSpec): Paytable<S> {
         throw new Error(`paytable: '${symbol}' at ${count} has an invalid payout (${payout})`);
       }
       inner.set(count, payout);
+    }
+    if (!opts.allowGaps) {
+      const paying = [...inner].filter(([, v]) => v > 0).map(([k]) => k).sort((a, b) => a - b);
+      const lowest = paying[0];
+      const highest = paying[paying.length - 1];
+      if (lowest !== undefined && highest !== undefined) {
+        for (let n = lowest; n <= highest; n++) {
+          if (!inner.has(n)) {
+            throw new Error(
+              `paytable: '${symbol}' pays at ${lowest} and ${highest} but has no entry for ${n}. ` +
+              `Evaluators look up the exact run length, so ${n} of a kind would pay NOTHING while ` +
+              `${lowest} pays. Add the entry (0 is fine - it documents the intent), or pass ` +
+              `{ allowGaps: true } if this really is what the game does.`,
+            );
+          }
+        }
+      }
     }
     table.set(symbol, inner);
   }

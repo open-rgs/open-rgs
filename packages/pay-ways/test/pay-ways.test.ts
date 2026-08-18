@@ -161,3 +161,28 @@ describe("ragged grids", () => {
     expect(w?.ways).toBe(6); // 2 x 3 x 1
   });
 });
+
+describe("a wild with its own paytable row", () => {
+  // WILD substitutes for HIGH and also pays 3-of-a-kind on its own.
+  const pay = paytable({ HIGH: { 3: 10 }, WILD: { 3: 4 } });
+  const roles = { wilds: ["WILD"] };
+  // Three columns where every cell is a wild: HIGH's run and WILD's run are
+  // the SAME three cells.
+  const grid = fromColumns([["WILD"], ["WILD"], ["WILD"]]);
+
+  test("does not pay the same cells twice by default", () => {
+    const wins = evalWays(grid, pay, { roles });
+    expect(wins.map((w) => w.symbol)).toEqual(["HIGH"]);
+    expect(wins.reduce((n, w) => n + w.multiplier, 0)).toBe(10);
+  });
+
+  test("pays separately only when the game asks for it", () => {
+    const wins = evalWays(grid, pay, { roles, wildsPaySeparately: true });
+    expect(wins.map((w) => w.symbol).sort()).toEqual(["HIGH", "WILD"]);
+    expect(wins.reduce((n, w) => n + w.multiplier, 0)).toBe(14);
+  });
+
+  test("evalWay on the wild itself is unchanged - the choice is at the set level", () => {
+    expect(evalWay(grid, "WILD", pay, { roles })?.multiplier).toBe(4);
+  });
+});

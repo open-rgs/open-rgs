@@ -19,12 +19,27 @@
 //   2. Each symbol pays at most ONCE, for its longest run - the same rule as
 //      paylines. Ways games are dense, so a prefix-paying bug here is far
 //      worse than on lines: nearly every spin would win.
+//
+//   3. A WILD THAT PAYS ON ITS OWN pays twice unless you say otherwise. Wilds
+//      substitute, so a wild cell is already counted inside the run of whatever
+//      it stood in for; if the wild ALSO has a paytable row, `evalWays` would
+//      return that run too and the same cells pay under two symbols. That is
+//      the ways equivalent of prefix-paying, and it is easy to miss because it
+//      only fires on boards that have a wild. `wildsPaySeparately` decides it
+//      explicitly, and the default is not to double-pay.
 
 import { type Grid, heightOf, indexOf, widthOf } from "@open-rgs/grid";
-import { type Paytable, type Roles, type Win, isScatter, substitutes } from "@open-rgs/paytable";
+import { type Paytable, type Roles, type Win, isScatter, isWild, substitutes } from "@open-rgs/paytable";
 
 export interface WaysOptions<S = string> {
   readonly roles?: Roles<S>;
+  /** Whether a wild that has its own paytable row also pays as itself.
+   *
+   *  Default FALSE: a wild is already counted inside the run it substituted
+   *  into, so paying it again pays the same cells twice. Set true only for a
+   *  game whose paytable is priced for it - and then price it knowing the wild
+   *  run and the substituted run overlap. */
+  readonly wildsPaySeparately?: boolean;
 }
 
 /** Cells in `col` whose symbol counts toward `target`, wilds included. */
@@ -88,6 +103,9 @@ export function evalWays<S extends string>(
   const wins: Win<S>[] = [];
   for (const symbol of pay.symbols) {
     if (isScatter(symbol, roles)) continue;
+    // A wild's cells are already inside the run of whatever it substituted
+    // for; evaluating it as its own symbol pays them a second time.
+    if (!opts.wildsPaySeparately && isWild(symbol, roles)) continue;
     const w = evalWay(grid, symbol, pay, opts);
     if (w) wins.push(w);
   }

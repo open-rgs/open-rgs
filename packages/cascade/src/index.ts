@@ -126,9 +126,13 @@ export interface CascadeResult<S> {
   readonly finalGrid: Grid<S>;
   /** Sum of every step's payout. */
   readonly multiplier: number;
-  /** True when the run stopped because it hit `maxSteps` rather than because
-   *  the board went quiet. A game that sees this in simulation has a cap that
-   *  is too low, or a paytable that self-sustains. */
+  /** True when the run used its whole `maxSteps` budget.
+   *
+   *  Read it as "this cascade reached the cap", not as "this cascade had more
+   *  to give": the loop stops BEFORE evaluating the step after the last one, so
+   *  it cannot know whether the next board would have won. A game that sees
+   *  this in simulation has a cap that is too low, or a paytable that
+   *  self-sustains - either way the run is worth looking at. */
   readonly truncated: boolean;
 }
 

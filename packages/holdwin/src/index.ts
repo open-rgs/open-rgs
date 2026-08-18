@@ -215,13 +215,32 @@ export type Effect = (grid: Grid<Cell>, source: Pos, next: () => number) => Grid
  */
 export function collector(targets: Selector<Cell> = coinCells(), jp?: JackpotTable): Effect {
   return (grid, source, next) => {
-    const jpTable = jp ?? ZERO_JACKPOTS;
     const picks = targets(grid, next).filter((p) => !samePosition(p, source) && cellAt(grid, p) !== null);
     let gained = 0;
-    for (const p of picks) gained += valueOf(cellAt(grid, p)!, jpTable);
+    for (const p of picks) {
+      const c = cellAt(grid, p)!;
+      if (c.tier && !jp) {
+        // The jackpot table used to default to zeros here, so collecting a
+        // GRAND without passing one absorbed it at nothing and emptied the
+        // cell: the player lost the jackpot and the round's max-win accounting
+        // lost it too, silently, on the shorter of the two call shapes. A tier
+        // coin has no value without the ladder, so refuse rather than invent
+        // one.
+        throw new Error(
+          `collector: collecting a ${c.tier} coin needs the jackpot table  - ` +
+          `call collector(targets, jackpots) so the tier can be valued`,
+        );
+      }
+      gained += valueOf(c, jp ?? ZERO_JACKPOTS);
+    }
 
     const me = cellAt(grid, source);
-    const merged: Coin = { value: (me ? valueOf(me, jpTable) : 0) + gained };
+    if (me?.tier && !jp) {
+      throw new Error(
+        `collector: the collecting coin is a ${me.tier}  - pass the jackpot table so its own value is known`,
+      );
+    }
+    const merged: Coin = { value: (me ? valueOf(me, jp ?? ZERO_JACKPOTS) : 0) + gained };
     return withAt(grid, [
       ...picks.map((p) => [p, EMPTIED] as const),
       [source, merged] as const,
@@ -255,19 +274,55 @@ export function multiplier(factor: number, targets: Selector<Cell> = all<Cell>()
   };
 }
 
+export interface UpgraderOptions {
+  /** Ladder values, so an upgrade can be checked against what it replaces.
+   *  Without it a cash coin is left alone (see `cash`). */
+  readonly jackpots?: JackpotTable;
+  /** What to do with a plain cash coin.
+   *
+   *  - `"promote"` (default): turn it into MINI. The genre convention, and the
+   *    behaviour every existing game is priced against - which is why it stays
+   *    the default. Note what it means though: a cash coin worth MORE than MINI
+   *    is DOWNGRADED by its own upgrade, and the player watches it happen.
+   *  - `"promote-if-better"`: promote only when MINI is worth at least as much
+   *    as the cash coin. Needs `jackpots` to compare. This is what most games
+   *    mean by "upgrade".
+   *  - `"skip"`: leave cash coins alone; the upgrader only walks the ladder. */
+  readonly cash?: "promote" | "promote-if-better" | "skip";
+}
+
 /** UPGRADER - bumps targeted coins one rung up the jackpot ladder.
  *
- *  A cash coin becomes MINI. GRAND is the top and stays put, rather than
- *  wrapping or overflowing into a fifth tier that has no name and no value. */
-export function upgrader(targets: Selector<Cell> = upTo(1, all<Cell>())): Effect {
+ *  GRAND is the top and stays put, rather than wrapping or overflowing into a
+ *  fifth tier that has no name and no value.
+ *
+ *  A cash coin becomes MINI by default, which is the genre convention and can
+ *  also be a DOWNGRADE - a 50x cash coin "upgraded" into a 10x MINI is worth
+ *  less than it was. `cash: "promote-if-better"` is the version most games
+ *  actually mean; see {@link UpgraderOptions.cash}. */
+export function upgrader(
+  targets: Selector<Cell> = upTo(1, all<Cell>()),
+  opts: UpgraderOptions = {},
+): Effect {
+  const cashRule = opts.cash ?? "promote";
+  if (cashRule === "promote-if-better" && !opts.jackpots) {
+    throw new Error("upgrader: cash 'promote-if-better' needs the jackpot table to compare against");
+  }
   return (grid, source, next) => {
     const picks = targets(grid, next).filter((p) => !samePosition(p, source) && cellAt(grid, p) !== null);
-    return withAt(grid, picks.map((p) => {
+    const writes: Array<readonly [Pos, Cell]> = [];
+    for (const p of picks) {
       const c = cellAt(grid, p)!;
-      const idx = c.tier ? TIERS.indexOf(c.tier) : -1;
-      const nextTier = TIERS[Math.min(idx + 1, TIERS.length - 1)]!;
-      return [p, jackpot(nextTier)] as const;
-    }));
+      if (!c.tier) {
+        if (cashRule === "skip") continue;
+        if (cashRule === "promote-if-better" && opts.jackpots && opts.jackpots.MINI < c.value) continue;
+        writes.push([p, jackpot(TIERS[0]!)] as const);
+        continue;
+      }
+      const idx = TIERS.indexOf(c.tier);
+      writes.push([p, jackpot(TIERS[Math.min(idx + 1, TIERS.length - 1)]!)] as const);
+    }
+    return withAt(grid, writes);
   };
 }
 

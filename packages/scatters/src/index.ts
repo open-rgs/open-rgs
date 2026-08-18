@@ -61,6 +61,26 @@ export interface SpawnResult<S = string> {
   readonly positions: readonly number[];
 }
 
+/** Samplers built per config, not per spin.
+ *
+ *  `spawnOn` used to call `countSampler(cfg.count)` on every call - revalidating
+ *  the distribution and rebuilding its cumulative table on the hot path, in a
+ *  library whose own documentation tells you to build a sampler once at module
+ *  scope. The config object is the natural key: a game builds one and reuses it,
+ *  so the cache holds one entry per configured spawn.
+ *
+ *  Weak, so a config built per spin by a caller that insists on it is still
+ *  collectable rather than a leak. */
+const COUNT_SAMPLERS = new WeakMap<object, Sampler<number>>();
+
+function countSamplerFor<S>(cfg: SpawnConfig<S>): Sampler<number> {
+  const hit = COUNT_SAMPLERS.get(cfg as unknown as object);
+  if (hit) return hit;
+  const built = countSampler(cfg.count);
+  COUNT_SAMPLERS.set(cfg as unknown as object, built);
+  return built;
+}
+
 function countSampler(spec: Readonly<Record<number, number>>): Sampler<number> {
   const entries = Object.entries(spec).map(([n, weight]) => {
     const count = Number(n);
@@ -163,7 +183,7 @@ function drawSome<T>(pool: readonly T[], count: number, next: () => number): T[]
  * happens - and if it happens at all often, the `protects` set is too wide.
  */
 export function spawnOn<S>(grid: Grid<S>, cfg: SpawnConfig<S>, next: () => number): SpawnResult<S> {
-  const wanted = countSampler(cfg.count).pick(next());
+  const wanted = countSamplerFor(cfg).pick(next());
   if (wanted === 0) return { grid, wanted: 0, spawned: 0, positions: [] };
 
   const byReel = legalByReel(grid, cfg);

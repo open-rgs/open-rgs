@@ -5,11 +5,15 @@
 
 import { describe, expect, test } from "bun:test";
 import { fromColumns, makeGrid, rect } from "@open-rgs/grid";
-import { paytable, totalMultiplier, type Roles } from "@open-rgs/paytable";
+import { bands, paytable, totalMultiplier, type Roles } from "@open-rgs/paytable";
 import { clustersOf, evalAllClusters, evalClusters, largestCluster } from "../src/index.js";
 
+// Cluster games pay by RANGE, which is what `bands` is for: it expands
+// "8-or-more pays 100, 15-or-more pays 500" into the exact counts the
+// evaluator looks up. Writing the sparse table directly leaves a cluster of 7
+// paying nothing while a cluster of 6 pays 40, which `paytable` now refuses.
 const PAY = paytable({
-  HIGH: { 3: 5, 4: 10, 5: 20, 6: 40, 8: 100, 15: 500 },
+  ...bands({ HIGH: [[3, 5], [4, 10], [5, 20], [6, 40], [8, 100], [15, 500]] }, 25),
   LOW: { 3: 1, 4: 2, 5: 4, 6: 8 },
   WILD: { 3: 1 },
   SC: { 3: 5 },
@@ -154,15 +158,24 @@ describe("payouts", () => {
     expect(evalClusters(g, "HIGH", PAY, { roles: ROLES })).toEqual([]);
   });
 
-  test("a size with no paytable entry pays nothing", () => {
-    // 7 is absent from the HIGH table; there is no interpolation.
+  test("a size with no paytable entry pays nothing - which is why a gap is now refused at build", () => {
     const g = board([
       ["HIGH", "HIGH", "HIGH", "HIGH", X],
       ["HIGH", "HIGH", "HIGH", X, X],
       [X, X, X, X, X],
     ]);
     expect(clustersOf(g, "HIGH", ROLES)[0]).toHaveLength(7);
-    expect(evalClusters(g, "HIGH", PAY, { roles: ROLES })).toEqual([]);
+
+    // There is no interpolation: a size the table does not list pays zero. That
+    // is the whole hazard, so building such a table is an error unless the game
+    // says it means it.
+    expect(() => paytable({ HIGH: { 6: 40, 8: 100 } })).toThrow(/no entry for 7/);
+
+    const sparse = paytable({ HIGH: { 6: 40, 8: 100 } }, { allowGaps: true });
+    expect(evalClusters(g, "HIGH", sparse, { roles: ROLES })).toEqual([]);
+
+    // Expanded through `bands`, the same intent pays the band below.
+    expect(evalClusters(g, "HIGH", PAY, { roles: ROLES })[0]?.multiplier).toBe(40);
   });
 
   test("minSize can override the paytable minimum", () => {

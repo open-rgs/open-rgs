@@ -11,7 +11,7 @@ import { fromColumns, makeGrid, rect, sizeOf } from "@open-rgs/grid";
 import { sampler } from "@open-rgs/weights";
 import {
   type Cell, type JackpotTable, type RespinConfig,
-  TIERS, beginRespins, cashCells, coin, coinCells, coinCount, coinSet,
+  TIERS, EMPTIED, beginRespins, cashCells, coin, coinCells, coinCount, coinSet,
   coinsShortOfTrigger, collector, emptyCells, isCycleOver, jackpot, mixedCoinSet,
   multiplier, payer, settleRespins, spawner, stepRespins, tierCells, totalValue,
   triggers, upgrader, valueOf,
@@ -311,5 +311,53 @@ describe("a whole cycle end to end", () => {
     for (let i = 0; i < 3; i++) s = stepRespins(s, [], CFG);
     expect(isCycleOver(s)).toBe(true);
     expect(settleRespins(s, CFG, JP)).toBe(16);
+  });
+});
+
+describe("UPGRADER - cash rules", () => {
+  const jackpots = { MINI: 10, MINOR: 25, MAJOR: 100, GRAND: 1000 } as const;
+
+  test("'promote-if-better' refuses to turn a bigger cash coin into a smaller MINI", () => {
+    const g = board({ 0: coin(0), 1: coin(50) }); // 50x cash, MINI is 10x
+    const out = upgrader(cashCells(), { jackpots, cash: "promote-if-better" })(g, { col: 0, row: 0 }, R(0));
+    expect(out.cells[1]).toEqual(coin(50));
+  });
+
+  test("'promote-if-better' still promotes when MINI is worth more", () => {
+    const g = board({ 0: coin(0), 1: coin(2) });
+    const out = upgrader(cashCells(), { jackpots, cash: "promote-if-better" })(g, { col: 0, row: 0 }, R(0));
+    expect(out.cells[1]).toEqual(jackpot("MINI"));
+  });
+
+  test("'skip' leaves cash alone entirely", () => {
+    const g = board({ 0: coin(0), 1: coin(2) });
+    const out = upgrader(cashCells(), { cash: "skip" })(g, { col: 0, row: 0 }, R(0));
+    expect(out.cells[1]).toEqual(coin(2));
+  });
+
+  test("'promote-if-better' without a jackpot table is a build-time error, not a silent guess", () => {
+    expect(() => upgrader(cashCells(), { cash: "promote-if-better" })).toThrow(/jackpot table/);
+  });
+});
+
+describe("COLLECTOR - jackpot valuation", () => {
+  const jackpots = { MINI: 10, MINOR: 25, MAJOR: 100, GRAND: 1000 } as const;
+
+  test("collecting a tier coin without the table throws instead of absorbing it at zero", () => {
+    const g = board({ 0: coin(1), 1: jackpot("GRAND") });
+    expect(() => collector(coinCells())(g, { col: 0, row: 0 }, R(0))).toThrow(/jackpot table/);
+  });
+
+  test("with the table, the jackpot's value is actually collected", () => {
+    const g = board({ 0: coin(1), 1: jackpot("GRAND") });
+    const out = collector(coinCells(), jackpots)(g, { col: 0, row: 0 }, R(0));
+    expect(out.cells[0]).toEqual(coin(1001));
+    expect(out.cells[1]).toEqual(EMPTIED);
+  });
+
+  test("cash-only collection still needs no table", () => {
+    const g = board({ 0: coin(1), 1: coin(4) });
+    const out = collector(cashCells())(g, { col: 0, row: 0 }, R(0));
+    expect(out.cells[0]).toEqual(coin(5));
   });
 });
