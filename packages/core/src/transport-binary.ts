@@ -44,7 +44,7 @@ interface WsData extends ConnectionMeta {
   connectedAt: number;
   /** Replay-guard state (only used when cfg.replayGuard is on). The highest
    *  operation-sequence processed on this connection, and the encoded response
-   *  bytes for it  - so an exact re-send (a retry after a dropped response)
+   *  bytes for it: so an exact re-send (a retry after a dropped response)
    *  replays the same bytes instead of re-running the round. */
   lastOpSeq: number;
   lastOpResponse?: Uint8Array;
@@ -64,7 +64,7 @@ export interface BinaryTransportConfig {
    *  through to the built-in 404 (after the /livez fallback). */
   extraFetch?: (req: Request) => Promise<Response | undefined> | Response | undefined;
   /** Enable the per-connection operation-sequence replay guard (Guarantee 6,
-   *  "At Most Once", at the socket). Off by default  - back-compatible with
+   *  "At Most Once", at the socket). Off by default: back-compatible with
    *  clients that don't stamp `$seq`. When on, each request must carry a
    *  monotonically increasing integer under `WIRE_OPSEQ_KEY`: the transport
    *  processes `last+1`, REPLAYS the cached response for a re-sent `last`
@@ -72,7 +72,7 @@ export interface BinaryTransportConfig {
    *  gap or a frame missing the sequence. A client that opts in must stamp
    *  every frame; mixing is rejected, by design. Per-connection means per
    *  socket: a reconnect (same or different pod) starts a fresh `$seq` space
-   *  with an empty cache  - the wallet's idempotency-key dedupe (Spec 05) is
+   *  with an empty cache: the wallet's idempotency-key dedupe (Spec 05) is
    *  the cross-connection at-most-once guard. */
   replayGuard?: boolean;
 }
@@ -143,12 +143,12 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
             if (res) return res;
           }
           // Minimal fallback when no extraFetch handler claims the
-          // request  - keeps a bare transport usable in tests.
+          // request, keeps a bare transport usable in tests.
           if (url.pathname === "/livez") return new Response("OK");
           return new Response("Not found", { status: 404 });
         },
         websocket: {
-          // Reject oversized inbound frames at the WS layer  - Bun closes the
+          // Reject oversized inbound frames at the WS layer, Bun closes the
           // connection (1009) before the handler runs (Spec 04, H2).
           maxPayloadLength: MAX_FRAME_BYTES,
           open(ws) {
@@ -178,13 +178,13 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
               return sendError(ws, "DECODE_ERROR", `Frame decode failed: ${e}`);
             }
 
-            // Replay guard (Guarantee 6, opt-in). PING is exempt  - it carries no
+            // Replay guard (Guarantee 6, opt-in). PING is exempt, it carries no
             // sequence and moves no state.
             let capture: ((bytes: Uint8Array) => void) | undefined;
             if (cfg.replayGuard && type !== MSG_PING) {
               const decision = checkOpSeq(ws.data, payload);
               if (decision.kind === "duplicate") {
-                // Exact re-send of the last op  - replay the cached bytes, do not
+                // Exact re-send of the last op, replay the cached bytes, do not
                 // re-run the round. (A retry after a dropped response.)
                 if (ws.data.lastOpResponse) ws.send(ws.data.lastOpResponse);
                 return;
@@ -304,7 +304,7 @@ async function dispatch(
       : new RGSError("INTERNAL_ERROR", e instanceof Error ? e.message : String(e));
     // Codes whose message wraps arbitrary internal detail (a math runtime
     // error with a file path, an upstream wallet body, a stack). Never send
-    // that to the client  - log it server-side and return a generic message
+    // that to the client, log it server-side and return a generic message
     // plus the correlation id so an operator can find the log line. (M11)
     if (isOpaque(err.code)) {
       log.exception("transport dispatch error", e, {
@@ -315,7 +315,7 @@ async function dispatch(
       sendError(ws, err.code, clientMessage(err.code, err.message, cid), cid, capture);
     } else {
       // Controlled-vocabulary errors (INVALID_BET, INSUFFICIENT_BALANCE, ...)
-      // carry author-written, non-sensitive messages  - safe to surface.
+      // carry author-written, non-sensitive messages, safe to surface.
       sendError(ws, err.code, err.message, cid, capture);
     }
   }

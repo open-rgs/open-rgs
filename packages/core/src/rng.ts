@@ -11,7 +11,7 @@ import { log } from "./log.js";
 /** Cryptographically-secure default RNG, backed by the system CSPRNG (Bun /
  *  Node WebCrypto -> BoringSSL/OpenSSL `RAND_bytes`, the same source Bun's
  *  `crypto` uses). Returns a uniform 53-bit float in `[0, 1)`. This is
- *  open-rgs's secure default for outcome determination  - unpredictable and
+ *  open-rgs's secure default for outcome determination, unpredictable and
  *  unseedable, unlike `Math.random` (V8 xorshift128+).
  *
  *  It is a CSPRNG, NOT necessarily a *certified/auditable* RNG (no seed-commit
@@ -25,11 +25,11 @@ export function cryptoRng(): number {
 }
 
 /** Resolve the math RNG. Defaults to the secure system CSPRNG ({@link
- *  cryptoRng})  - never `Math.random`. In production with no injected rng we
+ *  cryptoRng}): never `Math.random`. In production with no injected rng we
  *  fail closed (throw) so the operator chooses its certified/approved source
  *  consciously rather than us picking silently. */
 /** Resolve the math RNG. Defaults to the secure system CSPRNG ({@link
- *  cryptoRng})  - never `Math.random`. In production with no injected rng we
+ *  cryptoRng}): never `Math.random`. In production with no injected rng we
  *  fail closed (throw) so the operator chooses its certified/approved source
  *  consciously rather than us picking silently. */
 export function resolveRng(
@@ -40,7 +40,7 @@ export function resolveRng(
   const isProduction = process.env["NODE_ENV"] === "production";
   if (opts?.rng) {
     // Reject a simulator-only PRNG (e.g. mulberry32) for production outcome
-    // determination  - it's reproducible and predictable (see audit H8).
+    // determination, it's reproducible and predictable (see audit H8).
     const tagged = (opts.rng as { __insecureSimulatorRng?: boolean }).__insecureSimulatorRng;
     if (isProduction && tagged && !opts.allowInsecureRng) {
       throw new Error(

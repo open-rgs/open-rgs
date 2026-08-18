@@ -34,8 +34,8 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 
 | File | Purpose |
 |---|---|
-| `src/index.ts` | One file  - boots `createServer` with `MockPlatform` + binary transport |
-| `maths/spin.ts` | One file  - returns multiplier + ops per spin |
+| `src/index.ts` | One file, boots `createServer` with `MockPlatform` + binary transport |
+| `maths/spin.ts` | One file, returns multiplier + ops per spin |
 | `package.json` | Three deps: `core`, `contract`, `platform-mock` |
 | `tsconfig.json` | Inherits the workspace strict config |
 
@@ -46,7 +46,7 @@ console.log(r);  // { roundId, ops, balance, bet, win, multiplier, type }
 - Reel-based math (this is a single-roll RNG; see the
   [slot libraries](https://open-rgs.dev/extension) for grids, weighted
   reels and pay evaluators)
-- Complex rounds (Mines, Chicken-Road, crash)  - see the docs at
+- Complex rounds (Mines, Chicken-Road, crash): see the docs at
   <https://open-rgs.dev/build>
 - Promo free-rounds, autoclose (supported by core; not
   exercised here)

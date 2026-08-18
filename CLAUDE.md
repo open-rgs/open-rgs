@@ -1,4 +1,4 @@
-# CLAUDE.md  - handoff context for AI sessions
+# CLAUDE.md: handoff context for AI sessions
 
 This file captures state for an AI assistant resuming work on
 **open-rgs**. Read this first; it points you at the right specs and
@@ -6,7 +6,7 @@ tells you what's done, what's decided, and what's pending.
 
 ## What this project is
 
-**open-rgs**  - an MIT-licensed Remote Game Server. Bun-native
+**open-rgs**, an MIT-licensed Remote Game Server. Bun-native
 orchestrator + snap-in TypeScript maths + pluggable platform adapters +
 binary-msgpack transport. The runtime layer between casino game math
 and operator wallets.
@@ -44,9 +44,9 @@ open-rgs/
 ## What's shipped
 
 - All published `@open-rgs/*` packages (adapter-artube is private, see below)
-- `apps/site`  - public docs site (Astro static SSG)
+- `apps/site`: public docs site (Astro static SSG)
 - Specs `00-10` + `12` + ADRs
-- `deploy/`  - reference Docker + k8s templates
+- `deploy/`: reference Docker + k8s templates
 
 ## Working principles (KISS + don't-rot)
 
@@ -75,8 +75,8 @@ list. Short version:
   (USD 1.00 -> 100 when `SessionInfo.currencyDecimals = 2`).
 - Math is currency-blind, RNG-injected, opaque-to-core.
 - Money moves twice per round at most (open + close, or one settle).
-- Autoclose is NEVER timer-driven inside RGS  - always external trigger.
-- Public packages have neutral examples  - never name a specific
+- Autoclose is NEVER timer-driven inside RGS: always external trigger.
+- Public packages have neutral examples: never name a specific
   provider's wire shape, brand, or product id in code or spec.
   ONE EXCEPTION: `packages/adapter-artube`, which is provider-specific by
   definition. It is `private: true` and on the changesets ignore list, so it

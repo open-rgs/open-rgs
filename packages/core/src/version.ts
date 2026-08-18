@@ -1,6 +1,6 @@
 // Single source of truth for @open-rgs/core's own version.
 //
-// Read straight from package.json so it can never drift  - the previous
+// Read straight from package.json so it can never drift, the previous
 // hardcoded constant went stale ("0.3.0" while the package was 0.5.1), so
 // /healthz and the startup banner lied about which core was live. npm
 // always ships package.json in the published tarball, and Bun resolves the

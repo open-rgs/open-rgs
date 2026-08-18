@@ -2,7 +2,7 @@
 //
 // Keeps to fetch() so it runs in Bun, Node, browser, Cloudflare Workers.
 // Auth header is set once at construction; retries are linear (no
-// exponential backoff for HTTP  - the server should give meaningful
+// exponential backoff for HTTP, the server should give meaningful
 // status codes, and we don't want to mask sticky outages).
 //
 // What you get:
@@ -18,7 +18,7 @@
 import type { DiagnosticsHandle } from "./diagnostics.js";
 
 export interface HttpClientOptions {
-  /** Base URL  - methods are appended as path segments unless `pathFor` overrides. */
+  /** Base URL, methods are appended as path segments unless `pathFor` overrides. */
   baseUrl: string;
   /** Static headers (auth tokens, X-Game-Id, etc). Merged with per-call headers. */
   headers?: Record<string, string>;
@@ -52,14 +52,14 @@ export class HttpClient {
    *  Retries happen ONLY when the call is marked `{ idempotent: true }`.
    *  A money RPC (settleSimple / openComplex / closeComplex) is NOT
    *  idempotent unless its body carries a stable idempotency key the wallet
-   *  dedupes on  - blindly resending a settle whose response was lost
+   *  dedupes on: blindly resending a settle whose response was lost
    *  double-charges. So such calls default to no retry; on a network failure
    *  the outcome is UNKNOWN and the caller must reconcile, not blind-retry.
    *  Mark a call idempotent only when a repeat is provably safe. */
   async request<T = unknown>(method: string, body: unknown, callOpts?: { idempotent?: boolean }): Promise<T> {
     const path  = this.opts.pathFor ? this.opts.pathFor(method) : `/${method}`;
     const url   = this.opts.baseUrl.replace(/\/+$/, "") + path;
-    // Only idempotent calls may auto-retry  - otherwise a lost response on a
+    // Only idempotent calls may auto-retry, otherwise a lost response on a
     // money RPC would be resent and double-processed.
     const retries = callOpts?.idempotent ? (this.opts.retries ?? 0) : 0;
     const delay   = this.opts.retryDelayMs ?? ((n: number) => (n + 1) * 200);
@@ -90,7 +90,7 @@ export class HttpClient {
         clearTimeout(t);
         // A network failure / timeout means the request may have reached the
         // server (response lost). For a non-retried (non-idempotent) call the
-        // outcome is UNKNOWN  - say so, so the caller reconciles rather than
+        // outcome is UNKNOWN, say so, so the caller reconciles rather than
         // blind-retrying and risking a double settle.
         const unknownOutcome = !callOpts?.idempotent;
         const hint = unknownOutcome ? "  - outcome UNKNOWN, reconcile (do not blind-retry)" : "";

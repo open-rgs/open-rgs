@@ -35,7 +35,7 @@ reqLog.warn("slow wallet call", { "event.action": "wallet.slow", "duration_ms": 
 try { /* ... */ }
 catch (e) { log.exception("spin failed", e, { "event.action": "spin" }); }
 
-// Pull recent entries (newest first)  - for an admin /logs endpoint
+// Pull recent entries (newest first): for an admin /logs endpoint
 const recent = log.getRecent("warn", 100);
 ```
 

@@ -43,12 +43,12 @@ PR with a changeset --merge--> main
 
 3. **Merge the "version packages" PR.** The workflow runs again, finds no
    pending changesets, and publishes the bumped packages with
-   `changeset publish`  - to npm with provenance, plus a GitHub Release
+   `changeset publish`, to npm with provenance, plus a GitHub Release
    per version. Versioning is **independent per package**
    (`.changeset/config.json` -> `fixed: []`); a dependency bump cascades a
    patch to its dependents.
 
-## Authentication  - npm OIDC trusted publishing (no token)
+## Authentication: npm OIDC trusted publishing (no token)
 
 Publishing uses **npm OIDC trusted publishing**; there is no `NPM_TOKEN`
 secret. `changesets/action` detects OIDC from the workflow's
@@ -71,7 +71,7 @@ One-time setup on npmjs.com:
 > OIDC trusted publishing pins the **workflow filename**, and the
 > existing Trusted Publisher entries already point at `npm-publish.yml`
 > (that's how the 0.x versions were published). Keeping the name means
-> no Trusted Publisher change is needed  - the changesets flow inherits
+> no Trusted Publisher change is needed, the changesets flow inherits
 > the proven OIDC identity.
 
 The npm CLI must be >= 11.5.1 for trusted publishing; the workflow
@@ -99,13 +99,13 @@ Every package's `package.json` carries:
 }
 ```
 
-No `registry` field  - npm defaults to `registry.npmjs.org`.
+No `registry` field: npm defaults to `registry.npmjs.org`.
 
 ## Manual publish (emergency / first bootstrap only)
 
-CI is the only routine path. If you ever must publish by hand  - e.g. the
+CI is the only routine path. If you ever must publish by hand, e.g. the
 very first publish of a brand-new package name, which can't use a Trusted
-Publisher until the package exists  - log in and run `changeset publish`
+Publisher until the package exists: log in and run `changeset publish`
 directly:
 
 ```bash

@@ -1,4 +1,4 @@
-# Spec 06  - Performance
+# Spec 06: Performance
 
 ## Goal
 
@@ -58,16 +58,16 @@ is exact for RTP / CI / verdict / hit-rate / contributions / deviations
 and the multiplier mean / stdDev / min / max; only the distribution
 percentiles are count-weighted across shards (flagged in the report).
 Sharding requires a seedable factory manifest so each shard draws an
-independent substream  - a static manifest is refused.
+independent substream: a static manifest is refused.
 
 For a WASM math kernel, `simulateWasmBatch(wasmPath, opts)` runs the whole
 spin loop INSIDE the kernel (its `sim_batch` export: a seeded in-VM
 xoshiro256++ + the same `decide` logic as `play`), so there is no per-spin
-JS<->WASM boundary  - only one crossing per chunk. Measured **~216M
+JS<->WASM boundary: only one crossing per chunk. Measured **~216M
 spins/sec single-threaded (100M spins in ~0.46s)**, ~250x the per-spin WASM
 path, and it's the SAME sandboxed artifact you serve (nothing to re-certify).
 It returns a focused RTP report (measured RTP + CI + verdict, hit-rate,
-multiplier mean/stdDev/min/max  - exact from the kernel's count/sum/sumsq/
+multiplier mean/stdDev/min/max: exact from the kernel's count/sum/sumsq/
 min/max/hits aggregate). Combine with `--shards` for multicore.
 
 The **native "extreme" tier** (`sim.zig` + `simulateNativeBatch`) compiles the
@@ -79,15 +79,15 @@ on a **byte-parity test**: a native single slice is byte-identical to WASM
 parity test (skipped where zig is absent) whenever the kernel changes; use the
 native tier for offline certification of your own math only.
 
-## Bun usage  - what makes the orchestrator fast
+## Bun usage: what makes the orchestrator fast
 
 ### Runtime choice rationale
 
-- **uWebSockets** under the hood for `Bun.serve`  - multi-thousand WS
+- **uWebSockets** under the hood for `Bun.serve`: multi-thousand WS
   per core with negligible overhead.
 - **Native MessagePack** via `@msgpack/msgpack` (JS impl, but Bun's V8
   optimizes it well). No transcode overhead.
-- **No Node.js loader tax**  - Bun starts modules in milliseconds,
+- **No Node.js loader tax**: Bun starts modules in milliseconds,
   imports `.ts` directly, no transpile step.
 - **`bun:ffi`** for native interop when needed (e.g., custom RNG).
 
@@ -103,17 +103,17 @@ native tier for offline certification of your own math only.
 - **No per-request allocation** in the orchestrator's mode-resolve and
   bet-compute paths. Object literals returned to the transport are the
   only allocations.
-- **Pre-loaded math modules**  - every math file is loaded once at boot.
+- **Pre-loaded math modules**: every math file is loaded once at boot.
 
 ### Patterns we avoid
 
-- **Promise.all without need**  - adds microtask overhead. Sequential
+- **Promise.all without need**: adds microtask overhead. Sequential
   awaits where dependencies are real.
-- **JSON in hot paths**  - MessagePack throughout. JSON only for admin
+- **JSON in hot paths**: MessagePack throughout. JSON only for admin
   endpoints.
 - **Chained `Array.prototype` methods** in hot loops (`.map().filter()`)
    - explicit `for` loops where they matter.
-- **String concatenation for ops**  - math returns ops as objects; no
+- **String concatenation for ops**: math returns ops as objects; no
   string serialization until the msgpack encoder runs at the boundary.
 
 ### Bun-specific APIs we lean on
@@ -123,7 +123,7 @@ native tier for offline certification of your own math only.
 | `Bun.serve` | Both transport WS and admin HTTP |
 | `Bun.serve<WsData>` | Per-WS state attached at upgrade time |
 | `Bun.file` | Static assets when serving the demo client |
-| `crypto.randomUUID()` | Native, fast  - used for round / connection IDs |
+| `crypto.randomUUID()` | Native, fast, used for round / connection IDs |
 | `performance.now()` | High-res timing for diagnostics |
 | `bun --watch` | Dev hot-reload |
 | `bun:test` | Unit tests (planned) |
@@ -137,7 +137,7 @@ native tier for offline certification of your own math only.
   is fine in core; alternative runtimes can implement equivalent
   shims if needed.
 
-## Zig usage  - where it fits
+## Zig usage: where it fits
 
 ### When to reach for Zig
 
@@ -158,7 +158,7 @@ In rough order of likelihood:
 ### Why Zig specifically
 
 - **Comptime evaluation.** Reel-strip weights, paytables, RTP-target
-  invariants  - all checkable at build time. The compiler refuses to
+  invariants, all checkable at build time. The compiler refuses to
   emit a binary that fails the invariants.
 - **No GC pauses.** A math kernel runs the same ~5 uss every call,
   every time, forever. A garbage-collected runtime has occasional GC
@@ -193,7 +193,7 @@ comptime {
     var ev:  f64 = 0;
     for (WEIGHTS, 0..) |w, i| { sum += w; ev += @as(f64, @floatFromInt(w)) * PAYS[i]; }
     if (ev / @as(f64, @floatFromInt(sum)) > 0.96) {
-        @compileError("declared RTP exceeded by paytable  - retune");
+        @compileError("declared RTP exceeded by paytable, retune");
     }
 }
 
@@ -216,7 +216,7 @@ export fn play(prev_p: [*]const u8, prev_l: usize,
     const mult = PAYS[idx];
 
     // Encode { multiplier, ops, type } as MessagePack into out_p.
-    // (Skipping the encoder code here for brevity  - reference impl in repo.)
+    // (Skipping the encoder code here for brevity, reference impl in repo.)
     return msgpack_encode_outcome(out_p, out_max, mult, idx);
 }
 
@@ -224,7 +224,7 @@ export fn alloc(n: usize) [*]u8 { /* bump allocator */ }
 export fn free(p: [*]u8) void   { /* no-op for bump */ }
 ```
 
-The `comptime` block is the killer feature  - *that paytable cannot
+The `comptime` block is the killer feature: *that paytable cannot
 ship if it would exceed 96% RTP*. Math labs would normally catch this
 in simulation; Zig catches it in CI.
 
@@ -234,7 +234,7 @@ in simulation; Zig catches it in CI.
 - Manifest entry references it: `math: "./maths/zig-slot/play.wasm"`.
 - Loader (`@open-rgs/core` `loadWasmMath`): instantiates with imports
   `host.rng_next`, `host.log_debug`. Calls exports via the typed wrapper.
-- Same `MathModule` interface  - orchestrator can't tell.
+- Same `MathModule` interface: orchestrator can't tell.
 
 ### Where Zig is NOT recommended
 

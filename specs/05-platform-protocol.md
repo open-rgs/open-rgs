@@ -1,4 +1,4 @@
-# Spec 05  - Wallet Protocol
+# Spec 05: Wallet Protocol
 
 ## Goal
 
@@ -31,7 +31,7 @@ interface PlatformAdapter {
 
 ### Currency precision
 
-`SessionInfo.currencyDecimals` is **required**  - every adapter MUST
+`SessionInfo.currencyDecimals` is **required**: every adapter MUST
 populate it from the upstream platform (config, DB, openSession
 response, wherever the provider exposes it). EUR/USD/RUB = 2,
 JPY/HUF = 0, BTC = 8.
@@ -39,7 +39,7 @@ JPY/HUF = 0, BTC = 8.
 The contract requires every `balance`, `bet`, `win`, and amount on
 this interface to be an **integer in the currency's minimal unit**
 (USD 1.00 -> 100 when `currencyDecimals = 2`). The orchestrator never
-converts amounts  - math operates on integers throughout. Adapters
+converts amounts: math operates on integers throughout. Adapters
 facing platforms that expect decimal strings or floats on the wire
 convert at their outbound boundary; `@open-rgs/adapter-kit/currency`
 provides `toWireAmount` / `fromWireAmount` helpers with explicit
@@ -53,7 +53,7 @@ rounding modes.
 | `openComplex` | Debit `bet`. Returns `roundId` referenceable by close/update. |
 | `updateComplex` | NO money movement. Pure audit/state-persistence. Idempotent. |
 | `closeComplex` | Credit `win` against the open round. Final transaction. |
-| `reverseRound` | OPTIONAL. Undo a settled round  - money AND carry  - latest-first. |
+| `reverseRound` | OPTIONAL. Undo a settled round, money AND carry, latest-first. |
 
 The orchestrator guarantees:
 
@@ -82,7 +82,7 @@ The wallet guarantees:
        when no upstream signal exists.
 
   An adapter that can neither be told to close a round nor derive a
-  close on its own is **non-conformant**  - it would leak open rounds
+  close on its own is **non-conformant**, it would leak open rounds
   forever. This is not optional: the conformance suite
   (`@open-rgs/adapter-test-kit`) asserts an open round reaches
   `closeComplex` after an autoclose signal, and operators relying on
@@ -91,10 +91,10 @@ The wallet guarantees:
 - `BalanceChangedEvent` is emitted whenever the balance changes for any
   reason (round settle, deposit, withdrawal, manual adjustment).
 
-### Open-round persistence & resume (v1.7  - adapters MAY omit until then)
+### Open-round persistence & resume (v1.7: adapters MAY omit until then)
 
 Decided in **ADR-007**: cross-pod / post-restart resume is
-wallet-driven  - `openSession` is the inquiry, `SessionInfo.openRound`
+wallet-driven: `openSession` is the inquiry, `SessionInfo.openRound`
 is the answer. No separate `getOpenRound` RPC.
 
 While a complex round is open, the wallet MUST persist, keyed by
@@ -102,7 +102,7 @@ session:
 
 - the `roundId` (from its own `openComplex` receipt);
 - the `bet` (plus `betIndex` / `priceMultiplier` for its native audit
-  trail  - already on `OpenComplex`);
+  trail, already on `OpenComplex`);
 - the mode the round was opened in;
 - the **initial state** (`OpenComplex.initialState`) and the **last
   state checkpoint** (the most recent `UpdateComplex.state`; the
@@ -116,47 +116,47 @@ On `openSession`, when such a record exists, the adapter SHOULD return
 it as `SessionInfo.openRound` so a fresh INIT on **any** pod can
 re-hydrate the round (Spec 02 §Resume on reconnect). Ops never cross
 to the wallet (see below), so a wallet-built `OpenRoundResume` MAY
-carry empty `ops` / `actionLog`  - resume is then state-correct but
+carry empty `ops` / `actionLog`: resume is then state-correct but
 render-degraded; same-pod resume keeps full fidelity.
 
 Until v1.7, adapters MAY omit all of this; the orchestrator treats an
 absent `openRound` as "nothing to resume" and
 `manifest.recovery.onRestart` applies. The autoclose backstop above is
-**unchanged**  - resume rescues the player who returns; the backstop
+**unchanged**, resume rescues the player who returns; the backstop
 settles the round of the player who never does.
 
-### Reversal (optional)  - Guarantee 2, "One Round, One Record"
+### Reversal (optional): Guarantee 2, "One Round, One Record"
 
 `reverseRound` is **optional** and **wallet-initiated**: it exists for
 chargebacks, reconciliation reversals, and operator corrections. The RGS never
-originates a reversal  - it's the wallet's tool for undoing a settlement it has
+originates a reversal: it's the wallet's tool for undoing a settlement it has
 decided was wrong. Implement it only if your upstream supports reversal; omit
 the method otherwise.
 
 When implemented, it MUST honour Guarantee 2 (`specs/00-guarantees.md`):
 
 - **Whole-record.** A round is the balance delta *and* the carry it produced.
-  A reversal restores **both**  - the pre-round balance and the pre-round carry  -
+  A reversal restores **both**, the pre-round balance and the pre-round carry  -
   in one atomic step. Undoing the money while leaving the carry advanced (or
   vice-versa) is the rollback-farming exploit this guarantee forbids: a player
   keeps meta-counter progress for a round whose money was refunded.
 - **Latest-first.** Only the most recent un-reversed round of a session may be
   reversed. Reversing an *older* round while newer rounds sit on top would
-  restore a pre-state that predates them and silently over-refund  - so an
+  restore a pre-state that predates them and silently over-refund, so an
   adapter MUST reject that (`reversed: false`, `reason: "not-latest-round"`),
   never apply it. A wallet reversing a span reverses newest-to-oldest.
 - **No-op, not error, when nothing to reverse.** An unknown or already-reversed
-  round returns `{ reversed: false, reason }` and moves no money  - reversing
+  round returns `{ reversed: false, reason }` and moves no money, reversing
   twice must not credit twice. Idempotency-key dedupe applies as elsewhere.
 - **Safe under concurrency.** Because reversal is wallet-initiated, it arrives
-  *outside* the orchestrator's per-session lock  - that lock serializes only
+  *outside* the orchestrator's per-session lock, that lock serializes only
   client-driven traffic, so nothing upstream of the adapter orders a reversal
   against an in-flight `settleSimple`/`openComplex`/`closeComplex` on the same
   session. An adapter MUST implement `reverseRound` to be safe under concurrent
   invocation with those calls (its own per-session mutex, an upstream
-  transaction  - the mechanism is the adapter's choice).
+  transaction, the mechanism is the adapter's choice).
 - **Durable tracking.** A real adapter MUST persist its reversed-round
-  tracking  - the reversal receipts it replays on a repeat, the set of
+  tracking. The reversal receipts it replays on a repeat, the set of
   already-reversed rounds, and the ordering basis behind latest-first  -
   durably, so it survives a process restart. An adapter that forgets prior
   reversals on restart turns a retried reversal into a second credit.
@@ -164,7 +164,7 @@ When implemented, it MUST honour Guarantee 2 (`specs/00-guarantees.md`):
 The reference `@open-rgs/platform-mock` implements these semantics correctly (a
 per-session LIFO stack of `(roundId, balanceBefore, carryBefore)` snapshots,
 plus a receipt map for idempotent replay). It keeps all of that **in memory**  -
-by design, it is a dev mock  - so it is deliberately not a model for the
+by design, it is a dev mock: so it is deliberately not a model for the
 durable-tracking rule above. The conformance suite asserts the whole-record,
 latest-first, and no-double-credit properties.
 
@@ -190,7 +190,7 @@ type PlatformEvent =
 ```
 
 Events not modelled by these variants are dropped. Future variants
-require a contract bump (additive, non-breaking  - orchestrator tolerates
+require a contract bump (additive, non-breaking, orchestrator tolerates
 unknown types).
 
 ## Error translation
@@ -220,20 +220,20 @@ double-crediting.
 
 Key derivation (see `@open-rgs/core`'s `idempotency.ts`):
 
-- **Settling a known round**  - `closeComplex` from a client CLOSE, an
+- **Settling a known round**: `closeComplex` from a client CLOSE, an
   `autocloseRequested` event, the `sessionClosed` cascade, or the admin
-  endpoint  - derives the key deterministically from `(sessionId, roundId)`
+  endpoint, derives the key deterministically from `(sessionId, roundId)`
   (`"<sessionId>:<roundId>:close"`). Every close path and every retry of a
   round therefore present the **identical** key, so a duplicated or raced
   close (e.g. a client close arriving alongside an autoclose) collapses to
   a single credit. No client cooperation is needed.
 
-- **Round-initiating calls**  - a simple `settleSimple` (spin) or
-  `openComplex` (open)  - have no server-assigned round id yet. Retry-safety
+- **Round-initiating calls**: a simple `settleSimple` (spin) or
+  `openComplex` (open), have no server-assigned round id yet. Retry-safety
   there requires a stable token from the client (`ClientRequestSpin
   /OpenRound.idempotencyKey`): when present the key is derived from it
   (`"<sessionId>:spin:<token>"`), so the client can safely resend. When
-  absent the orchestrator falls back to a random key  - a blind retry of a
+  absent the orchestrator falls back to a random key, a blind retry of a
   round-initiating call **without** a client token cannot be deduped, and
   clients SHOULD resume the round on reconnect rather than blind-retry.
 
@@ -270,7 +270,7 @@ A typical persistent-WebSocket adapter (such as the one in the external
   session-closed -> `sessionClosed`, autoclose-requested (if the upstream
   emits one) -> `autocloseRequested`.
 
-A real adapter is **private to the operator**  - it lives outside this repo
+A real adapter is **private to the operator**: it lives outside this repo
 because it encodes a commercial API contract. Public packages never name a
 specific provider's brand, product id, or wire shape.
 
@@ -281,7 +281,7 @@ specific provider's brand, product id, or wire shape.
   these.
 - Player UI state. Ops never cross to the wallet.
 - Cheat hints. Even when `cheat` is set on a request, the wallet sees
-  only the resulting outcome's multiplier  - same as a normal spin.
+  only the resulting outcome's multiplier, same as a normal spin.
 
 ## Acceptance criteria
 
@@ -301,7 +301,7 @@ specific provider's brand, product id, or wire shape.
 ## Open questions
 
 - ~~Should `PlatformAdapter` expose `getOpenRound(sessionId)` for
-  cross-process resume?~~ **Decided  - no** (ADR-007): `openSession` is
+  cross-process resume?~~ **Decided, no** (ADR-007): `openSession` is
   the inquiry; the wallet returns `SessionInfo.openRound` per
   §"Open-round persistence & resume" above.
 - Should `PlatformAdapter` expose a `listOpenSessions()` for boot-time

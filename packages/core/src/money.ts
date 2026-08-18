@@ -1,7 +1,7 @@
 // The one money rounding boundary.
 //
 // Every monetary amount in @open-rgs/contract is an integer in the
-// currency's minimal unit (ADR-002  - USD 1.00 -> 100, BTC 1 sat -> 1). A
+// currency's minimal unit (ADR-002, USD 1.00 -> 100, BTC 1 sat -> 1). A
 // win, however, is a dimensionless `multiplier` (a float produced by math)
 // times an integer `bet`, so `multiplier x bet` is generally fractional  -
 // e.g. `0.5 x 25 = 12.5`. Sending that to a wallet corrupts ledgers and
@@ -30,7 +30,7 @@ export function roundHalfEven(x: number): number {
 
 /** Compute a settle amount in integer minor units from a dimensionless win
  *  `multiplier` and an integer `bet`. The multiplier must already be
- *  sanitized (finite, >= 0  - the orchestrator's max-win cap does this). The
+ *  sanitized (finite, >= 0: the orchestrator's max-win cap does this). The
  *  result is asserted to be an integer before it can reach a settle call,
  *  per ADR-002. */
 export function settleAmount(multiplier: number, bet: number): number {
@@ -41,7 +41,7 @@ export function settleAmount(multiplier: number, bet: number): number {
 
 /** Guard a monetary amount: it must be a non-negative integer within the
  *  float64 safe-integer range. Money is carried as `number` (ADR-002), which
- *  silently loses precision past 2^53  - high-decimal currencies (BTC sats),
+ *  silently loses precision past 2^53: high-decimal currencies (BTC sats),
  *  low-unit fiat, jackpots, and aggregate counters can exceed it. Rather
  *  than corrupt the ledger, fail loud here. (Full `bigint` money is the
  *  longer-term fix; ADR-002.) */

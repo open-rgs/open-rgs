@@ -17,32 +17,32 @@ for anything exploitable.
 ## Supported versions
 
 The **latest published minor** of each `@open-rgs/*` package receives
-security fixes. No backports  - upgrade to the current release.
+security fixes. No backports: upgrade to the current release.
 
 ## Scope: the Seven Guarantees are security properties
 
 The Seven Guarantees ([specs/00-guarantees.md](specs/00-guarantees.md))
 are the engine's safety surface. A **reproducible violation of any of
-them is a security bug**, not a regular bug  - report it privately:
+them is a security bug**, not a regular bug: report it privately:
 
-1. **No Money, No Honey**  - game state never persists unless the money
+1. **No Money, No Honey**: game state never persists unless the money
    for it moved.
-2. **One Round, One Record**  - money and game-state commit together
+2. **One Round, One Record**: money and game-state commit together
    and revert together, latest-first.
-3. **Blind Math**  - the math never sees bet, balance, currency, clock,
+3. **Blind Math**: the math never sees bet, balance, currency, clock,
    or I/O.
-4. **The House Computes, The Client Asks**  - outcomes are
+4. **The House Computes, The Client Asks**: outcomes are
    server-authoritative; the client supplies intent, never results.
-5. **Fail Closed**  - under uncertainty the engine refuses to pay
+5. **Fail Closed**: under uncertainty the engine refuses to pay
    rather than guessing.
-6. **At Most Once**  - a replayed or raced request moves money at most
+6. **At Most Once**: a replayed or raced request moves money at most
    once.
-7. **Bounded Payout**  - every win is capped, and the engine enforces
+7. **Bounded Payout**: every win is capped, and the engine enforces
    the cap.
 
 Concretely: a double-settle, a payout above the max-win cap, math code
 escaping its sandbox, forging or splicing the tamper-evident audit
-chain, a client-supplied outcome being honoured  - all security bugs.
+chain, a client-supplied outcome being honoured, all security bugs.
 
 ## Out of scope
 
@@ -53,11 +53,11 @@ chain, a client-supplied outcome being honoured  - all security bugs.
   documented behaviour, not a finding.
 - Issues that require an already-compromised operator or admin token.
 - Vulnerabilities in consumer game code or platform adapters that live
-  outside this repo  - report those to their authors.
+  outside this repo, report those to their authors.
 
 ## Supply chain
 
-npm publishes use **OIDC Trusted Publishing with provenance**  - every
+npm publishes use **OIDC Trusted Publishing with provenance**, every
 `@open-rgs/*` release is built by the repo's release workflow and
 carries a signed attestation. There are **no long-lived npm tokens**
 to steal. See [PUBLISHING.md](PUBLISHING.md).

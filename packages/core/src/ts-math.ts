@@ -274,7 +274,7 @@ export function assertPure(src: string, path: string): void {
 }
 
 
-// --- the math's own files ---------------------------------------------------
+// -. The math's own files ---------------------------------------------------
 //
 // A math is rarely one file. It used to be treated as one anyway: the loader
 // read the entry, scanned that string for purity, hashed that string as the

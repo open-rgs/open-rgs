@@ -1,4 +1,4 @@
-# Spec 03  - Math Runtime
+# Spec 03: Math Runtime
 
 ## Goal
 
@@ -62,16 +62,16 @@ Math NEVER ships its own PRNG. The host provides one:
 - **TS**: a `random: () => number` argument injected at construction.
 
 The host implementation can be **injected at boot** via
-`loadTsMath(path, { rng })`. The default is a secure CSPRNG  - **never
+`loadTsMath(path, { rng })`. The default is a secure CSPRNG, **never
 `Math.random`**:
 
 - Default: `cryptoRng`, the system CSPRNG via WebCrypto (`getRandomValues`
   -> BoringSSL/OpenSSL, the same source Bun's `crypto` uses). Exported from
-  `@open-rgs/core`. Secure and unpredictable, but a CSPRNG  - not necessarily
+  `@open-rgs/core`. Secure and unpredictable, but a CSPRNG, not necessarily
   a *certified/auditable* RNG (no seed-commit or consumed-value log).
 - Production: must choose the source **consciously**. `loadTsMath` fails
   closed (throws) under `NODE_ENV=production` when no `rng` is injected  -
-  even though a secure default exists  - so the operator picks deliberately.
+  even though a secure default exists, so the operator picks deliberately.
   Pass `{ rng: cryptoRng }` to use the system CSPRNG, or inject a
   jurisdiction-certified (auditable) source. `Math.random` (non-crypto,
   unseedable, GLI-19/GLI-11 disallowed) is never used.
@@ -130,7 +130,7 @@ A WASM math module exposes these exports:
   (func (param i32 i32 i32 i32 i32 i32) (result i32)))
 ;;          prev_p prev_l ctx_p ctx_l out_p out_max -> out_len
 
-;; complex  - open/step/close/autoclose return out_len; is_terminal returns 0|1
+;; complex, open/step/close/autoclose return out_len; is_terminal returns 0|1
 (export "open"
   (func (param i32 i32 i32 i32 i32 i32) (result i32)))
 ;;          prev_p prev_l ctx_p ctx_l out_p out_max -> out_len
@@ -307,7 +307,7 @@ restart                math is reloaded fresh; carry rehydrates from session.car
 ## Open questions
 
 - Should we ship `host.now_ms()` for time-bounded games (e.g., crash
-  countdowns)? Adds nondeterminism  - math becomes less reproducible.
+  countdowns)? Adds nondeterminism, math becomes less reproducible.
   **Probably no**; the deadline lives in `awaiting.deadline`, the host
   enforces it via the autoclose trigger, math doesn't need to read time
   directly. Decision: **no**.

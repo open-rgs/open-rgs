@@ -1,4 +1,4 @@
-# Spec 01  - Public Contracts
+# Spec 01: Public Contracts
 
 ## Goal
 
@@ -114,8 +114,8 @@ nothing generic can render a game it has never seen, so smoke tests,
 replay tools and integration harnesses end up game-specific too.
 
 `@open-rgs/contract/ops` is the opt-in middle ground: nine shapes covering
-what a slot needs to say  - `board`, `win`, `cascade`, `respin`, `coin`,
-`award`, `feature`, `meter`, `message`  - plus `isCanonicalOp`,
+what a slot needs to say: `board`, `win`, `cascade`, `respin`, `coin`,
+`award`, `feature`, `meter`, `message`: plus `isCanonicalOp`,
 `canonicalOps` and `opsTotal`. A game emitting these can be driven by any
 client that understands them, including `@open-rgs/client`'s
 `UniversalClient`.
@@ -170,10 +170,10 @@ Every implementation MUST guarantee:
 - `settleSimple` is the ONLY money-mover for simple rounds (one debit +
   credit atomically).
 - `openComplex` debits the bet; `closeComplex` credits the win.
-- `updateComplex` NEVER moves money  - it is pure audit/state-persistence
+- `updateComplex` NEVER moves money: it is pure audit/state-persistence
   for jurisdictions that require server-side action logs.
 - `PlatformEvent` notifications are best-effort but the wallet is the
-  source of truth  - RGS treats local balance as a cache.
+  source of truth, RGS treats local balance as a cache.
 
 ### PlatformEvent
 
@@ -192,7 +192,7 @@ MUST treat unknown types as no-ops, not errors.
 
 Wallet adapters translate native error codes into the canonical
 `RGSErrorCode` vocabulary at the boundary. The orchestrator never sees
-`"InsufficientFunds"`  - only `"INSUFFICIENT_BALANCE"`.
+`"InsufficientFunds"`: only `"INSUFFICIENT_BALANCE"`.
 
 ## 3. ClientTransport
 

@@ -1,4 +1,4 @@
-# Spec 08  - Testing & Certification
+# Spec 08: Testing & Certification
 
 ## Goal
 
@@ -35,10 +35,10 @@ orchestrator does, so a stateful game's RTP is measured correctly. Each
 mode's report carries an RTP **verdict**: it computes the standard error of
 the measured RTP (`stdDev(per-spin return)/sqrtn`) and a 95% confidence
 interval, then reports `pass` (declared within the 95% CI), `warn` (within
-99%), or `fail` (declared significantly outside)  - so "does measured RTP
+99%), or `fail` (declared significantly outside), so "does measured RTP
 match declared?" gets an answer, not just a printed delta. (An
 optimal-strategy exploit pass over a public-state `view()` projection is
-still planned  - see `compare`/`fuzz`.)
+still planned: see `compare`/`fuzz`.)
 
 ```bash
 bunx open-rgs-sim ./examples/hello-spin/src/manifest.ts \
@@ -47,7 +47,7 @@ bunx open-rgs-sim ./examples/hello-spin/src/manifest.ts \
 # output:
 # Game: hello-spin  Mode: default  Math: spin 0.1.0
 # Spins: 10,000,000
-# Measured RTP: 0.9097 (declared 0.91  - within 0.5%)
+# Measured RTP: 0.9097 (declared 0.91: within 0.5%)
 # Hit rate: 0.252
 # Volatility (std dev / mean): 18.4
 # Max win observed: 50x bet
@@ -60,7 +60,7 @@ in CI on every commit that touches `maths/`.
 
 ## Strategy testing for complex rounds
 
-For complex maths, the simulator can't drive itself  - it needs
+For complex maths, the simulator can't drive itself, it needs
 strategies (action pickers). Math files ship a `simulate.pickAction`
 function or the game ships separate strategy files in `strategies/`:
 
@@ -120,7 +120,7 @@ nightly job runs it with a large budget (deep).
 
 For exploit testing to be meaningful, math files MUST expose only
 public state (what a player can see) to strategies. The current
-contract doesn't enforce this  - `RoundState` is opaque to core, but a
+contract doesn't enforce this: `RoundState` is opaque to core, but a
 strategy receives the full state.
 
 Planned addition to `ComplexMath`:

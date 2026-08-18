@@ -1,4 +1,4 @@
-# Spec 00  - The Seven Guarantees
+# Spec 00: The Seven Guarantees
 
 ## Goal
 
@@ -8,7 +8,7 @@ load-bearing promises of the engine. Everything else is detail.
 
 Each guarantee states: the **promise**, **where** the engine enforces it,
 what it **prevents**, and how an integrator must **not break it**. They are
-deliberately few and deliberately named  - a reviewer should be able to point
+deliberately few and deliberately named: a reviewer should be able to point
 at a change and say which guarantee it touches.
 
 > These are guarantees, not guidelines. A change that weakens one is a
@@ -23,7 +23,7 @@ at a change and say which guarantee it touches.
 money; it never precedes it.**
 
 A round's cross-round state (carry: progress counters, meta-meters, gamble
-pots) is written **only as part of the settle that moves the money**  - never
+pots) is written **only as part of the settle that moves the money**, never
 in a separate, earlier write. A round that is abandoned, errors, or whose bet
 is declined writes **nothing**: no balance change, and no state change.
 
@@ -32,7 +32,7 @@ is declined writes **nothing**: no balance change, and no state change.
   `carry` in one operation (`specs/05-platform-protocol.md`). Nothing is
   persisted before that call. There is no "advance the counter" code path
   separate from the money path.
-- **Prevents:** *partial-state farming*  - accumulating progress (a bonus
+- **Prevents:** *partial-state farming*: accumulating progress (a bonus
   meter, a free-spin counter) on rounds that never financially happened. The
   classic break is writing a progress counter before the win settles; a
   crash, disconnect, or forced error between the two then leaves free progress.
@@ -41,27 +41,27 @@ is declined writes **nothing**: no balance change, and no state change.
   state, store it in the **same transaction** as the balance change. See
   [[2 . One Round, One Record]] for the reverse direction.
 - **Auditable:** every money-moving round logs a named `outcomeStatus`
-  (`RoundOutcomeStatus`) in the tamper-evident audit log  - `settled`,
+  (`RoundOutcomeStatus`) in the tamper-evident audit log, `settled`,
   `settled-max-win`, `opened`, `autoclosed`, and crucially `failed-bet`: a
   declined bet logs `failed-bet` with `win = 0` and is **never** a `settled`.
   So "no money, no honey" is not just a code property, it's visible in the
-  audit trail  - an auditor can confirm no phantom settle exists for a round
+  audit trail. An auditor can confirm no phantom settle exists for a round
   whose money never moved.
 
 ## 2 . One Round, One Record
 
 **Money and game-state are a single atomic unit. They commit together, and
-they revert together  - latest-first, never from a stale snapshot.**
+they revert together: latest-first, never from a stale snapshot.**
 
 A round is one record: the balance delta *and* the carry it produced. A
-rollback / reversal / chargeback reverses the **whole** record  - both halves  -
+rollback / reversal / chargeback reverses the **whole** record, both halves  -
 and only the most recent un-reversed round may be reversed.
 
 - **Enforced by:** the settle call is atomic (one transaction in a real
   wallet). The reversal contract (`PlatformAdapter` rollback semantics,
   `specs/05-platform-protocol.md`) requires money and carry to move as one
   unit, and rejects out-of-order reversal.
-- **Prevents:** *rollback farming*  - reversing the money while keeping the
+- **Prevents:** *rollback farming*: reversing the money while keeping the
   state (free progress), or keeping a payout while replaying its trigger. Also
   prevents the subtler bug where rolling back an **older** round restores a
   snapshot that predates newer rounds and silently over-refunds them.
@@ -75,12 +75,12 @@ and only the most recent un-reversed round may be reversed.
 injected randomness: `(prev_carry, rng, params) -> multiplier + ops + carry`.
 No bet, no balance, no currency, no clock, no I/O.
 
-- **Enforced by:** `SpinContext` carries only `{ mode, params }`  - never a
+- **Enforced by:** `SpinContext` carries only `{ mode, params }`, never a
   bet or balance (`specs/01-public-contracts.md`). Randomness reaches the math
   only through the injected `host.rng_next`, and `loadTsMath`'s purity gate
   rejects a source that reaches for ambient randomness, the clock, I/O, or the
   escape hatches that would restore them (`specs/03-math-runtime.md`). The gate
-  reads the WHOLE math  - the entry file and every local file it imports  -
+  reads the WHOLE math, the entry file and every local file it imports  -
   because a math split across files is the ordinary way to write one, and a
   gate that reads only the entry catches nothing that lives one import away.
   Package imports are not followed: a dependency is pinned by the lockfile and
@@ -89,7 +89,7 @@ No bet, no balance, no currency, no clock, no I/O.
   not the adversary. A determined author can defeat it, and TypeScript math
   runs with the process's own authority. **Math files are code you ship**  -
   review them like code, not like content.
-- **Prevents:** an entire class of MISTAKE *structurally*  - a math file is
+- **Prevents:** an entire class of MISTAKE *structurally*, a math file is
   never handed a bet, so it cannot value a payout by a switched one, and the
   gate stops the ordinary slips that would make a round unreplayable. Bet-aware
   safety (e.g. stake-locks on deferred payouts) therefore lives where it
@@ -105,7 +105,7 @@ results.** Win, multiplier, RNG, and outcome are computed by the engine; the
 client may only choose *which bet* and *which action*.
 
 - **Enforced by:** the wire request types carry a bet index / price
-  multiplier / action  - never a win, multiplier, seed, or outcome
+  multiplier / action, never a win, multiplier, seed, or outcome
   (`specs/04-wire-protocol.md`). Forced-outcome hints (`cheat`) are stripped in
   production and are never a first-class wire field
   (`specs/01-public-contracts.md`).
@@ -120,7 +120,7 @@ client may only choose *which bet* and *which action*.
 
 A non-finite multiplier (`NaN`/`+/-Infinity`), a win the bet can't fund, a
 0-bet round that produced a win, a math file that overran its time budget, or
-(in production) a missing certified RNG  - each fails the round rather than
+(in production) a missing certified RNG, each fails the round rather than
 moving money on a bad value.
 
 - **Enforced by:** multiplier sanitization (non-finite -> hard error, negative
@@ -150,8 +150,8 @@ moving money on a bad value.
 
 **A replayed or raced request moves money at most once.**
 
-The same logical operation  - retried after a dropped response, re-sent on
-reconnect, or raced from a second connection  - settles a single time.
+The same logical operation: retried after a dropped response, re-sent on
+reconnect, or raced from a second connection: settles a single time.
 
 - **Enforced by:** per-session operation serialization in the orchestrator (at
   most one operation per session runs at a time), a request cache that answers
@@ -162,7 +162,7 @@ reconnect, or raced from a second connection  - settles a single time.
   duplicates/rejects gaps at the socket (`specs/04-wire-protocol.md`).
 - **Prevents:** double-spend / double-credit via replay or concurrency.
 - **Integrators must not:** rely on the engine alone if your wallet is a
-  separate service  - the wallet **must** dedupe on the idempotency key for the
+  separate service. The wallet **must** dedupe on the idempotency key for the
   guarantee to hold end-to-end. The engine derives and forwards the key; the
   wallet honours it. The request cache narrows the gap when a wallet cannot
   (no field on the wire for the key) but is per process: a retry reaching a
@@ -170,7 +170,7 @@ reconnect, or raced from a second connection  - settles a single time.
 
 ## 7 . Bounded Payout
 
-**Every win is capped, and the cap is enforced by the engine  - never trusted
+**Every win is capped, and the cap is enforced by the engine, never trusted
 from the math.**
 
 A per-mode or game-wide `maxWinMultiplier` clips any single round's win; when
@@ -200,7 +200,7 @@ it fires the outcome is stamped so the cap is visible and auditable.
 
 ## What this is not
 
-These guarantees are about the **engine's** integrity surface  - that the
+These guarantees are about the **engine's** integrity surface, that the
 calculator runs rounds, conserves money, and asks the wallet to move it
 safely. They are **not** a substitute for the operator's own controls:
 KYC/AML, responsible-gaming limits, jurisdiction rules, and the wallet's own

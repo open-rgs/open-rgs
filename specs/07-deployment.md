@@ -1,4 +1,4 @@
-# Spec 07  - Deployment
+# Spec 07: Deployment
 
 ## Goal
 
@@ -14,7 +14,7 @@ A deployable game server is:
 ```
   @open-rgs/core         (MIT, npm)
   @open-rgs/contract     (MIT, npm)
-  @open-rgs/transport-binary  (MIT, npm  - currently inside core)
+  @open-rgs/transport-binary  (MIT, npm; currently inside core)
   + 1 platform adapter           (per operator, usually private)
   + N math files               (per game, paths in manifest)
   + 1 manifest.ts              (composes maths into modes)
@@ -30,10 +30,10 @@ optional infrastructure each operator wires per their stack.
 Math files live in a `maths/` directory at the repo root, one folder
 per math. Each folder contains either:
 
-- `play.ts` (or `play.wasm`)  - the math source or artifact.
-- `README.md`  - design notes, RTP target, certification status.
-- Optional: `parameters.json`  - declared knobs for the optimizer.
-- Optional: `certification/`  - measured-RTP reports, math-lab
+- `play.ts` (or `play.wasm`): the math source or artifact.
+- `README.md`: design notes, RTP target, certification status.
+- Optional: `parameters.json`: declared knobs for the optimizer.
+- Optional: `certification/`: measured-RTP reports, math-lab
   signatures, build recipes.
 
 The manifest references each file by relative path:
@@ -59,9 +59,9 @@ npm package consumed by multiple game repos.
 | `ADMIN_PORT` | no | `81` | Admin/health HTTP port |
 | `NODE_ENV` | no | `development` | `production` strips dev-only paths |
 | `LOG_LEVEL` | no | env-derived | Override min log level |
-| `GAME_ID` | yes (or in code) |  - | Game identifier  - used by adapters |
-| `API_KEY` | per adapter |  - | Platform adapter auth |
-| `PLATFORM_WS_URL` | per adapter |  - | Wallet endpoint |
+| `GAME_ID` | yes (or in code) |, | Game identifier, used by adapters |
+| `API_KEY` | per adapter |, | Platform adapter auth |
+| `PLATFORM_WS_URL` | per adapter |, | Wallet endpoint |
 | `RNG_URL` | no | none | When set, math.random routes via certified RNG sidecar |
 | `RANDOM_WORKER_COMMAND` | no | none | Command to start the RNG sidecar |
 
@@ -71,7 +71,7 @@ own README. The orchestrator reads none of them itself.
 ## Reference Dockerfile
 
 Two-stage build, bun-runtime base. Production runs `bun src/index.ts`
-directly  - no bundling step (the TypeScript loader's `glue.wasm` loads from
+directly: no bundling step (the TypeScript loader's `glue.wasm` loads from
 `node_modules/`).
 
 ```dockerfile
@@ -114,7 +114,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata: { name: <game-id> }
 spec:
-  replicas: 3                        # stateless  - scale freely
+  replicas: 3                        # stateless, scale freely
   template:
     spec:
       securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
@@ -149,7 +149,7 @@ spec:
 ```
 
 Notes:
-- `livenessProbe` MUST hit `/livez` (always 200 if process is up)  - NOT
+- `livenessProbe` MUST hit `/livez` (always 200 if process is up), NOT
   `/healthz`, which goes 503 when the wallet is unhealthy. We don't
   want the wallet flapping to restart pods.
 - `readinessProbe` SHOULD hit `/readyz` (200 healthy / 503 when the wallet
@@ -161,7 +161,7 @@ Notes:
   admin under a prefix (e.g. `/api/<game-id>/*`) and forwards *without*
   rewriting it, set `adminRouteBasePath: "/api/<game-id>"` in
   `createServer`. Each canonical route then matches in BOTH the
-  prefixed (`/api/<game-id>/livez`) and the bare (`/livez`) shape  - so
+  prefixed (`/api/<game-id>/livez`) and the bare (`/livez`) shape, so
   the public ingress sees the prefixed form while k8s probes and the
   Docker HEALTHCHECK keep hitting the pod IP at the bare paths shown
   above. Matching stays EXACT (`===`) for both shapes; no suffix
@@ -172,16 +172,16 @@ Notes:
   without a token. In single-port mode admin shares the public client
   port, so either set a token or run admin on a separate `adminPort` bound
   to a private interface behind a default-deny NetworkPolicy. CORS is never
-  wildcard  - set `adminAllowedOrigins` for a browser dashboard.
+  wildcard, set `adminAllowedOrigins` for a browser dashboard.
 - **Public `/healthz` (opt-in).** Set `adminPublicHealthz: true` (or
   `publicHealthz: true` directly on an `AdminConfig`) when a dashboard
   or external uptime prober needs to read `/healthz` from somewhere
-  that can't inject a token. Same JSON shape, no auth  - exposes
+  that can't inject a token. Same JSON shape, no auth, exposes
   core/game/math versions, uptime, session COUNT, and platform
   connection state. `/admin/*` stays gated. For probe-level
   "is it up?" checks prefer `/readyz` (always open, 503 when the
   platform is down). Default false.
-- No persistent volume  - the orchestrator owns no durable state.
+- No persistent volume: the orchestrator owns no durable state.
 - Sticky sessions are nice-to-have (faster reconnect -> in-memory
   session cache hit) but NOT required for correctness.
 
@@ -200,12 +200,12 @@ env:
 
 The id is surfaced in three places that correlate one-to-one:
 `rgs_build_info{instance_id,...}` on `/admin/metrics` (the node_exporter
-build_info pattern  - a fresh series appearing = an instance (re)started),
+build_info pattern: a fresh series appearing = an instance (re)started),
 `instance_id` in `/healthz`, and `service.instance.id` on every log line.
 
 `/admin/metrics` serves Prometheus exposition behind the admin bearer
 token (`authorization.credentials` in the scrape config). Metrics are
-pod-local  - scrape every pod and aggregate in dashboards. Alongside the
+pod-local: scrape every pod and aggregate in dashboards. Alongside the
 round/math/session series, the platform-adapter SLA series answer "is the
 wallet there, and is it answering":
 
@@ -269,13 +269,13 @@ math is in-tree.
 
 ## Multi-game deployments
 
-`createServer` accepts **one manifest per process**  - one game per
+`createServer` accepts **one manifest per process**, one game per
 process. This is deliberate, not a missing feature: in-process
 multi-tenancy isn't worth its complexity (spec 10, "What we deliberately
 AVOID"; spec 02, "Open questions").
 
-To run several games, run several single-game processes  - on separate
-ports, or as separate images  - and route to them at the edge (an ingress
+To run several games, run several single-game processes, on separate
+ports, or as separate images: and route to them at the edge (an ingress
 or reverse proxy mapping a path or host per game):
 
 ```ts
@@ -304,7 +304,7 @@ await createServer({ manifest: gambleCherry, platform, transport: binaryTranspor
 ## Open questions
 
 - Should the Dockerfile bundle a Zig toolchain for in-image math
-  rebuilds? **No**  - artifacts ship pre-built; the runtime image stays
+  rebuilds? **No**, artifacts ship pre-built; the runtime image stays
   thin.
 - Should we publish a Helm chart? **Probably eventually**; Spec 09
   tracks it.

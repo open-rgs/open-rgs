@@ -22,7 +22,7 @@ bun add @open-rgs/contract
 
 `Op` is `unknown` in the core contract: math authors define their own visual
 instructions and the engine only forwards them. `@open-rgs/contract/ops` is
-the opt-in middle ground  - nine shapes a generic client can render.
+the opt-in middle ground: nine shapes a generic client can render.
 
 ```ts
 import { canonicalOps, opsTotal, type CanonicalOp } from "@open-rgs/contract/ops";
@@ -32,8 +32,8 @@ const shown = opsTotal(res.ops);
 ```
 
 `board`, `win`, `cascade`, `respin`, `coin`, `award`, `feature`, `meter`,
-`message`. Emit them and any client that understands them  - including
-`UniversalClient` in `@open-rgs/client`  - can drive your game. Ignore them
+`message`. Emit them and any client that understands them, including
+`UniversalClient` in `@open-rgs/client`: can drive your game. Ignore them
 and nothing changes: core never reads ops, and this module is types plus a
 type guard.
 
@@ -47,4 +47,4 @@ Full reference: <https://open-rgs.dev>
 
 ## License
 
-MIT  - © open-rgs contributors
+MIT: © open-rgs contributors

@@ -1,4 +1,4 @@
-# Spec 00  - Overview
+# Spec 00: Overview
 
 ## Goal
 
@@ -19,11 +19,11 @@ target without learning a vendor's framework.
 
 open-rgs separates three concerns that have historically been tangled:
 
-- **Game math**  - paytables, weights, RTP, feature triggers. Written by
+- **Game math**: paytables, weights, RTP, feature triggers. Written by
   math designers, certified by math labs, owned by studios.
-- **Wallet integration**  - Hello/Welcome handshakes, op_seq counters,
+- **Wallet integration**: Hello/Welcome handshakes, op_seq counters,
   audit logs, promo payloads. Operator-specific.
-- **Orchestration**  - session caching, mode resolution, bet computation,
+- **Orchestration**: session caching, mode resolution, bet computation,
   round lifecycle, observability. Universal.
 
 This project owns the third. The first two plug in.
@@ -59,11 +59,11 @@ This project owns the third. The first two plug in.
 
 - Wallet implementations themselves (each operator writes their own).
 - Game UI/client rendering.
-- Player identity, KYC, AML, GDPR  - these belong upstream of the wallet.
-- Funds movement / cashier  - also upstream.
+- Player identity, KYC, AML, GDPR: these belong upstream of the wallet.
+- Funds movement / cashier: also upstream.
 - Persistent storage of any kind. The wallet is the source of truth.
 - Game-specific math (we ship examples; real math is per-studio).
-- Cross-operator promotional tooling (jackpots, tournaments)  - those
+- Cross-operator promotional tooling (jackpots, tournaments), those
   live above the RGS.
 
 ## Architecture in one sentence
@@ -102,7 +102,7 @@ See `docs/architecture.drawio` for the colour-coded diagrams (six tabs).
 - Reference examples (`hello-spin`, `gamble-slot`, `hold-and-win`, ...) live in
   `examples/` and are MIT.
 - Reference deployment template (`deploy/`) is MIT.
-- Math files written by third parties are NOT MIT by association  - each
+- Math files written by third parties are NOT MIT by association, each
   studio's math is whatever license they choose. The orchestrator
   doesn't impose anything on what runs on top of it.
 

@@ -45,7 +45,7 @@ export function applyCap(multiplier: number, maxMultiplier: number | undefined):
   return m > maxMultiplier ? maxMultiplier : m;
 }
 
-/** Round to nearest integer, ties to even (banker's rounding)  - the money
+/** Round to nearest integer, ties to even (banker's rounding), the money
  *  boundary rule from ADR-002. Mirrors @open-rgs/core's `roundHalfEven`;
  *  duplicated here because the simulator deliberately has no core dep. */
 function roundHalfEven(x: number): number {
@@ -84,17 +84,17 @@ export interface SimulateOptions {
   /** Units bet per spin BEFORE the mode's stakeMultiplier. Default 1. */
   betUnits?: number;
   /** Include `internal: true` modes (those only reachable via nextMode).
-   *  Defaults to true  - you usually want the internal-mode RTP measured
+   *  Defaults to true: you usually want the internal-mode RTP measured
    *  independently for math review. */
   includeInternal?: boolean;
   /** Complex-round step strategy. Default "first".
-   *  - "first":  always pick awaiting.options[0]
-   *  - "random": pick from awaiting.options uniformly (seeded  - see seed)
-   *  - a StrategyFn: your own policy, called at each decision with the public
+   *, "first":  always pick awaiting.options[0]
+   *, "random": pick from awaiting.options uniformly (seeded, see seed)
+   *. A StrategyFn: your own policy, called at each decision with the public
    *    context (awaiting + latest public ops + step index + the sim rng). */
   complexStrategy?: ComplexStrategy;
   /** Seed for the simulator's *own* PRNG (drives "random" strategy and
-   *  any tie-breaking). Does NOT seed the math  - see top-of-file note. */
+   *  any tie-breaking). Does NOT seed the math: see top-of-file note. */
   seed?: number;
   /** Safety cap on steps per complex round to avoid infinite loops in
    *  buggy maths. Default 1000. */
@@ -114,7 +114,7 @@ export interface SimulateOptions {
    *  pass the sessionId, and disconnect after simulate() returns.
    *  Spin loop runs at math speed (~= microseconds per spin), so
    *  using a real adapter implies real wallet movements at the
-   *  upstream  - only point this at a sandbox account. */
+   *  upstream: only point this at a sandbox account. */
   adapter?: PlatformAdapter;
   /** Session id to thread through adapter calls. Required when
    *  `adapter` is set. */
@@ -173,7 +173,7 @@ async function simulateMode(
   // says so rather than letting the verdict imply a precision it does not have.
   let correlatedSpins = false;
 
-  // Optional adapter integration  - when set, each spin is settled via
+  // Optional adapter integration, when set, each spin is settled via
   // the real adapter so wire-protocol bugs (validator mismatches, auth
   // drift, envelope shape errors) surface during sim instead of prod.
   const adapter        = opts.adapter;
@@ -254,7 +254,7 @@ async function simulateMode(
       adapterRpcsSent += 1;
       // The adapter is a real wallet expecting integer minor units, so the
       // settled win must be rounded exactly as core's orchestrator does
-      // (round half to even, ADR-002)  - not the raw float `multiplier x
+      // (round half to even, ADR-002), not the raw float `multiplier x
       // bet`. (The theoretical `totalWin` above stays exact on purpose: it
       // measures RTP, not what a wallet would actually credit.)
       const winMinor = roundHalfEven(multiplier * betPerSpin);

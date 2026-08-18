@@ -27,7 +27,7 @@ interface MeasuredSeries {
 }
 
 /** Compute one TargetDeviation per declared target in `expected`. Quiet
- *  when `expected` is undefined  - no opinions, no entries. */
+ *  when `expected` is undefined: no opinions, no entries. */
 export function computeDeviations(
   expected: MathExpectations | undefined,
   measured: MeasuredSeries,

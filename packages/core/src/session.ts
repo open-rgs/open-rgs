@@ -11,13 +11,13 @@ export interface LocalPromo {
   /** Rounds remaining in the pool. Decremented by orchestrator as
    *  rounds are consumed; pool is removed when this hits 0. */
   remaining: number;
-  /** Optional mode whitelist  - pool consumable only in these modes. */
+  /** Optional mode whitelist, pool consumable only in these modes. */
   modeFilter?: string[];
   /** Optional UX hint surfaced to the client. */
   label?: string;
-  /** Optional UX hint  - total rounds originally granted. */
+  /** Optional UX hint, total rounds originally granted. */
   total?: number;
-  /** Optional UX hint  - ISO expiry. */
+  /** Optional UX hint, ISO expiry. */
   validTo?: string;
   /** True once the player has accepted the offer on this connection. */
   active: boolean;
@@ -30,9 +30,9 @@ export interface OpenRound {
   modeId: string;
   /** base x priceMultiplier (integer minor units). Wire-safe; sent
    *  through every platform call as `bet`. Does NOT include the mode's
-   *  stakeMultiplier  - that rides on `priceMultiplier` instead. */
+   *  stakeMultiplier: that rides on `priceMultiplier` instead. */
   bet: number;
-  /** bet x stakeMultiplier  - what was actually debited from the player.
+  /** bet x stakeMultiplier, what was actually debited from the player.
    *  May be fractional for stake-adjusted modes (e.g. ante 1.25x on a
    *  1-unit base = 1.25). Used for balance check, max-win cap, win
    *  calculation, and the audit log's "amount paid" field. */
@@ -79,7 +79,7 @@ export interface LocalSession {
 const sessions = new Map<string, LocalSession>();
 
 /** Soft cap on cached sessions. On overflow the oldest IDLE sessions (no
- *  open round) are evicted  - their balance cache is rebuilt on next INIT.
+ *  open round) are evicted: their balance cache is rebuilt on next INIT.
  *  Sessions with an open round are NEVER evicted (a debited stake + resume
  *  state are outstanding); bounding *those* needs a wallet autoclose backstop
  *  (see specs/07 + the autoclose section of specs/02). */
@@ -101,7 +101,7 @@ export function promoFromApi(p: PromoFreeRounds): LocalPromo {
 }
 
 /** Cache a session. Returns the ids evicted to make room (empty in the normal
- *  case) so the caller can drop whatever else it keyed by those ids  - the
+ *  case) so the caller can drop whatever else it keyed by those ids, the
  *  request cache, in the orchestrator's case. */
 export function put(s: LocalSession): string[] {
   sessions.set(s.sessionId, s);
@@ -118,7 +118,7 @@ export function size(): number { return sessions.size; }
  *  This runs on the INIT hot path whenever the cache sits at capacity, so it
  *  must not snapshot or sort the whole map. A Map iterates in insertion
  *  order, and `put` inserts a session once when it's created, so walking from
- *  the front visits the oldest sessions first  - the same victims the previous
+ *  the front visits the oldest sessions first: the same victims the previous
  *  copy-filter-sort produced, but in O(evicted) with no transient array.
  *  Deleting the current entry mid-iteration is well-defined for Map and does
  *  not disturb the walk. */
@@ -134,7 +134,7 @@ function evictIdleOverflow(): string[] {
   return removed;
 }
 
-/** Operational snapshot of in-flight (open) rounds  - for /healthz so the
+/** Operational snapshot of in-flight (open) rounds, for /healthz so the
  *  count of debited-but-unclosed rounds is observable (audit M6). */
 export function openRoundStats(now: number): { open_rounds: number; oldest_open_round_age_ms: number } {
   let count = 0;

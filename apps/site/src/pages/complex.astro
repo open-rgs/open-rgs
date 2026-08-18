@@ -4,7 +4,7 @@ import Mermaid from "../components/Mermaid.astro";
 ---
 
 <BaseLayout
-  title="Complex rounds (Mines, Chicken Road, crash)  - open-rgs"
+  title="Complex rounds (Mines, Chicken Road, crash), open-rgs"
   description="Write open / step / close TypeScript math for instant games with mid-round player input: Mines, Chicken Road, gamble, hold-and-spin, crash. Full Mines reference."
 >
   <main>
@@ -91,7 +91,7 @@ sequenceDiagram
       pick grows the multiplier. <code>close</code> cashes out the
       current ladder value. The grid is committed once at <code>open</code>,
       so every pick resolves against that single committed roll. (This is
-      not a commit-reveal "provably-fair" scheme  - outcome integrity comes
+      not a commit-reveal "provably-fair" scheme, outcome integrity comes
       from the certified RNG and the durable round log, not a player-checkable
       commitment.)
     </p>
@@ -220,7 +220,7 @@ return {
       Crash games skip STEP entirely: one OPEN, the client streams the
       tick visual, then sends CLOSE the instant the player taps "cash
       out". If the player never taps, the wallet (or admin) fires an
-      external autoclose  - see <a href="/admin">Admin</a>.
+      external autoclose, see <a href="/admin">Admin</a>.
     </p>
 
     <h2 data-section="§ 6">Reconnect &amp; resume</h2>

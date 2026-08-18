@@ -3,8 +3,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="Simple math  - open-rgs"
-  description="Write a single-call math module in TypeScript for open-rgs. Used by slots, instant-win, dice, plinko, scratchers  - any round that resolves in one response."
+  title="Simple math, open-rgs"
+  description="Write a single-call math module in TypeScript for open-rgs. Used by slots, instant-win, dice, plinko, scratchers, any round that resolves in one response."
 >
   <main>
     <h1>Math . simple</h1>
@@ -68,7 +68,7 @@ return {
       <tbody>
         <tr><td><code>host.rng_next()</code></td><td>returns a float in <code>[0, 1)</code> from the orchestrator's RNG (a secure CSPRNG by default; <code>Math.random</code> is never used)</td></tr>
         <tr><td><code>host.log_debug(msg)</code></td><td>writes a debug line tagged with the math file path</td></tr>
-        <tr><td><code>host.mark.count(name)</code></td><td>increments a named counter  - inert in production, recorded by the simulator</td></tr>
+        <tr><td><code>host.mark.count(name)</code></td><td>increments a named counter, inert in production, recorded by the simulator</td></tr>
         <tr><td><code>host.mark.observe(name, v)</code></td><td>appends a value to a named histogram</td></tr>
         <tr><td><code>host.mark.tag(name)</code></td><td>tags the current spin under <code>name</code></td></tr>
         <tr><td><code>host.mark.contribute(name, m)</code></td><td>adds a multiplier to a named RTP-attribution bucket</td></tr>

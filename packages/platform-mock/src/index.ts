@@ -11,7 +11,7 @@
 //   - Monotonic round ids that never collide.
 //   - Amounts are non-negative integer minor units; anything else is rejected.
 //   - A promo (free-round) settle is allowed only against a non-empty pool.
-// A production wallet MUST do the same  - especially the dedupe.
+// A production wallet MUST do the same, especially the dedupe.
 
 import type {
   PlatformAdapter,
@@ -44,7 +44,7 @@ export interface MockPlatformOptions {
   promos?: Record<string, PromoFreeRounds>;
 }
 
-/** One settled round's pre-state, for reversal. Guarantee 2  - "One Round, One
+/** One settled round's pre-state, for reversal. Guarantee 2, "One Round, One
  *  Record": a round is the balance delta AND the carry it produced, so the
  *  snapshot we keep to undo it holds BOTH. Pushed on every settle/close, popped
  *  LATEST-FIRST on reverseRound. */
@@ -70,17 +70,17 @@ interface MockState {
    *  rather than threading it into a different model. A wallet that keeps the
    *  carry but forgets this cannot make that distinction for it. */
   mathVersion?: string;
-  /** Cross-round carry the math threaded in (Guarantee 1  - persisted only with
+  /** Cross-round carry the math threaded in (Guarantee 1, persisted only with
    *  the money that earned it; written in the same settle that moved the win). */
   carry?: CarryState;
   /** LIFO stack of reversible settled rounds (most recent on top). */
   reversals: ReversalEntry[];
-  /** roundIds already reversed  - so a repeated reverseRound is a safe no-op. */
+  /** roundIds already reversed, so a repeated reverseRound is a safe no-op. */
   reversed: Set<string>;
 }
 
 /** Reject anything that isn't a non-negative integer in the currency's
- *  minimal unit  - the contract's hard rule. A fractional or negative amount
+ *  minimal unit: the contract's hard rule. A fractional or negative amount
  *  (e.g. an un-rounded win, or a negative settlement) must never be accepted
  *  by a wallet; it corrupts the ledger. */
 function assertAmount(n: number, name: string): void {
@@ -98,7 +98,7 @@ export class MockPlatform implements PlatformAdapter {
   /** idempotencyKey -> reversal receipt, so a repeated reverseRound is a no-op. */
   private reverseReceipts = new Map<string, ReverseReceipt>();
   /** Monotonic, collision-free round-id source (bumped on every id-producing
-   *  op, not just settles  - two opens in the same ms must not share an id). */
+   *  op, not just settles: two opens in the same ms must not share an id). */
   private roundIdSeq = 0;
   private roundCounter = 0;
   private connected = false;
@@ -164,7 +164,7 @@ export class MockPlatform implements PlatformAdapter {
     assertAmount(req.bet, "bet");
     assertAmount(req.win, "win");
 
-    // Snapshot pre-state BEFORE anything moves (Guarantee 2  - money+carry as
+    // Snapshot pre-state BEFORE anything moves (Guarantee 2, money+carry as
     // one record). A simple round opens+closes atomically, so its roundState
     // doubles as the carry it produced.
     const balanceBefore = s.balance;
@@ -214,7 +214,7 @@ export class MockPlatform implements PlatformAdapter {
     if (isPromo) {
       this.assertPromo(s, req.promoId!);
     } else {
-      // See settleSimple  - debit = bet x priceMultiplier under the new
+      // See settleSimple, debit = bet x priceMultiplier under the new
       // stake-on-priceMul semantics.
       const cost = req.bet * (req.priceMultiplier ?? 1);
       if (cost > s.balance) throw new Error("InsufficientFunds");
@@ -258,7 +258,7 @@ export class MockPlatform implements PlatformAdapter {
     return this.remember(req.idempotencyKey, { roundId: req.roundId, balance: s.balance });
   }
 
-  // --- reversal (Guarantee 2  - One Round, One Record) ---------------------
+  // --- reversal (Guarantee 2, One Round, One Record) ---------------------
 
   async reverseRound(req: ReverseRound): Promise<ReverseReceipt> {
     const dupKey = req.idempotencyKey;
@@ -279,7 +279,7 @@ export class MockPlatform implements PlatformAdapter {
     if (!top) return noop("round-not-found");
     // LATEST-FIRST: only the most recent un-reversed round may be reversed.
     // Reversing an older round would restore a snapshot predating newer rounds
-    // and silently over-refund them  - the exploit this guarantee forbids.
+    // and silently over-refund them, the exploit this guarantee forbids.
     if (top.roundId !== req.roundId) return noop("not-latest-round");
 
     // Restore BOTH halves atomically from the one record.

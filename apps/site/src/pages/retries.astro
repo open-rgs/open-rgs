@@ -67,7 +67,7 @@ const decide = `const uc = new UniversalClient(rgs, {
 ---
 
 <BaseLayout
-  title="Retries, canonical ops and the universal client  - open-rgs"
+  title="Retries, canonical ops and the universal client, open-rgs"
   description="Request-level idempotency so a retry cannot pay twice, an optional op vocabulary any client can render, and a client that drives any game to completion."
 >
   <main>
@@ -109,7 +109,7 @@ const decide = `const uc = new UniversalClient(rgs, {
 
     <p>
       The dangerous resend is not the one that arrives after the first finished.
-      It is the one that arrives <em>while</em> the first is still running  - a
+      It is the one that arrives <em>while</em> the first is still running, a
       client that gave up at five seconds against a round still executing at six.
       A cache holding only completed responses misses that case entirely and lets
       both run.
@@ -158,7 +158,7 @@ const decide = `const uc = new UniversalClient(rgs, {
     <p>
       Calls are also tagged by phase, so a client reusing one token across a spin
       and a close does not collapse them into each other. Entries expire on a TTL
-      and the store is bounded, oldest evicted first  - the window only needs to
+      and the store is bounded, oldest evicted first, the window only needs to
       outlive a client's retry behaviour, not a session.
     </p>
 
@@ -168,7 +168,7 @@ const decide = `const uc = new UniversalClient(rgs, {
       <strong>This is per process, not per cluster.</strong> A retry that lands
       on a different pod finds an empty cache and runs for real. The
       cross-pod guard is still the wallet's own dedupe on the idempotency key,
-      and this does not replace it  - it closes the case where the wallet cannot
+      and this does not replace it, it closes the case where the wallet cannot
       help. The per-session lock keeps a single pod's concurrent calls in order;
       sticky sessions make the cache effective in practice, and are not a
       correctness requirement for anything else.
@@ -188,7 +188,7 @@ const decide = `const uc = new UniversalClient(rgs, {
       <code>Op</code> is <code>unknown</code> in the contract on purpose: math
       authors define their own visual instructions and the engine only forwards
       them. That is the right default and it is not changing. The cost is that
-      every client is bespoke  - nothing generic can render a game it has never
+      every client is bespoke, nothing generic can render a game it has never
       seen, so smoke tests, replay tools and integration harnesses end up
       game-specific too.
     </p>
@@ -213,7 +213,7 @@ const decide = `const uc = new UniversalClient(rgs, {
     <p>
       Canonical and bespoke ops travel in the same stream. A generic client
       renders what it recognises and ignores the rest, so adopting the
-      vocabulary is not all-or-nothing  - use it for the parts a tool should be
+      vocabulary is not all-or-nothing, use it for the parts a tool should be
       able to read, and keep your own shapes for the parts only your client
       draws.
     </p>
@@ -281,7 +281,7 @@ const decide = `const uc = new UniversalClient(rgs, {
     <p>
       Every call carries a token, and a retry inside the client reuses it, so the
       server answers from cache instead of running the round again. Retries only
-      fire on transport and platform failures  - a rejection the client caused
+      fire on transport and platform failures, a rejection the client caused
       will reject identically next time, so retrying it just wastes the round.
     </p>
 
@@ -291,7 +291,7 @@ const decide = `const uc = new UniversalClient(rgs, {
       <code>decide</code> answers whatever a round is waiting for; the default
       picks the first offered option, which walks most games end to end.
       <code>maxSteps</code> is the guard against a math bug that never reaches a
-      terminal state  - without it a broken <code>isTerminal</code> hangs the
+      terminal state, without it a broken <code>isTerminal</code> hangs the
       runner instead of failing it.
     </p>
 
@@ -299,7 +299,7 @@ const decide = `const uc = new UniversalClient(rgs, {
 
     <p>
       <code>describeRound</code> renders the round as one stable line per event.
-      For a test fixture, a CI log, or a bug report attachment  - greppable text
+      For a test fixture, a CI log, or a bug report attachment, greppable text
       rather than a pretty picture.
     </p>
 

@@ -4,7 +4,7 @@ import Mermaid from "../components/Mermaid.astro";
 ---
 
 <BaseLayout
-  title="How it works (mile-high)  - open-rgs"
+  title="How it works (mile-high), open-rgs"
   description="Mile-high overview of open-rgs: client transport, orchestrator, TypeScript/WASM math, platform adapter. One Bun process, one port, four interchangeable parts."
 >
   <main>
@@ -12,7 +12,7 @@ import Mermaid from "../components/Mermaid.astro";
 
     <p class="lede">
       One Bun process. One port. Four parts. Each part is one interface
-      in <code>@open-rgs/contract</code>  - swap any of them without
+      in <code>@open-rgs/contract</code>, swap any of them without
       touching the others.
     </p>
 
@@ -50,7 +50,7 @@ flowchart TD
         <tr>
           <td><strong>Orchestrator</strong></td>
           <td>round lifecycle, mode resolution, bet computation, promo free-rounds, max-win cap, autoclose, metrics</td>
-          <td>never touch  - that's the framework</td>
+          <td>never touch, that's the framework</td>
         </tr>
         <tr>
           <td><strong>Math</strong></td>
@@ -84,7 +84,7 @@ flowchart TD
     <p>
       A simple round is <strong>one settle RPC</strong> (carrying the debit
       and the credit together); a complex round is <strong>two RPCs</strong>
-      (open = debit, close = credit)  - never more. STEP is
+      (open = debit, close = credit), never more. STEP is
       pure in-process: the math computes the next visual + state, no
       wallet is touched. Cash-out on a Mines / Chicken-Road style round
       is a client-initiated CLOSE, not a special STEP.

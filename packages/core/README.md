@@ -152,7 +152,7 @@ one token cannot collapse a spin into a close.
 
 It is per process: a retry reaching a different pod finds an empty cache and
 runs for real, so the wallet's own dedupe is still the cross-pod guarantee. A
-call with no client token is not cached  - there is nothing stable to
+call with no client token is not cached: there is nothing stable to
 deduplicate on.
 
 ## Also exported

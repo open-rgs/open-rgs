@@ -7,7 +7,7 @@
 //   const spin = await c.spin({ betIndex: 2 });
 //   c.disconnect();
 //
-// One request in flight at a time per connection  - same constraint
+// One request in flight at a time per connection, same constraint
 // the orchestrator's wire spec assumes. Concurrent calls reject.
 
 import { encode, decode } from "@msgpack/msgpack";
@@ -170,12 +170,12 @@ export class RgsClient {
       : undefined;
 
     // A frame carrying a correlation id must match the in-flight request's id.
-    // A mismatch is a stale/duplicate response from a timed-out call  - drop it
+    // A mismatch is a stale/duplicate response from a timed-out call, drop it
     // so it can't resolve a newer request. (Pre-dispatch errors and legacy
     // servers may omit the id; those fall through to the type match.)
     if (cid !== undefined && this.pending && cid !== this.pending.cid) return;
 
-    // Server-side error frame  - fails the matching in-flight request.
+    // Server-side error frame, fails the matching in-flight request.
     if (code === FRAME.ERROR) {
       const err = payload as ClientResponseError;
       if (this.pending) {
@@ -186,7 +186,7 @@ export class RgsClient {
       return;
     }
 
-    // PONGs are unsolicited  - just acknowledge silently.
+    // PONGs are unsolicited, just acknowledge silently.
     if (code === FRAME.PONG) return;
 
     if (this.pending?.expect === code) {
@@ -194,6 +194,6 @@ export class RgsClient {
       this.pending.resolve(stripCid(payload));
       this.pending = undefined;
     }
-    // Else drop  - could be a stale response after timeout, or out-of-band push.
+    // Else drop, could be a stale response after timeout, or out-of-band push.
   }
 }

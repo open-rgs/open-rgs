@@ -1,5 +1,5 @@
 // SimulationReport shape + markdown renderer. Keep this file readable
-//  - the markdown output is what most users will look at; the typed
+//. The markdown output is what most users will look at; the typed
 // object is what an LLM eats.
 
 import type { TargetDeviation } from "./deviation.js";

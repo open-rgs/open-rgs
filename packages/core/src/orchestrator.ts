@@ -51,7 +51,7 @@ import type { IdempotencyConfig, ConcurrencyPolicy } from "@open-rgs/contract";
 export interface OrchestratorConfig {
   manifest: GameManifest;
   platform: PlatformAdapter;
-  /** @deprecated No longer used by the orchestrator  - cheats are gated by
+  /** @deprecated No longer used by the orchestrator, cheats are gated by
    *  `cheatsEnabled`, not the environment. Accepted for back-compat. */
   isDev?: boolean;
   /** Enable the dev-only forced-outcome cheat path (read from
@@ -68,7 +68,7 @@ export interface OrchestratorConfig {
   auditLog?: AuditLog;
   /** How the wallet-side `updateComplex` action-log checkpoint is treated on
    *  a complex-round step. "best-effort" (default) fires it and swallows
-   *  failures; "mandatory" awaits it and FAILS the step if it's dropped  - for
+   *  failures; "mandatory" awaits it and FAILS the step if it's dropped, for
    *  jurisdictions that require a server-side action log. */
   auditMode?: "best-effort" | "mandatory";
   /** Request-level idempotency. A client call carrying an `idempotencyKey`
@@ -210,7 +210,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   // open). No server-side round id exists yet, so retry-safety requires a
   // stable token from the client: when present we derive deterministically
   // from it; otherwise we fall back to a random key (a blind retry of a
-  // round-initiating call WITHOUT a client token cannot be deduped  - see
+  // round-initiating call WITHOUT a client token cannot be deduped, see
   // the contract's IdempotencyConfig and specs/05-platform-protocol.md).
   function initiatingIdemKey(sessionId: string, phase: "spin" | "open", clientToken?: string): string {
     return clientToken ? deriveIdempotencyKey(sessionId, phase, clientToken) : genIdemKey();
@@ -221,9 +221,9 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   // JS is single-threaded, but every money op `await`s the math and the
   // wallet, and an `await` yields the event loop. So two operations on the
   // same session can interleave across their awaits:
-  //   - a client CLOSE racing an autoclose (event/admin)  - both read
+  //   - a client CLOSE racing an autoclose (event/admin), both read
   //     `s.openRound`, both call `closeComplex`;
-  //   - two concurrent spins  - both pass the `bet > balance` check against
+  //   - two concurrent spins, both pass the `bet > balance` check against
   //     the same stale balance, then both settle -> overspend.
   // We chain each session's operations into a queue so at most one runs at
   // a time. Once an op holds the lock it runs start-to-finish (including
@@ -246,7 +246,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   }
 
   function runLocked<T>(sid: string | null | undefined, fn: () => Promise<T>): Promise<T> {
-    // No session id yet (e.g. a request missing sid)  - nothing to serialize
+    // No session id yet (e.g. a request missing sid), nothing to serialize
     // against; run directly and let the impl throw the proper error.
     if (!sid) return fn();
     const prev = sessionChains.get(sid) ?? Promise.resolve();
@@ -302,7 +302,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       const s = sessions.get(e.sessionId);
       if (s) s.promo = sessions.promoFromApi(e.promo);
     } else if (e.type === "autocloseRequested") {
-      // External signal  - find the round, run math.autoclose, settle.
+      // External signal, find the round, run math.autoclose, settle.
       autocloseRound({
         sessionId: e.sessionId,
         ...(e.roundId !== undefined ? { roundId: e.roundId } : {}),
@@ -314,7 +314,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     } else {
       // An adapter emitting an unrecognised event type (e.g. the legacy
       // "campaignGranted" instead of "promoGranted") would otherwise have
-      // its event silently dropped  - and free-round grants would vanish.
+      // its event silently dropped, and free-round grants would vanish.
       // Make the mismatch visible.
       log.warn("Dropped unknown platform event type", {
         "event.category": "orchestrator",
@@ -345,7 +345,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
   function buildSpinContext(modeId: string, cheatRaw?: Record<string, unknown>, params?: Record<string, unknown>): SpinContext {
     // Cheats are fully off unless explicitly enabled outside production
-    // (see OrchestratorConfig.cheatsEnabled)  - a forced-outcome path can
+    // (see OrchestratorConfig.cheatsEnabled), a forced-outcome path can
     // never be reached in a production build.
     const cheat = cheatsEnabled ? parseCheat(cheatRaw) : undefined;
     return { mode: modeId, cheat, params };
@@ -370,7 +370,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INVALID_BET", `betIndex ${betIndex} out of range`);
     }
     const baseBet = s.allowedBets[betIndex]!;
-    // priceMultiplier is client-supplied  - validate it like betIndex. A
+    // priceMultiplier is client-supplied, validate it like betIndex. A
     // crafted large/fractional value would otherwise inflate the bet or make
     // it non-integer (feeding the money path bad input). (M4)
     const priceMultiplier = requestedPriceMultiplier ?? 1;
@@ -378,8 +378,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INVALID_BET", `priceMultiplier must be an integer in [1, ${MAX_PRICE_MULTIPLIER}], got ${priceMultiplier}`);
     }
     // `bet` stays integer minor units: base x client priceMultiplier
-    // (both integers). The mode's stakeMultiplier  - which can be
-    // fractional, e.g. 1.25 for ante  - is NOT folded into bet. That
+    // (both integers). The mode's stakeMultiplier, which can be
+    // fractional, e.g. 1.25 for ante, is NOT folded into bet. That
     // would have broken bets with fractional stakes (1 x 1.25 = 1.25
     // != integer) and made every adapter that reads `bet` directly see
     // a stake-blended number it didn't ask for. Instead the stake
@@ -394,7 +394,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // fractional in minor units; the platform sees (bet_index,
     // priceMultiplier x stake) and computes its own debit at full
     // currency precision. Used for balance check, max-win cap input,
-    // win calc, and the audit log's "amount paid" field  - never sent
+    // win calc, and the audit log's "amount paid" field, never sent
     // on the wire as `bet`.
     const effectiveCost = bet * mode.stakeMultiplier;
     return { bet, betIndex, priceMultiplier, effectiveCost };
@@ -453,7 +453,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     let info: import("@open-rgs/contract").SessionInfo;
 
     if (s?.openRound) {
-      // Don't re-call openSession on the platform  - we still own this
+      // Don't re-call openSession on the platform, we still own this
       // session locally and the platform still has the round open. Refresh
       // balance from the platform's last known value (BalanceChangedEvent
       // keeps it current). Connection metadata gets updated.
@@ -486,7 +486,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         "round.actions_so_far": s.openRound.actionLog.length,
       });
     } else {
-      // Fresh INIT  - go to platform, build a new LocalSession from
+      // Fresh INIT, go to platform, build a new LocalSession from
       // the SessionInfo it returns (per ADR-004, platform is the
       // source of truth for carry / nextMode / mathVersion).
       info = await timedPlatformCall(metrics, "openSession",
@@ -571,7 +571,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       promo.markOffered(s);
     }
 
-    // Resume payload  - same-process reconnect, full replay context.
+    // Resume payload, same-process reconnect, full replay context.
     if (s.openRound) {
       const r: OpenRoundResume = {
         roundId: s.openRound.roundId,
@@ -634,7 +634,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
-    // Dev cheats (when enabled) ride inside params.cheat  - never a
+    // Dev cheats (when enabled) ride inside params.cheat, never a
     // first-class wire field. Ignored entirely when cheatsEnabled is false.
     const ctx = buildSpinContext(requestedMode, req.params?.["cheat"] as Record<string, unknown> | undefined, req.params);
     const math = mode.math as SimpleMath;
@@ -662,7 +662,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     try {
       // Default round_state envelope when the math returns no carry.
       // Some wallets validate this as required-non-empty, so we ALWAYS send a
-      // meaningful audit envelope describing the round outcome  - never an
+      // meaningful audit envelope describing the round outcome, never an
       // empty string. When the math DOES set carry, we forward it verbatim;
       // the math owns the format.
       const roundState = cappedOutcome.carry ?? JSON.stringify({
@@ -721,7 +721,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     else if (betInfo.promoId) promo.consume(s);
 
     // Math returned ops; we forward them as-is. Balance is a separate
-    // top-level response field  - math is currency-blind.
+    // top-level response field, math is currency-blind.
     const resp: ClientResponseSpin = {
       roundId: receipt.roundId,
       ops: cappedOutcome.ops,
@@ -870,7 +870,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       }));
       if (auditMode === "mandatory") {
         // Jurisdictions that mandate a server-side action log can't treat a
-        // dropped update as "best effort"  - block the step and fail it so the
+        // dropped update as "best effort", block the step and fail it so the
         // mandated record is never silently missing.
         try { await update(); }
         catch (e) { throw translate(e, "STEP_FAILED"); }
@@ -1002,7 +1002,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
   //   - Admin HTTP POST /api/autoclose for operator scripts
   // NEVER by an in-process timer.
 
-  // Locked wrapper  - used by both the public API and the platform-event
+  // Locked wrapper, used by both the public API and the platform-event
   // handler above, so an autoclose serializes against a client close of the
   // same session.
   function autocloseRound(req: AutocloseRequest): Promise<AutocloseResponse> {
@@ -1030,7 +1030,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // a round with banked value could be silently forfeited).
     const policy = manifest.autoclose?.policy ?? "math-decides";
     if (policy === "hold") {
-      // Don't autoclose  - the round persists for later resolution.
+      // Don't autoclose, the round persists for later resolution.
       return { closed: false, reason: "policy-hold" };
     }
 
@@ -1046,7 +1046,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         closeResult = await Promise.resolve(math.close(open.state));
       } else if (policy === "settle-at-current") {
         // settle-at-current needs a valuation the math didn't provide.
-        // Refuse rather than silently forfeit banked player value  - surface
+        // Refuse rather than silently forfeit banked player value, surface
         // the misconfiguration; the round stays open for resolution.
         log.error("Autoclose policy 'settle-at-current' but math has no autoclose() valuation  - refusing to forfeit", {
           "event.category": "autoclose",
@@ -1056,7 +1056,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         });
         return { closed: false, reason: "settle-at-current-requires-math-autoclose" };
       } else {
-        // math-decides, no autoclose, not terminal  - conservative loss (no
+        // math-decides, no autoclose, not terminal, conservative loss (no
         // surprise pay-out from a stale state). Games that can leave value on
         // the table should implement math.autoclose or use settle-at-current.
         closeResult = { multiplier: 0, ops: [], type: "autoclose-loss" };
@@ -1071,7 +1071,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     }
 
     // Autoclose moves money too, so it must run the same sanitize + cap
-    // path as a client close  - otherwise a non-finite/negative multiplier
+    // path as a client close, otherwise a non-finite/negative multiplier
     // from math.autoclose() (or a cap-exceeding one) would settle unguarded.
     const cappedClose = applyMaxWinCapClose(
       closeResult,
@@ -1157,7 +1157,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // be retained below (open round) for a resume by a future connection.
     sessions.setConnection(conn.sessionId, null);
 
-    // Keep the session in cache if a round is open  - the player may
+    // Keep the session in cache if a round is open, the player may
     // reconnect within the platform's grace window and resume. Autoclose
     // will be triggered externally (platform event or admin API call) if
     // the platform decides the player isn't coming back.
@@ -1213,7 +1213,7 @@ function sessionOrThrow(id: string | null | undefined): sessions.LocalSession {
 
 /** A 0 effective bet (e.g. a `stakeMultiplier: 0` free-round mode) with a
  *  winning multiplier would settle `win = multiplier x 0 = 0`, silently
- *  losing the player's payout. Forbid it  - free rounds must be funded so the
+ *  losing the player's payout. Forbid it: free rounds must be funded so the
  *  win is non-zero: either by a promo pool (which locks a non-zero bet) or by
  *  accumulating the feature's winnings into the parent round's carry and
  *  paying them at that round's close. (audit H4) */
@@ -1254,7 +1254,7 @@ function translate(e: unknown, fallback: import("@open-rgs/contract").RGSErrorCo
  *  call, so it must fail closed. The old cap check (`multiplier <= cap`)
  *  was the only validation and it was backwards for bad inputs: `NaN <= cap`
  *  and `Infinity <= cap` are both `false`, so a non-finite multiplier fell
- *  through to the cap branch and paid out `cap x bet`  - a math bug became a
+ *  through to the cap branch and paid out `cap x bet`, a math bug became a
  *  *maximum* payout. A negative multiplier passed the check unchanged and
  *  produced a negative settlement.
  *
@@ -1270,12 +1270,12 @@ function sanitizeMultiplier(multiplier: number): number {
 }
 
 /** Apply max-win cap to a simple-round outcome. The multiplier is first
- *  sanitized (see sanitizeMultiplier  - non-finite throws, negative clamps
+ *  sanitized (see sanitizeMultiplier: non-finite throws, negative clamps
  *  to 0). If the cap then fires:
- *  - multiplier is clipped to maxMultiplier
- *  - type is stamped as "max_win_reached" so the client can render
+ *, multiplier is clipped to maxMultiplier
+ *, type is stamped as "max_win_reached" so the client can render
  *    the max-win celebration
- *  - ops are preserved; if the cap fired, we append a "max_win" op
+ *, ops are preserved; if the cap fired, we append a "max_win" op
  *    so the client knows visually
  *  When no cap or outcome is under cap -> returned with the sanitized
  *  multiplier (unchanged when it was already finite and non-negative). */

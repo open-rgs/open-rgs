@@ -1,5 +1,5 @@
 // In-process MarkCollector implementation used by the math loaders when
-// marks are opted in. The orchestrator never instantiates this  - only
+// marks are opted in. The orchestrator never instantiates this, only
 // the simulator (or other introspection harnesses) does, by passing
 // `{ marks: true }` to a loader.
 //

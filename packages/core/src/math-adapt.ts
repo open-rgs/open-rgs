@@ -1,6 +1,6 @@
 // Shared math-outcome adapters: normalise a raw outcome object (returned by a
 // TypeScript math, or msgpack-decoded from a WASM kernel) into the canonical
-// @open-rgs/contract shapes. No runtime dependency  - used by both loadTsMath
+// @open-rgs/contract shapes. No runtime dependency, used by both loadTsMath
 // and loadWasmMath so they normalise identically (e.g. snake_case `next_mode`
 // -> `nextMode`, 1-indexed arrays -> JS arrays, defaults).
 

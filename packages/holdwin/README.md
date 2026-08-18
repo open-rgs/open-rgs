@@ -35,4 +35,4 @@ Worked examples and animated explainers: <https://open-rgs.dev/extension/holdwin
 
 ## License
 
-MIT  - (c) open-rgs contributors
+MIT: (c) open-rgs contributors

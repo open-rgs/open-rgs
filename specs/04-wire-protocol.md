@@ -1,4 +1,4 @@
-# Spec 04  - Wire Protocol (binary-msgpack reference)
+# Spec 04: Wire Protocol (binary-msgpack reference)
 
 ## Goal
 
@@ -21,13 +21,13 @@ encoding of the typed request or response.
 **Correlation id.** The client stamps a unique id on each request payload
 under the reserved key `$cid` (`WIRE_CORRELATION_KEY`); the transport echoes
 it on the matching response / error frame. The client matches responses by
-this id, not just by frame type  - so a late or duplicate response from a
+this id, not just by frame type: so a late or duplicate response from a
 timed-out request can't resolve a newer call. `PING`/`PONG` are unsolicited
 and carry no id; a pre-dispatch error (unparseable frame) may omit it. The
 client strips `$cid` before returning the response to callers.
 
 **Operation sequence (replay guard, optional).** Guarantee 6 ("At Most Once",
-`specs/00-guarantees.md`) holds at the orchestrator regardless  - per-session
+`specs/00-guarantees.md`) holds at the orchestrator regardless, per-session
 operation serialization plus idempotency keys to the wallet. The transport adds
 an **opt-in** second line of defence so replay-safety doesn't depend on the
 wallet deduping: enable `binaryTransport({ replayGuard: true })` and each
@@ -35,7 +35,7 @@ request must carry a per-connection monotonically increasing integer under the
 reserved key `$seq` (`WIRE_OPSEQ_KEY`). The transport then:
 
 - **processes** `last + 1` (and remembers its response bytes),
-- **replays** the cached response for an exact re-send of `last`  - a
+- **replays** the cached response for an exact re-send of `last`, a
   dropped-response retry gets the original answer with no re-run and no second
   settle,
 - **rejects** (`INVALID_FORMAT`) a gap, or a frame missing/with a non-integer
@@ -43,17 +43,17 @@ reserved key `$seq` (`WIRE_OPSEQ_KEY`). The transport then:
 
 `PING` is exempt (no sequence, moves no state). The guard is **off by default**:
 a client that doesn't stamp `$seq` is unaffected, so this is backward
-compatible. A client that opts in MUST stamp every frame  - mixing is rejected,
+compatible. A client that opts in MUST stamp every frame, mixing is rejected,
 by design. It's the standard monotonic-sequence dedup for an at-least-once
 message channel, applied at the socket so it backstops the wallet's own
 idempotency rather than relying on it.
 
 **Scope.** The guard is **per-connection by design**: the sequence space and
 the cached last-response bytes live and die with the socket. A reconnect  -
-to the same pod or a different one  - starts fresh at `$seq` 1 with an empty
+to the same pod or a different one: starts fresh at `$seq` 1 with an empty
 cache, so a retry that straddles a reconnect gets no transport-level replay
 protection. The cross-connection (and cross-pod) at-most-once guard is the
-wallet's idempotency-key dedupe (`specs/05-platform-protocol.md`)  - that is
+wallet's idempotency-key dedupe (`specs/05-platform-protocol.md`), that is
 the end-to-end guarantee; the transport guard only tightens the single-socket
 case. Sticky sessions do NOT change this: routing a player back to the same
 pod does not extend the guard across sockets.
@@ -118,7 +118,7 @@ The full TS schemas live in `@open-rgs/contract`:
 - `ClientRequestPromoAccept`, `ClientResponsePromoAccept`
 - `ClientResponseError`
 
-This spec doesn't duplicate them  - read the source. What this spec
+This spec doesn't duplicate them: read the source. What this spec
 DOES specify:
 
 - **Field semantics** for the cases that aren't obvious from the type.
@@ -127,34 +127,34 @@ DOES specify:
 
 ### Notable field semantics
 
-`ClientResponseInit.modes`  - every entry in this catalog is renderable
+`ClientResponseInit.modes`: every entry in this catalog is renderable
 by the client. Internal modes (`internal: true` in the manifest) are
 excluded server-side. The catalog is the authoritative source for
 "which buy buttons should I show" and their stake multipliers.
 
-`ClientResponseInit.resume`  - present iff a round was in flight when
+`ClientResponseInit.resume`: present iff a round was in flight when
 the player previously disconnected. The client SHOULD replay
 `resume.ops` in order to rebuild visual state, then render UI for
 `resume.awaiting`. The action history `resume.actionLog` is provided so
 the client can narrate "you've already gambled twice."
 
-`ClientRequestSpin.priceMultiplier`  - defaults to 1 if absent. Combined
+`ClientRequestSpin.priceMultiplier`: defaults to 1 if absent. Combined
 with the manifest's mode `stakeMultiplier` to compute the actual bet.
 
-Forced-outcome cheats are **not** a wire field  - `ClientRequestSpin` has no
+Forced-outcome cheats are **not** a wire field: `ClientRequestSpin` has no
 `cheat`. A forced-outcome field must never be part of the canonical
 contract. In dev only, a cheat hint may ride inside
 `ClientRequestSpin.params.cheat`, and the orchestrator honors it **only**
 when cheats are explicitly enabled (`createServer { enableCheats }` /
 `OPEN_RGS_ENABLE_CHEATS=1`) AND `NODE_ENV !== "production"`. It is off by
-default everywhere and impossible in production  - a misconfigured
+default everywhere and impossible in production, a misconfigured
 `NODE_ENV` can no longer enable it.
 
-`ClientResponseSpin.promo`  - present iff the promo pool was active for
+`ClientResponseSpin.promo`: present iff the promo pool was active for
 this spin. Tells the client the remaining count so it can update the
 HUD ("8 / 10 free spins left").
 
-`ClientRequestStepRound.action`  - MUST have a `type` field. The
+`ClientRequestStepRound.action`: MUST have a `type` field. The
 orchestrator validates `action.type` against the stored `awaiting.type`
 before invoking math; mismatches return `INVALID_ACTION` at the
 transport boundary.
@@ -217,7 +217,7 @@ sends a bounded `INTERNAL_ERROR` instead.
 Optional keepalive. Either side MAY send PING; recipient MUST reply
 PONG within 5 seconds. Client uses this to detect half-open
 connections; the orchestrator does NOT use it for autoclose decisions
-(autoclose is external  - see **Spec 02**).
+(autoclose is external, see **Spec 02**).
 
 ## Versioning
 
@@ -232,7 +232,7 @@ unknown message code gets `0xff DECODE_ERROR`.
   produces a `0x04` response or `0xff` error within the latency budget
   in **Spec 06**.
 - A frame with an unknown type byte (including the reserved `0x80`-`0xfc`
-  range) is rejected with `0xff DECODE_ERROR`  - matching Spec 08 and the
+  range) is rejected with `0xff DECODE_ERROR`, matching Spec 08 and the
   shipped transport. (A future schema may carve out a silently-ignored
   forward-compat range; it does not exist yet.)
 - A text frame (string, not binary) is rejected with
@@ -246,6 +246,6 @@ unknown message code gets `0xff DECODE_ERROR`.
   closes? Currently autoclose produces a normal `CLOSE_RESPONSE` with
   `type` reflecting the math's autoclose tag. **Probably sufficient**;
   decision pending.
-- JSON-WS transport for browser dev tooling  - should it use the same
+- JSON-WS transport for browser dev tooling: should it use the same
   type byte scheme (just JSON-encoded payloads) or speak a JSON-RPC
   variant? **Pending**; first implementation will pick.

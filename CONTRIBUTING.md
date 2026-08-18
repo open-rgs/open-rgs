@@ -1,6 +1,6 @@
 # Contributing to open-rgs
 
-Small, opinionated, rot-resistant  - that's the whole game. Read
+Small, opinionated, rot-resistant: that's the whole game. Read
 [specs/10-design-philosophy.md](specs/10-design-philosophy.md) before
 your first PR; it explains *why* the rules below exist.
 
@@ -23,7 +23,7 @@ changeset-check**. Green locally means green in CI.
   "pick your favourite." If you need exotic, bring your own outside
   core.
 - **No half-features in core.** Either it's done or it's not in.
-- **Every dependency needs a justification**  - a comment in
+- **Every dependency needs a justification**: a comment in
   `package.json` saying why it's there and what it would take to
   remove.
 - **Neutral examples only.** Public packages and specs NEVER name a
@@ -59,9 +59,9 @@ Docs-only changes (like this file) need no changeset.
 - **Major decisions get an ADR** in `specs/adr/`.
 - **Bigger changes start as a proposal**, not a PR: open an issue per
   "How to propose a change" in
-  [specs/09-roadmap.md](specs/09-roadmap.md)  - state the goal, the
+  [specs/09-roadmap.md](specs/09-roadmap.md), state the goal, the
   alternatives considered, your recommendation. Implement after the
   spec lands; reviewers check both.
 
-Security issues are different: never a public issue  - see
+Security issues are different: never a public issue, see
 [SECURITY.md](SECURITY.md).

@@ -3,13 +3,13 @@
 //
 // Builtins:
 //   "json"         - ECS-aligned JSON (default; what most dashboards want)
-//   "server-core"  - legacy server-core / server-core byte-shape: same as json but DROPS
+//   "server-core", legacy server-core / server-core byte-shape: same as json but DROPS
 //                   service.environment + private "_*" keys, with a stable
 //                   field order so the legacy server-core downstream log tooling parses
 //                   ours unchanged
 //   "pretty"       - human-readable single-line: 12:34:56 INFO msg k=v
 //   "logfmt"       - key=value pairs, Heroku/Datadog ingestable
-//   "text"         - single-line "TIMESTAMP [LEVEL] message"  - no fields
+//   "text"         - single-line "TIMESTAMP [LEVEL] message", no fields
 //
 // Custom: pass a function (entry: LogEntry) => string.
 
@@ -47,7 +47,7 @@ export const formatters: Record<FormatterName, Formatter> = {
    *  service.version, then everything else in insertion order.
    *
    *  Use this when piping into a downstream log tool that was built
-   *  against the legacy server-core logger output  - fluent-bit pipelines, custom
+   *  against the legacy server-core logger output: fluent-bit pipelines, custom
    *  parsers, dashboards keyed on field positions, etc. */
   "server-core"(entry) {
     const out: Record<string, unknown> = {
@@ -126,6 +126,6 @@ function logfmtValue(v: unknown): string {
     return v;
   }
   if (typeof v === "number" || typeof v === "boolean") return String(v);
-  // Objects/arrays  - render as compact JSON. Logfmt purists frown; we're pragmatic.
+  // Objects/arrays, render as compact JSON. Logfmt purists frown; we're pragmatic.
   return `"${JSON.stringify(v).replace(/"/g, '\\"')}"`;
 }

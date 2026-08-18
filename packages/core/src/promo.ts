@@ -6,7 +6,7 @@
 // new pool appears upstream. This module owns the "is the promo active
 // for this round?" decision and forces the right bet override when it
 // is. Everything else about bonus engines (campaigns, jackpots, etc.)
-// lives on the platform side  - see specs/05-platform-protocol.md.
+// lives on the platform side, see specs/05-platform-protocol.md.
 
 import type { LocalSession } from "./session.js";
 import { log } from "./log.js";
@@ -16,7 +16,7 @@ export function markOffered(s: LocalSession): void {
   if (s.promo) s.promo.offered = true;
 }
 
-/** Player accepts the promo  - activate it. */
+/** Player accepts the promo, activate it. */
 export function activate(s: LocalSession): boolean {
   if (!s.promo || s.promo.remaining <= 0 || s.promo.active) return false;
   s.promo.active = true;
@@ -24,7 +24,7 @@ export function activate(s: LocalSession): boolean {
   return true;
 }
 
-/** Player declines  - mark offered so we don't ask again. */
+/** Player declines, mark offered so we don't ask again. */
 export function decline(s: LocalSession): void {
   if (!s.promo) return;
   s.promo.offered = true;

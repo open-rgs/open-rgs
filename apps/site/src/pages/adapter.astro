@@ -3,14 +3,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="Platform adapter  - open-rgs"
+  title="Platform adapter, open-rgs"
   description="open-rgs PlatformAdapter interface: session lifecycle, simple + complex round settlement, promo free-rounds, and event stream."
 >
   <main>
     <h1>Platform adapter</h1>
 
     <p class="lede">
-      One interface  - <code>PlatformAdapter</code>  - covers everything
+      One interface, <code>PlatformAdapter</code>, covers everything
       upstream of the RGS: session lifecycle, money movement, free-round
       promo free-rounds, and platform events. How it talks to the operator (one
       WS, three microservices, REST + polling) is the integrator's call.
@@ -42,17 +42,17 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         <tr><td>simple (slot spin)</td><td><code>settleSimple(bet, win)</code></td><td>once per <code>SPIN_REQUEST</code></td></tr>
         <tr><td>complex (Mines, Road)</td><td><code>openComplex(bet)</code></td><td>at <code>OPEN_REQUEST</code></td></tr>
         <tr><td>complex (Mines, Road)</td><td><code>closeComplex(win)</code></td><td>at <code>CLOSE_REQUEST</code></td></tr>
-        <tr><td>complex  - STEP</td><td><em>none</em></td><td>STEP is pure in-process</td></tr>
+        <tr><td>complex, STEP</td><td><em>none</em></td><td>STEP is pure in-process</td></tr>
       </tbody>
     </table>
 
     <p class="mute">
-      At most two money RPCs per round  - one <code>settleSimple</code> for a
+      At most two money RPCs per round, one <code>settleSimple</code> for a
       simple round (a debit and a credit in one call), or
       <code>openComplex</code> + <code>closeComplex</code> for a complex one.
       Mid-round <code>step</code> calls never touch the wallet. If you need an
       audit trail for in-flight state, implement the optional
-      <code>updateComplex</code>  - the orchestrator calls it
+      <code>updateComplex</code>, the orchestrator calls it
       fire-and-forget after each step; failures are logged, never
       surfaced to the player.
     </p>
@@ -134,7 +134,7 @@ RoundReceipt = { roundId, balance, promo?: { remaining } }`}</code></pre>
       100 when decimals = 0. Adapters facing platforms that expect
       decimal strings or floats convert at the boundary with
       <code>toWireAmount</code> / <code>fromWireAmount</code> from
-      <code>@open-rgs/adapter-kit</code>  - pick an explicit
+      <code>@open-rgs/adapter-kit</code>, pick an explicit
       <code>RoundingMode</code> (default <code>half_even</code>,
       banker's rounding).
     </p>
@@ -148,10 +148,10 @@ RoundReceipt = { roundId, balance, promo?: { remaining } }`}</code></pre>
     <h2 data-section="§ 7">Authoring resources</h2>
 
     <ul>
-      <li><code>@open-rgs/adapter-kit</code>  - helpers for WS / HTTP RPC, error mapping, diagnostics</li>
-      <li><code>@open-rgs/adapter-test-kit</code>  - conformance suite (run live or fixtures)</li>
-      <li><code>@open-rgs/platform-mock</code>  - in-memory dev/test wallet with promo + autoclose helpers</li>
-      <li><a href="https://github.com/open-rgs/open-rgs/blob/main/specs/12-adapter-cookbook.md">specs/12  - adapter cookbook</a></li>
+      <li><code>@open-rgs/adapter-kit</code>, helpers for WS / HTTP RPC, error mapping, diagnostics</li>
+      <li><code>@open-rgs/adapter-test-kit</code>, conformance suite (run live or fixtures)</li>
+      <li><code>@open-rgs/platform-mock</code>, in-memory dev/test wallet with promo + autoclose helpers</li>
+      <li><a href="https://github.com/open-rgs/open-rgs/blob/main/specs/12-adapter-cookbook.md">specs/12, adapter cookbook</a></li>
     </ul>
 
     <nav class="related" aria-label="Related">

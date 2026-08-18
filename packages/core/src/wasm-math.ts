@@ -1,6 +1,6 @@
 // WASM math loader. Loads a `.wasm` math kernel conforming to the spec ABI
 // (specs/03-math-runtime.md "WASM runtime details") and adapts it to a
-// MathModule  - the orchestrator can't tell it from a TypeScript math. Supports both
+// MathModule. The orchestrator can't tell it from a TypeScript math. Supports both
 // simple (single `play`) and complex (open / step / is_terminal / close /
 // autoclose) kernels.
 //
@@ -24,7 +24,7 @@
 // base64 and core never sees bytes. (A kernel MAY emit `state` as a msgpack
 // string instead - it is then passed through unchanged.)
 //
-// LIMITATION  - NO EXECUTION WATCHDOG (security/availability). A running WASM call cannot be interrupted from JS, so a kernel that
+// LIMITATION, NO EXECUTION WATCHDOG (security/availability). A running WASM call cannot be interrupted from JS, so a kernel that
 // loops forever blocks the event loop (a DoS). loadWasmMath has no per-call
 // timeout: treat these kernels as TRUSTED and bounded. createMathPool runs them
 // on worker threads and FAILS THE ROUND closed (MATH_TIMEOUT) on a budget
@@ -84,7 +84,7 @@ const MAX_OUT = 1 << 16; // 64 KiB
 export async function loadWasmMath(path: string, opts?: LoadWasmMathOptions): Promise<MathModule> {
   const rng = resolveRng(path, opts, "loadWasmMath");
   const bytes = await readFile(path);
-  // Hash the artifact  - proves which kernel produced an outcome (audit log).
+  // Hash the artifact, proves which kernel produced an outcome (audit log).
   const contentHash = createHash("sha256").update(bytes).digest("hex");
 
   // Visibility for the no-watchdog limitation (see file header): a runaway WASM

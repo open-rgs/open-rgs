@@ -2,13 +2,13 @@
 //
 // The public contract every part of an Open-RGS system targets:
 // - Math authors implement MathModule (Simple, Complex, or both).
-// - Operator integrators implement PlatformAdapter  - the single surface
+// - Operator integrators implement PlatformAdapter, the single surface
 //   the RGS uses to talk to the upstream operator's back-office. It
 //   covers four responsibilities: session lifecycle + authoritative
 //   state, money movement (the "wallet" part), promo free-rounds
 //   (granted-from-platform bonuses), and an event source. How the
 //   adapter assembles those internally (one WS, three microservices,
-//   a polling loop with a cache  - anything) is the integrator's call.
+//   a polling loop with a cache, anything) is the integrator's call.
 // - Transport authors implement ClientTransport.
 // - Game integrators compose maths into a GameManifest via defineGame().
 //
@@ -21,16 +21,16 @@
 // break it). In brief:
 //   1. No Money, No Honey   - state is persisted only with the money that
 //      earned it (carry rides the settle; nothing is written before it).
-//   2. One Round, One Record  - money + carry commit and revert as one unit,
+//   2. One Round, One Record, money + carry commit and revert as one unit,
 //      latest-first.
-//   3. Blind Math  - SpinContext carries no bet/balance; math is pure.
-//   4. House Computes, Client Asks  - requests carry intent, never results.
-//   5. Fail Closed  - bad values fail the round; the engine never pays on a guess.
-//   6. At Most Once  - idempotency keys + per-session serialization make a
+//   3. Blind Math, SpinContext carries no bet/balance; math is pure.
+//   4. House Computes, Client Asks, requests carry intent, never results.
+//   5. Fail Closed, bad values fail the round; the engine never pays on a guess.
+//   6. At Most Once, idempotency keys + per-session serialization make a
 //      replayed/raced request settle once.
-//   7. Bounded Payout  - the max-win cap is enforced by the engine, not the math.
+//   7. Bounded Payout. The max-win cap is enforced by the engine, not the math.
 // Integrators implementing PlatformAdapter are responsible for upholding 1, 2,
-// and the wallet half of 6 (dedupe on idempotencyKey)  - noted at each method.
+// and the wallet half of 6 (dedupe on idempotencyKey), noted at each method.
 
 // --- Round outputs ----------------------------------------------------------
 
@@ -67,7 +67,7 @@ export interface AwaitingHint {
   /** Optional list of valid values for the action's primary parameter. */
   options?: unknown[];
   /** Optional UX hint: ms-budget for this step. NOT enforced by the engine
-   *  (autoclose is external-trigger only  - there are no in-process step
+   *  (autoclose is external-trigger only: there are no in-process step
    *  timers); a client may use it to show a countdown. */
   deadline?: number;
   /** Optional UX hint for the client. */
@@ -114,7 +114,7 @@ export interface SpinContext {
   mode: string;
   /** Dev-only forced-outcome hint. Populated by the orchestrator ONLY when
    *  cheats are explicitly enabled (createServer `enableCheats` /
-   *  `OPEN_RGS_ENABLE_CHEATS=1`) AND not in production  - it is always
+   *  `OPEN_RGS_ENABLE_CHEATS=1`) AND not in production, it is always
    *  `undefined` in production, regardless of how `NODE_ENV` is set. It is
    *  NOT a field of the wire request (a forced-outcome field must never be
    *  part of the canonical contract); in dev it is carried inside
@@ -124,7 +124,7 @@ export interface SpinContext {
   params?: Record<string, unknown>;
 }
 
-/** Dev-only forced outcome hints. See SpinContext.cheat  - never reaches a
+/** Dev-only forced outcome hints. See SpinContext.cheat, never reaches a
  *  production build. */
 export interface CheatHint {
   force_win?: boolean;
@@ -138,7 +138,7 @@ export interface CheatHint {
 //
 // Author-declared intent + runtime annotations the simulator uses to
 // produce a "targets vs measured" diagnosis. None of this is wired in
-// the orchestrator  - marks are a math-author + simulator concern.
+// the orchestrator, marks are a math-author + simulator concern.
 
 /** A target value the simulator compares its measurement against.
  *  `tolerance` is absolute; if absent, defaults to 5% of |target|. */
@@ -163,7 +163,7 @@ export interface MathExpectations {
 
 /** The collector backing `host.mark.*` calls in math. The simulator
  *  drives the per-spin lifecycle (beginSpin / endSpin) and reads the
- *  final snapshot. The orchestrator never touches it  - marks are
+ *  final snapshot. The orchestrator never touches it, marks are
  *  inert outside a simulator run. */
 export interface MarkCollector {
   /** Increment named counter. Called from math.play() via host.mark.count. */
@@ -326,7 +326,7 @@ export function defineGame(m: GameManifest): GameManifest {
   if (!defaultMode) {
     throw new Error(`defaultMode '${m.defaultMode}' not in modes`);
   }
-  // The default mode must be client-reachable  - routing to an internal-only
+  // The default mode must be client-reachable, routing to an internal-only
   // mode by default strands every fresh round.
   if (defaultMode.internal) {
     throw new Error(`defaultMode '${m.defaultMode}' is internal  - pick a client-reachable default`);
@@ -354,7 +354,7 @@ export function defineGame(m: GameManifest): GameManifest {
       throw new Error(`mode '${id}' has invalid maxWinMultiplier`);
     }
   }
-  // Deep-freeze each mode too  - the old shallow freeze left nested mode/math
+  // Deep-freeze each mode too, the old shallow freeze left nested mode/math
   // objects mutable.
   const frozenModes: Record<string, GameMode> = {};
   for (const [id, mode] of Object.entries(m.modes)) frozenModes[id] = Object.freeze({ ...mode });
@@ -374,7 +374,7 @@ export interface SessionInfo {
   currency: string;
   /** Fractional digits of `currency`. EUR/USD/RUB = 2, JPY/HUF = 0,
    *  BTC = 8. The adapter sources this from the upstream platform
-   *  (config, DB, openSession response  - whatever the provider
+   *  (config, DB, openSession response: whatever the provider
    *  exposes) and returns it here.
    *
    *  RGS itself NEVER converts amounts. Every `balance`, `bet`, and
@@ -382,7 +382,7 @@ export interface SessionInfo {
    *  unit (USD 1.00 -> balance = 100 when currencyDecimals = 2).
    *  This field exists so adapters facing decimal- or float-wire
    *  platforms can convert at their outbound boundary with an
-   *  explicit number of fractional digits  - see
+   *  explicit number of fractional digits: see
    *  `@open-rgs/adapter-kit/currency` for helpers. */
   currencyDecimals: number;
   /** Balance in the currency's minimal unit (integer). USD 1.00 = 100. */
@@ -395,7 +395,7 @@ export interface SessionInfo {
   /** Open round to resume on reconnect, if any. */
   openRound?: OpenRoundResume;
   /** Last math carry from this player's most recent COMPLETED round.
-   *  Adapter is the source of truth for cross-round state  - it stores the
+   *  Adapter is the source of truth for cross-round state, it stores the
    *  carry alongside its own round-settle records and returns it here on
    *  next session-open. RGS uses this to seed the next round's math.play()
    *  or math.open(). */
@@ -411,18 +411,18 @@ export interface SessionInfo {
 }
 
 /** Promo free-rounds: a pool of platform-granted bonus rounds the player
- *  can opt into. RGS-side support is intentionally minimal  - when the
+ *  can opt into. RGS-side support is intentionally minimal, when the
  *  pool is active, RGS forces `bet` from the pool (instead of from
  *  `allowedBets[betIndex]`) and does not debit real balance. Each
  *  consumed round decrements `remaining` locally; at zero the pool
  *  disappears.
  *
  *  Bonus engines (campaigns, jackpots, tournaments, cashback, leaderboards
- *  etc.) live OUTSIDE open-rgs  - see specs/05-platform-protocol.md. The
+ *  etc.) live OUTSIDE open-rgs: see specs/05-platform-protocol.md. The
  *  adapter maps whatever shape its upstream uses (campaignId, freebetId,
  *  bonusId) into this opaque `id`. RGS treats `id` as a black box. */
 export interface PromoFreeRounds {
-  /** Opaque id  - adapter-defined (campaignId, freebetId, promoId, ...).
+  /** Opaque id, adapter-defined (campaignId, freebetId, promoId, ...).
    *  RGS passes it back unchanged on every settle so the adapter can
    *  attribute consumption to the right upstream record. */
   id: string;
@@ -431,14 +431,14 @@ export interface PromoFreeRounds {
   /** Rounds remaining in the pool. RGS decrements locally; at 0 the
    *  pool is removed. */
   remaining: number;
-  /** Optional  - the pool is only consumable in these modes. */
+  /** Optional, the pool is only consumable in these modes. */
   modeFilter?: string[];
   /** Optional UX hint surfaced to the client. */
   label?: string;
-  /** Optional UX hint  - total rounds initially granted, for progress
+  /** Optional UX hint, total rounds initially granted, for progress
    *  display ("3 of 10"). Sticky for the lifetime of the pool. */
   total?: number;
-  /** Optional UX hint  - ISO 8601 expiry. RGS does not enforce it
+  /** Optional UX hint, ISO 8601 expiry. RGS does not enforce it
    *  (autoclose is external); for client display only. */
   validTo?: string;
 }
@@ -457,7 +457,7 @@ export interface OpenRoundResume {
   actionLog: PlayerAction[];
   /** Currently expected action; null/absent = round is closing. */
   awaiting?: AwaitingHint;
-  /** Wall-clock time (ms epoch) the round opened  - UX hint. */
+  /** Wall-clock time (ms epoch) the round opened, UX hint. */
   openedAt?: number;
   /** Present when the round is open only because the client never finished it,
    *  rather than because the math is waiting on a decision. The client is
@@ -467,7 +467,7 @@ export interface OpenRoundResume {
    *  Set by the orchestrator when the round awaits the end-round action (see
    *  `withDeferredClose`), so a client need not know which modes use it. */
   replay?: {
-    /** Always true when present  - the field exists to be checked, not read. */
+    /** Always true when present, the field exists to be checked, not read. */
     unfinished: true;
     /** Canonical player-facing message, so every client says the same thing. */
     message: string;
@@ -479,7 +479,7 @@ export interface SettleSimple {
   /** Final bet in currency's minimal unit (integer).
    *  Includes priceMultiplier x stakeMultiplier already. */
   bet: number;
-  /** Index into the session's allowed_bets ladder  - what the player picked. */
+  /** Index into the session's allowed_bets ladder, what the player picked. */
   betIndex: number;
   /** Multiplier applied to the chosen bet level (mode stakeMultiplier x priceMultiplier). */
   priceMultiplier: number;
@@ -499,7 +499,7 @@ export interface SettleSimple {
    *  PromoFreeRounds). The adapter uses this to attribute the round
    *  to the right upstream campaign / freebet / bonus record. */
   promoId?: string;
-  /** Idempotency key  - RGS-generated. Adapter forwards if upstream supports it. */
+  /** Idempotency key, RGS-generated. Adapter forwards if upstream supports it. */
   idempotencyKey?: string;
 }
 
@@ -524,7 +524,7 @@ export interface UpdateComplex {
 export interface CloseComplex {
   sessionId: string;
   roundId: string;
-  /** Math's final state for this round  - opaque, persisted as the wallet's
+  /** Math's final state for this round, opaque, persisted as the wallet's
    *  audit-grade round_state. */
   finalState: RoundState;
   /** Cross-round carry math wants threaded into the NEXT round.
@@ -538,7 +538,7 @@ export interface CloseComplex {
   win: number;
   multiplier: number;
   type: string;
-  /** Idempotency key  - RGS-generated. Adapter forwards to the wallet
+  /** Idempotency key, RGS-generated. Adapter forwards to the wallet
    *  if the wallet supports dedupe. */
   idempotencyKey?: string;
   /** Set when this close was an AUTOCLOSE (external trigger), carrying the
@@ -557,36 +557,36 @@ export interface RoundReceipt {
   promo?: { remaining: number };
 }
 
-/** Reverse (roll back) an already-settled round  - a chargeback, a
+/** Reverse (roll back) an already-settled round, a chargeback, a
  *  reconciliation reversal, an operator correction. This is a WALLET-initiated
  *  operation (the wallet knows when a settlement must be undone); the RGS does
- *  not originate reversals. It's optional on the adapter  - implement it only if
+ *  not originate reversals. It's optional on the adapter, implement it only if
  *  your upstream supports reversal.
  *
- *  GUARANTEE 2  - "One Round, One Record" (specs/00-guarantees.md). A round is
+ *  GUARANTEE 2: "One Round, One Record" (specs/00-guarantees.md). A round is
  *  one record: the balance delta AND the carry it produced. A reversal MUST
  *  undo BOTH halves atomically:
  *    - restore the balance to what it was before the round, AND
  *    - restore the cross-round carry/state to what it was before the round.
  *  Undoing the money while leaving the carry advanced (or vice-versa) is the
- *  rollback-farming exploit this guarantee exists to forbid  - e.g. a player
+ *  rollback-farming exploit this guarantee exists to forbid, e.g. a player
  *  keeps progress on a meta-counter for a round whose money was refunded.
  *
- *  ORDER  - reversal is LATEST-FIRST. Only the most recent un-reversed round of
+ *  ORDER: reversal is LATEST-FIRST. Only the most recent un-reversed round of
  *  a session may be reversed; an adapter MUST reject an attempt to reverse an
  *  older round while newer rounds sit on top of it (restoring an old round's
  *  pre-state would silently discard the newer rounds and over-refund). A wallet
  *  reversing a span of rounds reverses them newest-to-oldest.
  *
- *  CONCURRENCY  - because reversal is wallet-initiated, it arrives OUTSIDE the
+ *  CONCURRENCY: because reversal is wallet-initiated, it arrives OUTSIDE the
  *  orchestrator's per-session lock; that lock serializes only client-driven
  *  traffic, so nothing upstream of the adapter orders a reversal against an
  *  in-flight settle/open/close on the same session. An adapter MUST implement
  *  reverseRound to be safe under concurrent invocation with those calls (its
- *  own per-session mutex, an upstream transaction  - the mechanism is the
+ *  own per-session mutex, an upstream transaction: the mechanism is the
  *  adapter's choice).
  *
- *  DURABILITY  - a real adapter MUST persist its reversed-round tracking (the
+ *  DURABILITY: a real adapter MUST persist its reversed-round tracking (the
  *  reversal receipts it replays, the set of already-reversed rounds, and the
  *  ordering basis behind latest-first) durably, so it survives a process
  *  restart. An adapter that forgets prior reversals on restart turns a retried
@@ -596,24 +596,24 @@ export interface ReverseRound {
   sessionId: string;
   /** The round to reverse. MUST be the latest un-reversed round on the session. */
   roundId: string;
-  /** Why  - for the wallet's audit trail (e.g. "chargeback", "operator-correction"). */
+  /** Why, for the wallet's audit trail (e.g. "chargeback", "operator-correction"). */
   reason: string;
   /** Idempotency key. A repeated reversal of the same round is a no-op that
-   *  returns the same receipt  - reversing twice must not credit twice. */
+   *  returns the same receipt: reversing twice must not credit twice. */
   idempotencyKey?: string;
 }
 
 /** Result of a reversal. Receipts are part of the adapter's durable
  *  reversed-round record: a repeated reversal of the same round (or a repeated
  *  idempotency key) MUST replay the stored receipt rather than credit again,
- *  which only holds if the receipts survive a process restart  - see
+ *  which only holds if the receipts survive a process restart, see
  *  DURABILITY on {@link ReverseRound}. */
 export interface ReverseReceipt {
   roundId: string;
-  /** Balance after the reversal  - restored to the round's pre-settle value. */
+  /** Balance after the reversal, restored to the round's pre-settle value. */
   balance: number;
   /** Whether a reversal actually happened. `false` (with `reason`) when there
-   *  was nothing to reverse (unknown/already-reversed round)  - a safe no-op,
+   *  was nothing to reverse (unknown/already-reversed round), a safe no-op,
    *  never an error that moves money. */
   reversed: boolean;
   /** Present when `reversed` is false: why it was a no-op
@@ -635,7 +635,7 @@ export type PlatformEvent =
   | { type: "sessionClosed"; sessionId: string; reason: string }
   | { type: "promoGranted"; sessionId: string; promo: PromoFreeRounds }
   /** Wallet asks the RGS to autoclose an in-flight round. RGS-side autoclose
-   *  is NEVER timer-driven  - every autoclose is initiated by an external
+   *  is NEVER timer-driven: every autoclose is initiated by an external
    *  signal (this event from the wallet, an admin HTTP call, or an
    *  upstream operator script). */
   | { type: "autocloseRequested"; sessionId: string; roundId?: string; reason: string };
@@ -663,11 +663,11 @@ export interface PlatformAdapter {
    *  implement only if your upstream supports reversal. MUST undo money AND
    *  carry together, latest-first; see {@link ReverseRound} (Guarantee 2,
    *  "One Round, One Record"). Because it is wallet-initiated it is NOT
-   *  covered by the orchestrator's per-session lock  - it MUST be safe to
+   *  covered by the orchestrator's per-session lock: it MUST be safe to
    *  invoke concurrently with settleSimple/openComplex/closeComplex on the
-   *  same session  - and a real adapter MUST keep its reversed-round tracking
+   *  same session: and a real adapter MUST keep its reversed-round tracking
    *  durable across restarts. The reference @open-rgs/platform-mock implements
-   *  the semantics correctly (in memory  - it's a mock) and the conformance
+   *  the semantics correctly (in memory: it's a mock) and the conformance
    *  suite checks them. */
   reverseRound?(req: ReverseRound): Promise<ReverseReceipt>;
 
@@ -680,16 +680,16 @@ export interface PlatformAdapter {
  *  payload under this key; the transport echoes it on the matching response /
  *  error frame. The client matches responses by this id (not just frame
  *  type), so a late/duplicate response from a timed-out call can't resolve a
- *  newer request. Reserved  - math/clients must not use it for game data. */
+ *  newer request. Reserved: math/clients must not use it for game data. */
 export const WIRE_CORRELATION_KEY = "$cid";
 
 /** Wire operation-sequence key. When the transport's replay guard is enabled,
  *  the client stamps a per-connection monotonically increasing integer under
  *  this key on every request. The transport processes `last+1`, replays the
- *  cached response for a re-sent `last` (a duplicate  - e.g. a retry after a
+ *  cached response for a re-sent `last` (a duplicate, e.g. a retry after a
  *  dropped response), and rejects a gap. This makes Guarantee 6 ("At Most
  *  Once") hold at the socket without depending on the wallet to dedupe.
- *  Reserved  - math/clients must not use it for game data. Optional: omit it and
+ *  Reserved: math/clients must not use it for game data. Optional: omit it and
  *  the guard is simply inactive (default), preserving back-compatible clients. */
 export const WIRE_OPSEQ_KEY = "$seq";
 
@@ -745,7 +745,7 @@ export interface ClientResponseInit {
   /** Active promo free-rounds pool surfaced to the client for the
    *  opt-in offer. Mirrors `SessionInfo.promo`. Absent when none. */
   promo?: { id: string; bet: number; remaining: number; total?: number; label?: string; validTo?: string };
-  /** A round was in flight when the player disconnected  - replay it.
+  /** A round was in flight when the player disconnected, replay it.
    *  ops:        full cumulative ops sequence (open + every step) so the
    *              client can rebuild the visual state.
    *  actionLog:  the player's prior actions in this round.
@@ -822,7 +822,7 @@ export interface OrchestratorAPI {
   stepRound(req: ClientRequestStepRound, conn: ConnectionMeta): Promise<ClientResponseStepRound>;
   closeRound(req: ClientRequestCloseRound, conn: ConnectionMeta): Promise<ClientResponseCloseRound>;
   promoAccept(req: ClientRequestPromoAccept, conn: ConnectionMeta): Promise<ClientResponsePromoAccept>;
-  /** External autoclose trigger  - called by wallet event handler, admin
+  /** External autoclose trigger, called by wallet event handler, admin
    *  HTTP endpoint, or any other out-of-band signal. NEVER timer-driven. */
   autocloseRound(req: AutocloseRequest): Promise<AutocloseResponse>;
   /** Called by transport when a connection drops. */
@@ -845,7 +845,7 @@ export interface ClientTransport {
   stop(opts?: { drainMs?: number }): void | Promise<void>;
   /** Push a structured error frame to a connection and close it. Used by
    *  the orchestrator's concurrencyPolicy "kick-old" to supersede the
-   *  older connection. OPTIONAL  - a transport without it degrades
+   *  older connection. OPTIONAL: a transport without it degrades
    *  kick-old to "allow" (createServer warns at boot). */
   closeConnection?(connectionId: string, code: RGSErrorCode, reason: string): void;
 }
@@ -857,7 +857,7 @@ export interface ClientTransport {
  *
  *  Keys for *settling a known round* (close / autoclose) are derived
  *  deterministically from `(sessionId, roundId)`, so every close path and
- *  every retry of a round collapse to one wallet credit  - `generate` is not
+ *  every retry of a round collapse to one wallet credit, `generate` is not
  *  used for those. `generate` is the fallback for a round-INITIATING call
  *  (simple spin / complex open) when the client supplies no idempotency
  *  token; default uuid-v4.
@@ -866,7 +866,7 @@ export interface ClientTransport {
  *    import { deriveIdempotencyKey } from "@open-rgs/core";
  *
  *  Wallets MUST dedupe on `idempotencyKey` for the retry-safety guarantee
- *  to hold  - see specs/05-platform-protocol.md.
+ *  to hold: see specs/05-platform-protocol.md.
  */
 export interface IdempotencyConfig {
   /** Random fallback generator for round-initiating calls with no client
@@ -882,19 +882,19 @@ export interface IdempotencyConfig {
  *  attached to another live connection. Enforced by the orchestrator at
  *  INIT (configured via `createServer({ concurrencyPolicy })`):
  *
- *  - "kick-old" (default): the older connection receives a SESSION_IN_USE
+ *, "kick-old" (default): the older connection receives a SESSION_IN_USE
  *    error frame and is closed; the new connection takes over the session.
- *    The player's newest window always wins  - opening the game twice never
+ *    The player's newest window always wins: opening the game twice never
  *    leaves a stale window silently diverging.
- *  - "reject-new": the new connection's INIT fails with SESSION_IN_USE
+ *, "reject-new": the new connection's INIT fails with SESSION_IN_USE
  *    while the older connection stays attached.
- *  - "allow": both connections coexist (the pre-enforcement behaviour).
- *    Money stays safe either way  - per-session operation serialization +
- *    wallet idempotency hold regardless  - but coexisting windows see
+ *, "allow": both connections coexist (the pre-enforcement behaviour).
+ *    Money stays safe either way: per-session operation serialization +
+ *    wallet idempotency hold regardless: but coexisting windows see
  *    diverging balance views; prefer kick-old.
  *
  *  A connection that disconnects detaches from its session, so a reconnect
- *  after a drop is never kicked/rejected  - the policy only arbitrates two
+ *  after a drop is never kicked/rejected: the policy only arbitrates two
  *  LIVE connections. */
 export type ConcurrencyPolicy = "kick-old" | "reject-new" | "allow";
 

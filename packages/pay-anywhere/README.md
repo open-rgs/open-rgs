@@ -32,4 +32,4 @@ Worked examples and animated explainers: <https://open-rgs.dev/extension/pay-any
 
 ## License
 
-MIT  - (c) open-rgs contributors
+MIT: (c) open-rgs contributors

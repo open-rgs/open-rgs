@@ -1,4 +1,4 @@
-# ADR 001  - Bun runtime, not Node
+# ADR 001: Bun runtime, not Node
 
 **Status:** Accepted
 **Date:** 2026-05-08
@@ -21,7 +21,7 @@ Use **Bun** as the canonical runtime.
 
 - `Bun.serve` (uWebSockets-backed) handles 10K+ concurrent WS per
   process trivially.
-- Direct `.ts` execution  - no transpile step, no `tsx`, no
+- Direct `.ts` execution: no transpile step, no `tsx`, no
   `ts-node`.
 - `bun:ffi` available for native interop (certified RNG, etc.)
   without writing a binding gen.
@@ -38,7 +38,7 @@ Use **Bun** as the canonical runtime.
 - Not every CI provider has a Bun runner; some require manual
   install in the workflow.
 - Code that uses Bun-specific APIs is not Node-compatible. We're
-  fine with that  - Node compatibility is not a goal.
+  fine with that, Node compatibility is not a goal.
 
 ## Distribution / packaging (consequence of "Bun, not Node")
 
@@ -50,7 +50,7 @@ this is deliberate, not an oversight:
   There is no compile/bundle step, so there's no `dist` to drift from
   source, no sourcemap dance, and the published code is the code you
   read. The cost is that a **consumer must run Bun** (or a TS-aware
-  loader)  - importing `@open-rgs/core` from plain `node` won't resolve
+  loader), importing `@open-rgs/core` from plain `node` won't resolve
   the `.ts` entry. That's the intended audience.
 - **CLIs are `bunx`-only.** `@open-rgs/simulator` (`open-rgs-sim`) and
   `@open-rgs/adapter-test-kit` (`open-rgs-adapter-conform`) declare a
@@ -63,15 +63,15 @@ this is deliberate, not an oversight:
   and the constraint is machine-readable for consumers.
 
 If Node consumption is ever required, the fix is a build step that emits
-`dist/*.js` + `.d.ts` and dual `exports`  - explicitly out of scope today.
+`dist/*.js` + `.d.ts` and dual `exports`: explicitly out of scope today.
 
 ## Alternatives considered
 
-- **Node.js**  - works, mature, well-known, but slower WS, slower
+- **Node.js**: works, mature, well-known, but slower WS, slower
   cold-start, requires transpile step in dev. The throughput delta
   vs Bun is real and worth the trade-off.
-- **Deno**  - clean stdlib but the npm-compat story is more friction
+- **Deno**: clean stdlib but the npm-compat story is more friction
   than Bun, and the WS performance is roughly Node-equivalent.
-- **Native (Zig/Rust)**  - overkill for the orchestrator; the math
+- **Native (Zig/Rust)**: overkill for the orchestrator; the math
   hot-path can use Zig->WASM as a peer concern (see Spec 06). The
   glue layer benefits from a high-iteration language.

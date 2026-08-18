@@ -27,24 +27,24 @@ export interface ServerConfig {
   transport: ClientTransport;
   /** Version of the consumer service (the game server). Surfaced in
    *  /healthz as game_version. Pass your package.json version. Default
-   *  "unknown"  - pass it so /healthz doesn't lie about what's deployed. */
+   *  "unknown": pass it so /healthz doesn't lie about what's deployed. */
   version?: string;
   /** Unique id of THIS running instance. Every instance generates its own
    *  at boot (`rgs-<8 hex>`); the `OPEN_RGS_INSTANCE_ID` env var overrides
    *  the generation (e.g. the pod name via the k8s downward API), and an
    *  explicit value here wins over both. Surfaced as the `instance_id`
    *  label on `rgs_build_info`, as `instance_id` in /healthz, and as
-   *  `service.instance.id` on every log line  - so per-instance metrics,
+   *  `service.instance.id` on every log line: so per-instance metrics,
    *  logs, and health all correlate on one key. */
   instanceId?: string;
   /** HTTP admin port. Default: same as transport port (single-port mode,
    *  routes mounted under /admin/* + /livez + /readyz + /healthz). Set
-   *  to a distinct port to spin up a separate admin Bun.serve  - ideally on
+   *  to a distinct port to spin up a separate admin Bun.serve, ideally on
    *  a private interface behind a default-deny NetworkPolicy. */
   adminPort?: number;
   /** Bearer token required on /admin/* and the detailed /healthz. Falls back
    *  to the OPEN_RGS_ADMIN_TOKEN env var. In production, if neither is set,
-   *  those routes fail closed (403)  - admin shares the public client port in
+   *  those routes fail closed (403): admin shares the public client port in
    *  single-port mode, so it must not be open. */
   adminToken?: string;
   /** CORS origin allowlist for browser operator dashboards hitting /admin/*.
@@ -53,7 +53,7 @@ export interface ServerConfig {
   /** Exact base path your ingress serves admin under (one declared rewrite,
    *  e.g. "/api"). Default "" -> exact canonical routes. */
   adminRouteBasePath?: string;
-  /** Serve /healthz WITHOUT auth  - for operator dashboards or external
+  /** Serve /healthz WITHOUT auth, for operator dashboards or external
    *  uptime probers that can't inject an admin token. /admin/* stays
    *  gated. Default false. See AdminConfig.publicHealthz for the
    *  trade-offs. Prefer /readyz for plain "is it up?" checks. */
@@ -118,7 +118,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   // Forced-outcome cheats: fail closed. Require an explicit opt-in AND a
   // non-production NODE_ENV. The old gate keyed off `isDev`, which defaults
   // to ON whenever NODE_ENV is anything other than exactly "production"
-  // (unset, "prod", "staging", a typo)  - so a misconfigured env shipped a
+  // (unset, "prod", "staging", a typo), so a misconfigured env shipped a
   // live forced-win path. Now the env can't enable cheats; only a
   // deliberate opt-in can, and never in production.
   const isProduction = process.env["NODE_ENV"] === "production";
@@ -137,7 +137,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     "service.environment": isDev ? "development" : "production",
   });
 
-  // Math identity per mode  - log so operators can verify the live
+  // Math identity per mode, log so operators can verify the live
   // source matches what the simulator validated.
   for (const [id, mode] of Object.entries(cfg.manifest.modes)) {
     log.info("Math loaded", {
@@ -327,7 +327,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   // Bun.serve. Only kicks in for the bundled binaryTransport (which
   // is the one >99% of consumers use). A custom transport that
   // wasn't built with extraFetch in mind just won't expose admin
-  // on its port  - the caller can still pass adminPort to get the
+  // on its port, the caller can still pass adminPort to get the
   // legacy separate-port behaviour.
   const singlePort = cfg.adminPort === undefined;
   let separateAdmin: { stop: () => void } | undefined;

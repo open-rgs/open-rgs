@@ -1,4 +1,4 @@
-# Spec 10  - Design Philosophy
+# Spec 10: Design Philosophy
 
 ## Goal
 
@@ -18,8 +18,8 @@ small, opinionated, and well-instrumented.
 ### 1 . Public surface stays tiny
 
 Only `@open-rgs/contract` (types) and `@open-rgs/core` (runtime) are
-*required*. Everything else  - adapter-kit, mock-casino, CLI, TypeScript
-loader, WASM loader, transport variants, Redis session store  - lives
+*required*. Everything else, adapter-kit, mock-casino, CLI, TypeScript
+loader, WASM loader, transport variants, Redis session store, lives
 as opt-in peer packages.
 
 A new maintainer can read the required surface in 30 minutes.
@@ -32,7 +32,7 @@ for projects like this; we kill it by convention.
 
 ### 3 . One opinionated way per concern
 
-No "auth helper #1 vs #2 vs #3  - pick your favourite."
+No "auth helper #1 vs #2 vs #3: pick your favourite."
 
 - One canonical HMAC-SHA256
 - One canonical JWT
@@ -47,7 +47,7 @@ pick one.
 ### 4 . No half-features in core
 
 If autoclose isn't done, it's not in core. Better five solid pieces
-than eight half-baked ones. (We saw this with `patchBalance`  - it was
+than eight half-baked ones. (We saw this with `patchBalance`, it was
 half-finished, rotted, removed.)
 
 ### 5 . Push concerns out of core
@@ -88,7 +88,7 @@ Short architectural decision records in `specs/adr/`. New maintainers
 can read them and understand *why*. Format:
 
 ```
-# ADR NNN  - <title>
+# ADR NNN: <title>
 **Status:** Accepted | Superseded by ADR-XXX
 **Date:** YYYY-MM-DD
 **Context:** What problem

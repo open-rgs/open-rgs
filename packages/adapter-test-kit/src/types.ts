@@ -18,7 +18,7 @@ export interface CheckResult {
 
 export interface ConformanceReport {
   adapter: {
-    /** Best-effort label  - pulled from adapter.diagnostics.adapter or a fallback. */
+    /** Best-effort label, pulled from adapter.diagnostics.adapter or a fallback. */
     name: string;
     version: string;
   };

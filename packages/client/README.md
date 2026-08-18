@@ -24,8 +24,8 @@ c.disconnect();
 
 | Method | Returns |
 |---|---|
-| `connect()` | `Promise<void>`  - opens the WS, waits for `onopen` |
-| `disconnect()` | `void`  - closes the WS gracefully |
+| `connect()` | `Promise<void>`, opens the WS, waits for `onopen` |
+| `disconnect()` | `void`, closes the WS gracefully |
 | `init(sid)` | `Promise<ClientResponseInit>` |
 | `spin({ mode?, betIndex?, priceMultiplier?, params?, idempotencyKey? })` | `Promise<ClientResponseSpin>` |
 | `openRound({ mode?, betIndex?, priceMultiplier?, params?, idempotencyKey? })` | `Promise<ClientResponseOpenRound>` |
@@ -71,7 +71,7 @@ a retry is deduplicated server-side rather than replayed as a second round.
 | `keyFor(call, n)` | a counter | mint the idempotency token per logical call |
 | `retries` | 2 | attempts on a transport or platform failure |
 
-`describeRound()` renders a stable, greppable line per event  - for a test
+`describeRound()` renders a stable, greppable line per event, for a test
 fixture, a CI log, or a bug report. Games emitting the canonical ops from
 `@open-rgs/contract/ops` get their ops rendered; games emitting their own
 shapes still run, still settle, and still produce a transcript.
@@ -144,5 +144,5 @@ plain `Error`s.
 The wire protocol pairs requests to responses by frame-type, not by a
 correlation id. If you call `spin()` while another `spin()` is in
 flight, the second call rejects synchronously. Use multiple
-`RgsClient` instances if you genuinely need parallelism  - but normal
+`RgsClient` instances if you genuinely need parallelism, but normal
 slot UX is one-spin-at-a-time.

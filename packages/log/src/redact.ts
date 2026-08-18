@@ -1,13 +1,13 @@
 // Recursive PII/secret redaction. Drops sensitive values without dropping
-// the surrounding shape  - keeps logs structurally useful.
+// the surrounding shape, keeps logs structurally useful.
 //
 // Two layers, because key-name matching alone (the old behaviour) leaked:
-//   1. Key redaction  - a field whose name matches a redact key is replaced.
+//   1. Key redaction, a field whose name matches a redact key is replaced.
 //      Matching is separator- and case-insensitive, so configuring
 //      "session_id" (or the defaults below) also catches "session.id",
-//      "sessionId", "X-Session-Id", etc.  - the near-miss keys the old exact
+//      "sessionId", "X-Session-Id", etc., the near-miss keys the old exact
 //      match let through.
-//   2. Value scrubbing  - secrets that live in VALUES, not keys: a
+//   2. Value scrubbing, secrets that live in VALUES, not keys: a
 //      `Bearer <token>` in a message, or `?authToken=...` / `password=...` in a
 //      logged URL or string. Key matching can't catch these.
 //
@@ -17,7 +17,7 @@
 
 const REDACTED = "[REDACTED]";
 
-/** Default redact keys  - credential/secret field names. Matched separator-
+/** Default redact keys, credential/secret field names. Matched separator-
  *  and case-insensitively. */
 export const DEFAULT_REDACT_KEYS: readonly string[] = [
   "password", "passwd", "pwd",

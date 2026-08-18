@@ -2,9 +2,9 @@
 // orchestrator's I/O thread, with a per-call wall-clock budget.
 //
 // What it gives you:
-//  - Performance: math runs on worker threads -> concurrency under load (the
+//, Performance: math runs on worker threads -> concurrency under load (the
 //    I/O thread is never blocked by a spin).
-//  - Round-level fail-closed: a call that overruns its budget REJECTS with
+//, Round-level fail-closed: a call that overruns its budget REJECTS with
 //    MATH_TIMEOUT (the round refuses to pay a hung/overrunning value, and the
 //    connection isn't left waiting) and the worker is dropped + replaced, so the
 //    pool stays usable.
@@ -154,7 +154,7 @@ export async function createMathPool(opts: MathPoolOptions): Promise<MathPool> {
   }
 
   // Boot the pool. (Capture meta into a const so its non-null narrowing holds
-  // through the closures below  - a `let` assigned inside the spawn callback
+  // through the closures below, a `let` assigned inside the spawn callback
   // isn't narrowed by control-flow analysis.)
   const spawned = await Promise.all(Array.from({ length: size }, () => spawn()));
   workers.push(...spawned.map(s => s.w));

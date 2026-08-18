@@ -62,8 +62,8 @@ export interface LoggerOptions {
    *  sink that renders each entry through this formatter.
    *
    *   "json"    - ECS-aligned single-line JSON (default; what dashboards want)
-   *   "pretty"  - colour-tinted human-readable: "12:34:56 INFO message k=v"
-   *   "logfmt"  - Heroku/Datadog key=value pairs
+   *   "pretty": colour-tinted human-readable: "12:34:56 INFO message k=v"
+   *   "logfmt": Heroku/Datadog key=value pairs
    *   "text"    - plain "TIMESTAMP [LEVEL] message" (no fields)
    *
    *  Pass a function for full control. */

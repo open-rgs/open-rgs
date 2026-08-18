@@ -3,7 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="You can build (slot, Mines, Chicken Road, crash, gamble)  - open-rgs"
+  title="You can build (slot, Mines, Chicken Road, crash, gamble), open-rgs"
   description="Recipes for each common game shape: slots, instant-win, Mines, Chicken Road, Tower, crash games, gamble features, feature buys. The math file changes; the boot file stays."
 >
   <main>
@@ -48,7 +48,7 @@ return {
       The bomb layout is rolled at <code>open</code> and committed to
       state. Each <code>step</code> reveals one cell or advances one
       lane. <code>close</code> cashes out the current multiplier. A
-      bomb hit makes the round terminal  - the client then sends CLOSE
+      bomb hit makes the round terminal, the client then sends CLOSE
       to settle the bust.
     </p>
 
@@ -164,7 +164,7 @@ autoclose   = function(s) return { multiplier = 0, type = "crash", ... } end,`}<
 
     <p class="mute">
       <code>internal: true</code> hides the mode from the client's mode
-      catalog  - it's only reachable when another math returns
+      catalog, it's only reachable when another math returns
       <code>next_mode = "freespins"</code>. Deeper:
       <a href="/boot">boot reference</a>.
     </p>
@@ -174,7 +174,7 @@ autoclose   = function(s) return { multiplier = 0, type = "crash", ... } end,`}<
     <ul>
       <li>The boot file (<code>createServer</code> + <code>defineGame</code>) is identical regardless of game shape.</li>
       <li>The wire protocol is the same set of frame codes for every game.</li>
-      <li>The wallet adapter is unchanged  - it doesn't care what the math does.</li>
+      <li>The wallet adapter is unchanged, it doesn't care what the math does.</li>
       <li>Admin, probes, metrics, logs, autoclose: all wired by core.</li>
     </ul>
 

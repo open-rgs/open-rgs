@@ -1,5 +1,5 @@
 // Reconnecting WebSocket client with correlation-id RPC. The most
-// common upstream shape for slot platforms  - extracted so adapters
+// common upstream shape for slot platforms, extracted so adapters
 // don't each reinvent it.
 //
 // What you get:
@@ -8,7 +8,7 @@
 //   - request(method, params) -> Promise<result> with per-call timeout
 //   - Inbound event fanout
 //   - Diagnostics counters that drop straight into your /healthz
-//   - Verbose error logging  - extracts message/code/url from any
+//   - Verbose error logging, extracts message/code/url from any
 //     failure mode (DNS, TLS, 401, ECONNREFUSED, etc) instead of the
 //     opaque "[object ErrorEvent]" the browser-style WebSocket produces
 //
@@ -40,7 +40,7 @@ export interface WsClientOptions {
   url: string;
   /** Optional HTTP headers sent during the upgrade. Most slot platforms
    *  auth via X-Game-ID / X-Api-Key / Authorization. The browser
-   *  WebSocket API can't set these  - this kit uses the `ws` npm
+   *  WebSocket API can't set these: this kit uses the `ws` npm
    *  package which can. */
   headers?: Record<string, string>;
   /** Optional WS subprotocols, e.g. ["json"] when the wallet requires one. */
@@ -263,7 +263,7 @@ export class WsClient {
       });
 
       // Upgrade-rejected: the HTTP upgrade returned non-101 (401, 403,
-      // 404, 502...). This is the auth/permission failure path  - without
+      // 404, 502...). This is the auth/permission failure path, without
       // it we'd only see a generic "ws_close".
       // NB: Bun's ws-shim does not currently implement this event;
       // under Bun, failures still surface via ws_close + ws_error.

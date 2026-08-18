@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// open-rgs-play  - point it at a running open-rgs server and it plays.
+// open-rgs-play, point it at a running open-rgs server and it plays.
 //
 // The smallest useful thing you can run against a server you just deployed:
 // no game code, no fixtures, no knowledge of which modes are simple and which

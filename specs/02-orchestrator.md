@@ -1,4 +1,4 @@
-# Spec 02  - Orchestrator
+# Spec 02: Orchestrator
 
 ## Goal
 
@@ -37,7 +37,7 @@ Outputs:
    defaultBetIndex, mode catalog (excluding `internal: true`),
    optional promo offer, optional resume payload.
 
-### `spin(req, conn)`  - simple round
+### `spin(req, conn)`: simple round
 
 1. Look up session.
 2. Resolve mode: promo override -> `session.nextMode` -> `req.mode` ->
@@ -63,7 +63,7 @@ Outputs:
    receipt.
 10. Build `ClientResponseSpin` with `outcome.ops` forwarded as-is.
 
-### `openRound(req, conn)`  - complex round / debit
+### `openRound(req, conn)`: complex round / debit
 
 1. Look up session. Reject if `session.openRound` exists ->
    `ROUND_ALREADY_OPEN`.
@@ -78,7 +78,7 @@ Outputs:
    awaiting?, actionLog: [], opsLog: [...open.ops], openedAt: now }`.
 8. Build `ClientResponseOpenRound`.
 
-### `stepRound(req, conn)`  - pure in-process
+### `stepRound(req, conn)`: pure in-process
 
 1. Look up session and its `openRound`. Reject if missing ->
    `NO_ROUND_OPEN`.
@@ -93,12 +93,12 @@ Outputs:
    `step`), and checkpoint to the wallet if `wallet.updateComplex` is
    defined. The checkpoint honours `auditMode`: `best-effort` (default)
    fires it and swallows failures; `mandatory` awaits it and **fails the
-   step** (`STEP_FAILED`) if dropped  - for jurisdictions that require a
+   step** (`STEP_FAILED`) if dropped, for jurisdictions that require a
    server-side action log, where a missing record can't be "best effort".
 7. **No money moves.** Build `ClientResponseStepRound` with `ops` and
    `awaiting?`.
 
-### `closeRound(req, conn)`  - credit
+### `closeRound(req, conn)`: credit
 
 1. Look up session and its `openRound`. Reject if missing.
 2. Confirm `math.isTerminal(state) === true`. Otherwise `INVALID_ROUND`.
@@ -112,14 +112,14 @@ Outputs:
    promo update if any. Drop `openRound`.
 7. Build `ClientResponseCloseRound`.
 
-### `promoAccept(req, conn)`  - promo accept/decline
+### `promoAccept(req, conn)`: promo accept/decline
 
 1. Look up session.
 2. No promo offer or completed -> `{ ok: false }`.
 3. `req.accept === false` -> mark declined, return `{ ok: true }`.
 4. `req.accept === true` -> activate promo, return `{ ok: true, promo: {...} }`.
 
-### `autocloseRound(req)`  - external trigger
+### `autocloseRound(req)`: external trigger
 
 Documented in detail in **Spec 02 §Autoclose** below.
 
@@ -158,18 +158,18 @@ audit trail.
 ### Free-round funding
 
 `win = multiplier x bet`, so a `stakeMultiplier: 0` mode has `bet = 0` and any
-win would settle to **0**  - silently losing the payout. The orchestrator
+win would settle to **0**: silently losing the payout. The orchestrator
 forbids this: a 0-bet round that produces a winning multiplier fails with
 `INVALID_BET`. Free rounds must therefore be funded so the bet is non-zero:
 
-- **Promo pool**  - a `PromoFreeRounds` pool locks a non-zero bet for the
+- **Promo pool**: a `PromoFreeRounds` pool locks a non-zero bet for the
   round (`computeBet` uses the pool's bet, not `stakeMultiplier x 0`); the
   win pays normally and the pool decrements.
-- **Carry into the parent**  - a game-triggered feature accumulates its
+- **Carry into the parent**: a game-triggered feature accumulates its
   winnings into the triggering round's `carry` and pays them at that round's
   close (the triggering paid spin owns the feature EV).
 
-A 0-bet round that *loses* (multiplier 0) is fine  - it settles 0, as a free
+A 0-bet round that *loses* (multiplier 0) is fine, it settles 0, as a free
 spin that didn't win should.
 
 ## Autoclose
@@ -209,7 +209,7 @@ The autoclose flow honours the game's `manifest.autoclose.policy`
 A game that can leave value on the table (banked guaranteed winnings) MUST
 either implement `math.autoclose(state)` or declare `settle-at-current`  -
 otherwise an abandoned round is forfeited. Math's `autoclose(state)` is the
-math-decided valuation  - "force-stand the dealer," "lock the gamble at
+math-decided valuation: "force-stand the dealer," "lock the gamble at
 current pool," "settle the crash at last seen multiplier," etc.
 
 ## Resume on reconnect
@@ -221,7 +221,7 @@ payload from in-memory state:
 ```ts
 resume: {
   roundId, modeId, bet,
-  ops: openRound.opsLog,           // cumulative  - replay to render
+  ops: openRound.opsLog,           // cumulative, replay to render
   actionLog: openRound.actionLog,  // history of player decisions
   awaiting?: openRound.awaiting,
   openedAt: openRound.openedAt,
@@ -231,7 +231,7 @@ resume: {
 Cross-process resume (after a server restart or pod move) is
 wallet-driven: the fresh INIT's `wallet.openSession` returns
 `SessionInfo.openRound`, and the orchestrator re-hydrates
-`LocalSession.openRound` from it  - see **ADR-007** and Spec 05
+`LocalSession.openRound` from it: see **ADR-007** and Spec 05
 §"Open-round persistence & resume" (v1.7; until adapters populate it,
 restart-recovery operates per `manifest.recovery.onRestart`).
 
@@ -240,7 +240,7 @@ restart-recovery operates per `manifest.recovery.onRestart`).
 The orchestrator is single-threaded, but every money operation `await`s
 the math and the wallet, and an `await` yields the event loop. Two
 operations targeting the **same session** could therefore interleave
-across their awaits  - e.g. two spins both passing the `bet > balance`
+across their awaits: e.g. two spins both passing the `bet > balance`
 check against the same stale balance (overspend), or a client `closeRound`
 running concurrently with an `autocloseRound` and both calling
 `closeComplex` (double credit).
@@ -249,11 +249,11 @@ To prevent this, the orchestrator serializes operations per session: each
 of `init`, `spin`, `openRound`, `stepRound`, `closeRound`, `promoAccept`,
 and `autocloseRound` (including event- and admin-triggered autoclose) runs
 under a per-`sessionId` async queue, so at most one is in flight for a
-session at a time. An operation runs start-to-finish  - including clearing
-`session.openRound`  - before the next begins, so a close racing an
+session at a time. An operation runs start-to-finish, including clearing
+`session.openRound`: before the next begins, so a close racing an
 autoclose collapses to one credit (the second observes no open round). This
 is the orchestrator-level guard; idempotency keys (deterministic per round
-for closes  - see Spec 05) are the wallet-level backstop. Operations on
+for closes: see Spec 05) are the wallet-level backstop. Operations on
 *different* sessions are unaffected and run concurrently.
 
 The lock guards in-process ordering only; it is not a substitute for the
@@ -296,7 +296,7 @@ hold the queue while it waits.
 
 **Scope: per process.** A retry landing on a different pod finds an empty
 cache and runs for real; the cross-pod guard remains the wallet's own
-dedupe on the idempotency key (Spec 05). This does not replace that  - it
+dedupe on the idempotency key (Spec 05). This does not replace that, it
 closes the case where the wallet cannot help. A call carrying no client
 token is not cached, because there is nothing stable to deduplicate on.
 
@@ -307,13 +307,13 @@ connection (`createServer({ concurrencyPolicy })`):
 
 - **kick-old** (default): the older connection receives a
   `SESSION_IN_USE` error frame and is closed (app close code 4000); the
-  new connection takes over. The player's newest window always wins  - two
+  new connection takes over. The player's newest window always wins, two
   open windows never silently diverge.
 - **reject-new**: the newer INIT fails with `SESSION_IN_USE`; the older
   connection stays attached.
 - **allow**: both coexist (the pre-enforcement behaviour). Money stays
-  safe under any policy  - the per-session lock and wallet idempotency
-  hold regardless  - but coexisting windows see diverging balance views.
+  safe under any policy, the per-session lock and wallet idempotency
+  hold regardless, but coexisting windows see diverging balance views.
 
 A connection that disconnects DETACHES from its session first, so a plain
 reconnect after a drop is never policed: the policy only ever arbitrates
@@ -343,12 +343,12 @@ to allow with a boot-time warning. Interventions are counted in
 ## Open questions
 
 - Multiple games in one process: **decided against** (not deferred).
-  `createServer` takes one `manifest`  - one game per process  - and that
+  `createServer` takes one `manifest`, one game per process, and that
   is the intended shape: in-process multi-tenancy isn't worth the
   complexity (spec 10, "What we deliberately AVOID"). To run several
   games, run several processes (spec 07, "Multi-game deployments").
 - Should we expose a "drain" mode (reject new INITs but let in-flight
   rounds finish) for graceful shutdown? **Pending.**
 - ~~Cross-process resume needs a `wallet.getOpenRound(sessionId)`
-  call.~~ **Decided  - no new call** (ADR-007): `openSession` is the
+  call.~~ **Decided, no new call** (ADR-007): `openSession` is the
   inquiry; the wallet returns `SessionInfo.openRound`.

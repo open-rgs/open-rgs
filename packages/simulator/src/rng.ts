@@ -1,7 +1,7 @@
-// Tiny deterministic PRNG for the SIMULATOR ONLY  - reproducible RTP runs
+// Tiny deterministic PRNG for the SIMULATOR ONLY, reproducible RTP runs
 // and the simulator's own strategy/tie-break choices.
 //
-// ⚠️  NOT for production. mulberry32 has 32-bit state (period 2^32  - a few
+// ⚠️  NOT for production. mulberry32 has 32-bit state (period 2^32, a few
 // hours of spins at this project's throughput targets, after which the
 // stream repeats), is fully determined by its seed, and is trivially
 // predictable from a handful of outputs. Routing it into a production
@@ -20,7 +20,7 @@ export interface SeededRng {
   readonly __insecureSimulatorRng?: true;
 }
 
-/** mulberry32  - 32-bit state, period 2^32. Reproducible and fast; fine for
+/** mulberry32, 32-bit state, period 2^32. Reproducible and fast; fine for
  *  simulation, catastrophic for real-money outcome determination. */
 export function mulberry32(seed: number): SeededRng {
   let s = seed >>> 0;

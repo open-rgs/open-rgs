@@ -1,6 +1,6 @@
 // Streaming-friendly stat helpers for big simulator runs.
 
-/** Kahan (compensated) summation  - bounds the rounding error that naive
+/** Kahan (compensated) summation, bounds the rounding error that naive
  *  left-to-right addition accumulates over the 10^8+ samples a real RTP
  *  certification run produces. (L2) */
 function kahanSum(xs: readonly number[]): number {

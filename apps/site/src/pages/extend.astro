@@ -3,7 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout
-  title="You can extend (math, wallet, transport, metrics)  - open-rgs"
+  title="You can extend (math, wallet, transport, metrics), open-rgs"
   description="Extension points in open-rgs: plug your own wallet adapter, transport, slot libraries, metrics registry, log formatter. Every plug point is one interface."
 >
   <main>
@@ -40,7 +40,7 @@ Effect       = (grid, pos, next) => Grid  // changes a board`}</code></pre>
     <p>
       Implement <code>PlatformAdapter</code>. How you talk to the
       operator (one WS, three microservices, REST + polling, gRPC) is
-      your call  - the orchestrator only sees the interface.
+      your call, the orchestrator only sees the interface.
     </p>
 
     <pre><code>{`import type { PlatformAdapter } from "@open-rgs/contract";
@@ -70,7 +70,7 @@ export class MyAdapter implements PlatformAdapter {
 
     <p>
       Implement <code>ClientTransport</code>. The default is
-      <code>binaryTransport</code>  - binary-msgpack over WebSocket. You
+      <code>binaryTransport</code>, binary-msgpack over WebSocket. You
       could write a JSON transport, HTTP long-poll, gRPC, anything
       that produces typed <code>OrchestratorAPI</code> calls.
     </p>
@@ -148,7 +148,7 @@ await createServer({
 }`}</code></pre>
 
     <p class="mute">
-      Marks are inert in production  - zero cost. Run a sim:
+      Marks are inert in production, zero cost. Run a sim:
       <code>bunx open-rgs-sim ./maths/spin.ts --spins 1e8</code>.
       Reports: per-mode JSON, Markdown, HTML.
     </p>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// open-rgs-adapter-conform  - point this at a real or mock adapter
+// open-rgs-adapter-conform, point this at a real or mock adapter
 // implementation and get back a conformance report (md + json).
 //
 // Usage:
@@ -22,7 +22,7 @@
 //   --skip-events           skip event checks
 //   --concurrency           opt in to concurrency certification (parallel
 //                           settles, in-flight duplicate keys, reversal
-//                           interleave)  - mock/sandbox adapters only
+//                           interleave), mock/sandbox adapters only
 //   --timeout-ms <n>        per-check deadline, default 5000
 //   --out-md  <path>        write markdown report here
 //   --out-json <path>       write JSON report here

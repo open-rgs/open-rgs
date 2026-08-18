@@ -106,7 +106,7 @@ export function coinsShortOfTrigger(grid: Grid<Cell>, minCoins: number): number 
   return Math.max(0, minCoins - coinCount(grid));
 }
 
-// --- the respin cycle -------------------------------------------------------
+// -. The respin cycle -------------------------------------------------------
 
 export interface RespinConfig {
   /** Respins granted at trigger, and restored whenever a new coin lands.
@@ -280,14 +280,14 @@ export interface UpgraderOptions {
   readonly jackpots?: JackpotTable;
   /** What to do with a plain cash coin.
    *
-   *  - `"promote"` (default): turn it into MINI. The genre convention, and the
+   *, `"promote"` (default): turn it into MINI. The genre convention, and the
    *    behaviour every existing game is priced against - which is why it stays
    *    the default. Note what it means though: a cash coin worth MORE than MINI
    *    is DOWNGRADED by its own upgrade, and the player watches it happen.
-   *  - `"promote-if-better"`: promote only when MINI is worth at least as much
+   *, `"promote-if-better"`: promote only when MINI is worth at least as much
    *    as the cash coin. Needs `jackpots` to compare. This is what most games
    *    mean by "upgrade".
-   *  - `"skip"`: leave cash coins alone; the upgrader only walks the ladder. */
+   *, `"skip"`: leave cash coins alone; the upgrader only walks the ladder. */
   readonly cash?: "promote" | "promote-if-better" | "skip";
 }
 

@@ -5,7 +5,7 @@
 // Conventions:
 //   - units in the metric name (e.g. _seconds, _total)
 //   - low-cardinality labels only (kind, mode, method, reason). NEVER
-//     per-session-id or per-round-id  - Prom hates high cardinality.
+//     per-session-id or per-round-id, Prom hates high cardinality.
 
 import { Registry, type Counter, type Gauge, type Histogram } from "./metrics.js";
 
@@ -25,14 +25,14 @@ export interface RgsMetrics {
   wsConnections: Gauge;
   /** Math execution duration, per call (play / open / step / close). */
   mathDuration: Histogram;      // {kind, mode, phase}
-  /** Constant 1 carrying this instance's identity as labels  - the
+  /** Constant 1 carrying this instance's identity as labels, the
    *  node_exporter build_info pattern. Dashboards join on instance_id;
    *  a fresh series appearing = an instance (re)started. */
   buildInfo: Gauge;             // {instance_id, game, core_version, game_version}
   /** 1 while the platform adapter reports healthy, else 0. The
    *  "is the wallet there at all" SLA gauge. */
   platformConnected: Gauge;
-  /** Connection state transitions  - flap visibility. */
+  /** Connection state transitions, flap visibility. */
   platformTransitions: Counter; // {direction: up|down}
   /** Unix seconds of the last SUCCESSFUL platform RPC. Alert on
    *  `time() - rgs_platform_last_ok_timestamp_seconds` to catch a wallet

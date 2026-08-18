@@ -2,12 +2,12 @@
 //
 // Exports two shapes:
 //
-//   - createAdminHandler(cfg)  - returns a fetch handler + stop fn. The
+//   - createAdminHandler(cfg), returns a fetch handler + stop fn. The
 //     handler returns Response when the request matched an admin route,
 //     or undefined when it didn't. Designed to be composed inside
 //     another Bun.serve (e.g. mounted on the binary transport's port).
 //
-//   - startAdmin(cfg)  - legacy path: spins up its own Bun.serve on
+//   - startAdmin(cfg), legacy path: spins up its own Bun.serve on
 //     cfg.port. Kept for tests + the rare deployment that genuinely
 //     wants a separate admin port. createServer prefers single-port.
 //
@@ -22,13 +22,13 @@
 //   `/admin/autoclose`).
 //
 //   When `routeBasePath` is empty (default), only the bare form
-//   matches  - same behaviour as before.
+//   matches, same behaviour as before.
 //
 // Auth:
 //   `/admin/*` and the detailed `/healthz` require `Authorization: Bearer
 //   <authToken>` when a token is configured (constant-time compared). With
 //   no token AND `requireAuth` (set in production), those routes fail closed
-//   (403)  - the old "every request is from a trusted operator" assumption is
+//   (403). The old "every request is from a trusted operator" assumption is
 //   false when admin shares the public client port. The k8s probes
 //   `/livez` and `/readyz` are always open (no secrets; kubelet needs them).
 //
@@ -55,10 +55,10 @@ export interface AdminConfig {
   platform: PlatformAdapter;
   /** Orchestrator handle so admin can drive operator-initiated autocloses. */
   orchestrator: OrchestratorAPI;
-  /** Optional metrics registry  - exposed at /admin/metrics if provided. */
+  /** Optional metrics registry, exposed at /admin/metrics if provided. */
   metrics?: RgsMetrics;
   /** Version of the game/service hosting this admin handler. Surfaced
-   *  as game_version in /healthz. Default "unknown"  - callers should
+   *  as game_version in /healthz. Default "unknown": callers should
    *  pass their package.json version through createServer({ version }). */
   gameVersion?: string;
   /** Unique id of this running instance (createServer resolves it:
@@ -74,22 +74,22 @@ export interface AdminConfig {
   /** When true and no authToken is configured, sensitive routes fail closed
    *  (403) instead of serving openly. createServer sets this in production. */
   requireAuth?: boolean;
-  /** When true, `/healthz` is served WITHOUT auth  - same JSON shape, but no
+  /** When true, `/healthz` is served WITHOUT auth, same JSON shape, but no
    *  Bearer token required. Use this when an operator dashboard or external
    *  uptime checker needs to read /healthz from somewhere that can't
    *  inject a token (browser, third-party prober), and you've accepted
    *  that core/game/math versions, uptime, session COUNT, and platform
-   *  connection state are public. `/admin/*` is unaffected  - still gated.
+   *  connection state are public. `/admin/*` is unaffected, still gated.
    *
    *  For probe-level "is it up?" semantics, prefer `/readyz` (always open,
    *  returns 503 when the platform is down). `/healthz` is the rich
    *  diagnostic; this flag just opens the rich one too. Default false. */
   publicHealthz?: boolean;
-  /** Exact base path prepended to every canonical route  - one declared
+  /** Exact base path prepended to every canonical route, one declared
    *  ingress rewrite (e.g. "/api"). Default "" -> exact canonical paths. */
   routeBasePath?: string;
   /** CORS origin allowlist for browser-based operator dashboards. Default:
-   *  none  - no CORS headers are sent (server-to-server / same-origin only).
+   *  none: no CORS headers are sent (server-to-server / same-origin only).
    *  Never wildcard: these endpoints move money and expose balances. */
   allowedOrigins?: string[];
 }
@@ -100,7 +100,7 @@ export interface StartAdminConfig extends AdminConfig {
 
 export interface AdminHandler {
   /** Returns a Response when the path is an admin route, or undefined
-   *  to indicate "not handled  - fall through to your own 404". */
+   *  to indicate "not handled: fall through to your own 404". */
   fetch: (req: Request) => Promise<Response | undefined> | Response | undefined;
 }
 
@@ -116,14 +116,14 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
       // Exact match against either the prefixed or the bare canonical
       // route. Prefix matches the ingress (no-rewrite); bare matches
       // k8s probes + Docker HEALTHCHECK hitting the pod directly. Both
-      // are `===`  - no suffix matching, so the `/wss/admin/*` hole the
+      // are `===`, no suffix matching, so the `/wss/admin/*` hole the
       // audit closed stays closed.
       const matches = (route: string): boolean =>
         path === base + route || (base !== "" && path === route);
 
       if (req.method === "OPTIONS") return cors(new Response(null, { status: 204 }), req);
 
-      // -- K8s probes  - always open (no secrets; kubelet needs them) -----
+      // -- K8s probes, always open (no secrets; kubelet needs them) -----
       if (matches("/livez")) {
         return new Response("OK");
       }
@@ -135,7 +135,7 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
 
       // -- Auth gate for sensitive routes (detailed /healthz + /admin/*) --
       // /admin/* matches in both prefixed and bare shapes, same rule as
-      // canonical routes above  - internal callers hit /admin/*, the
+      // canonical routes above, internal callers hit /admin/*, the
       // external ingress hits ${base}/admin/*. /healthz is sensitive
       // unless the deployer opted into `publicHealthz: true` (operator
       // dashboard / external prober use case).
@@ -172,16 +172,16 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
         return cors(await handleAutoclose(req), req);
       }
 
-      // Not an admin route  - let the caller (transport / outer server)
+      // Not an admin route, let the caller (transport / outer server)
       // decide what to do (typically: 404 or upgrade-to-WS).
       return undefined;
     },
   };
 
   /** Bearer-token gate. Returns a deny Response, or null when allowed.
-   *  - token configured -> require a matching Bearer (constant-time);
-   *  - no token + requireAuth (prod) -> fail closed (403);
-   *  - no token + !requireAuth (dev) -> open. */
+   *, token configured -> require a matching Bearer (constant-time);
+   *, no token + requireAuth (prod) -> fail closed (403);
+   *, no token + !requireAuth (dev) -> open. */
   function authGate(req: Request): Response | null {
     if (cfg.authToken) {
       const got = bearerToken(req);
@@ -197,7 +197,7 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
   }
 
   function cors(res: Response, req: Request): Response {
-    // Never wildcard  - these routes move money and expose balances. Echo the
+    // Never wildcard, these routes move money and expose balances. Echo the
     // request origin only when it's on the configured allowlist; otherwise
     // send no CORS headers (server-to-server / same-origin only).
     const origin = req.headers.get("origin");
