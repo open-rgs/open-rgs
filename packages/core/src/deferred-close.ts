@@ -12,7 +12,7 @@
 // finished. A player who disappears mid-feature reconnects into an open round,
 // replays it, and ends it.
 //
-// WHAT THIS ACTUALLY DOES, said plainly: it turns the game into a complex
+// What this actually does, said plainly: it turns the game into a complex
 // round. There is no third round shape hiding here. `open` runs the simple
 // math and parks the outcome; `close` pays it. That means the money moves
 // TWICE - a debit when the round opens and a credit when it closes - exactly

@@ -243,9 +243,9 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     const byCurrency = new Map<string, Record<string, number>>();
     const fold = (rows: ReadonlyArray<{ values: Readonly<Record<string, string>>; value: number }>, kind: "bets" | "wins") => {
       for (const { values: l, value } of rows) {
-        // The label map comes straight from the registry now. This used to
-        // re-parse the rendered `k="v",k="v"` string by splitting on commas,
-        // which any label value containing a comma turned into nonsense.
+        // The label map comes straight from the registry. Re-parsing the
+        // rendered `k="v",k="v"` string would mean splitting on commas, which
+        // a label value containing one turns into nonsense.
         const cur = l["currency"] ?? "?";
         const slot = byCurrency.get(cur) ?? { bets_real: 0, bets_promo: 0, wins_real: 0, wins_promo: 0 };
         slot[`${kind}_${l["funding"] ?? "real"}`] = (slot[`${kind}_${l["funding"] ?? "real"}`] ?? 0) + value;

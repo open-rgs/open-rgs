@@ -10,8 +10,8 @@ export interface Counter {
   /** Read back current values per label-set. `values` is the label map itself;
    *  `labels` is the rendered `k="v",k="v"` form for display. In-process
    *  consumers - e.g. the financial snapshot log - read `values`: the rendered
-   *  string used to be all there was, and every consumer had to re-parse it by
-   *  splitting on commas, which a label value containing a comma breaks. */
+   *  string is for display; parsing it means splitting on commas, which a
+   *  label value containing one breaks. */
   snapshot(): ReadonlyArray<{ labels: string; values: LabelMap; value: number }>;
 }
 export interface Gauge {
@@ -80,11 +80,11 @@ export const DEFAULT_BUCKETS: readonly number[] = [
 
 // --- Implementations -------------------------------------------------------
 
-// The series key is a JSON array of the label VALUES in label-name order. It
-// used to be `name="value",name="value"`, which both the exposition and the
-// financial snapshot then re-parsed by splitting on commas - so a single label
-// value containing a comma produced a malformed metric line. A JSON array is
-// unambiguous to build and to read back, and nothing has to guess where one
+// The series key is a JSON array of the label VALUES in label-name order.
+// Storing it as `name="value",name="value"` would mean every reader (the
+// exposition, the financial snapshot) splits on commas, and one label value
+// containing a comma produces a malformed metric line. A JSON array is
+// unambiguous to build and to read back, and nothing has to guess where a
 // value ends.
 function labelKey(labels: LabelMap | undefined, names: readonly string[]): string {
   if (!names.length) return "";

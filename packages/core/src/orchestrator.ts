@@ -173,12 +173,10 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     ? undefined
     : createRequestCache(cfg.requestCache ?? {});
 
-  // The active-session gauge is DERIVED, never accumulated. It used to be an
-  // inc/dec pair across three lifecycle paths, and the INIT path incremented on
-  // every re-INIT of an already-cached session - which is what a reconnect is -
-  // while idle-overflow eviction decremented nothing. The gauge drifted upward
-  // all day. `sessions.size()` is a Map read, so reading the truth costs the
-  // same as guessing at it.
+  // The active-session gauge is derived, never accumulated. `sessions.size()`
+  // is a Map read, so counting from the store costs no more than keeping a
+  // counter, and it cannot drift: a counter has to be right on three lifecycle
+  // paths at once, and a reconnect looks exactly like a new session at INIT.
   function syncSessionGauge(): void {
     metrics?.sessionsActive.set(sessions.size());
   }
@@ -1026,8 +1024,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     }
     const math = mode.math as ComplexMath;
 
-    // Honour the game-declared AutoclosePolicy (was previously ignored, and
-    // a round with banked value could be silently forfeited).
+    // The game-declared AutoclosePolicy decides what an abandoned round is
+    // worth. Ignore it and a round with banked value is silently forfeited.
     const policy = manifest.autoclose?.policy ?? "math-decides";
     if (policy === "hold") {
       // Don't autoclose, the round persists for later resolution.
@@ -1149,8 +1147,8 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     if (!s) return;
 
     // Ownership guard: a connection that was superseded (kick-old) or
-    // otherwise replaced no longer owns the session - its late close event
-    // must not detach or evict the NEW owner's session.
+    // otherwise replaced does not own the session any more, and its late
+    // close event must not detach or evict the new owner's session.
     if (s.connectionId !== null && s.connectionId !== conn.connectionId) return;
 
     // This connection owns the binding - detach it. The session itself may

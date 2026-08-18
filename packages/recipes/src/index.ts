@@ -1,7 +1,7 @@
 // @open-rgs/recipes - a board is drawn from a MIXTURE of named recipes, each
 // with a declared probability.
 //
-// WHY NOT JUST DECORATE A BOARD AFTER DRAWING IT. Because the moment you take
+// Why not just decorate a board after drawing it. Because the moment you take
 // a drawn grid and stamp extra symbols onto it "for feel", the board's real
 // distribution stops matching the one your RTP was computed from, and nothing
 // tells you. Worse, if what you are stamping on is a tease, you have built the

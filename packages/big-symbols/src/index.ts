@@ -1,6 +1,6 @@
 // @open-rgs/big-symbols - one symbol occupying a w-by-h block of cells.
 //
-// THE REPRESENTATION IS THE DESIGN. A big symbol is written as the SAME symbol
+// The representation is the design. A big symbol is written as the SAME symbol
 // repeated across every cell it covers. There is no overlay structure, no
 // "this block is really one thing" marker, no parallel geometry for evaluators
 // to learn about.
@@ -16,7 +16,7 @@
 // `blocksOf` recovers the block layout from a finished grid. Presentation reads
 // it back; the maths never needs it.
 //
-// FIT IS NOT OBVIOUS ON A RAGGED GRID. A 2x2 needs two adjacent columns that
+// Fit is not obvious on a ragged grid. A 2x2 needs two adjacent columns that
 // are BOTH tall enough at those rows. On a multiways board where reel 3 drew a
 // height of 2, a block that fits everywhere else does not fit there - so
 // placement asks rather than assumes.

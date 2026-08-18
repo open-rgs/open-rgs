@@ -25,12 +25,11 @@ import { createFlowRecorder, type FlowLabel, type FlowRecorder } from "./flow.js
 
 /** Apply the engine's max-win cap to a raw math multiplier.
  *
- *  The simulator used to ignore it entirely: it took the whole manifest, and
- *  measured RTP off the RAW multiplier while the orchestrator clips every
- *  settle at `mode.maxWinMultiplier ?? manifest.maxWinMultiplier`. So the
- *  certification report described a game the server does not pay - overstated
- *  by exactly the distribution's mass above the cap, which is invisible unless
- *  you are looking for it.
+ *  The orchestrator clips every settle at `mode.maxWinMultiplier ??
+ *  manifest.maxWinMultiplier`, so an RTP measured off the raw multiplier
+ *  describes a game the server does not pay. It is overstated by exactly the
+ *  distribution's mass above the cap, which is invisible unless you already
+ *  suspect it.
  *
  *  Mirrors applyMaxWinCap in @open-rgs/core, including its sanitization order:
  *  a non-finite multiplier is a math fault (the engine fails the round; here we
@@ -165,8 +164,8 @@ async function simulateMode(
   let cappedRounds = 0;
   let totalSteps = 0;
   // Cross-round carry threaded spin-to-spin, exactly as the orchestrator does
-  // it. Passing `undefined` every spin (the old behaviour) made any stateful
-  // game's measured RTP wrong. (H7)
+  // it. A stateful game measured with a fresh `undefined` carry every spin
+  // reports an RTP its own players would never see.
   let carry: CarryState | undefined;
   // Set once the math threads state from one spin into the next. Spins are then
   // NOT independent, which the confidence interval below assumes - so the run

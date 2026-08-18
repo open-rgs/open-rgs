@@ -11,9 +11,9 @@
 //
 // This closes the hole on our side. Keyed on (session, client token), the
 // orchestrator answers a repeat from cache and never touches math or the
-// wallet, so the guarantee no longer depends on the wallet honouring anything.
+// wallet, so the guarantee holds whether or not the wallet honours a key.
 //
-// THREE THINGS THAT DECIDE WHETHER THIS IS CORRECT.
+// Three things that decide whether this is correct.
 //
 //   1. IN-FLIGHT COALESCING. The dangerous retry is the one that arrives while
 //      the first is still running - a client that timed out at 5s against a

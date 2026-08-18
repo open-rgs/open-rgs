@@ -1,7 +1,7 @@
 // @open-rgs/scatters - spawn scatters as a declared EVENT, on top of a board
 // that cannot grow them naturally.
 //
-// WHY THIS BEATS PUTTING SCATTERS IN THE SYMBOL WEIGHTS.
+// Why this beats putting scatters in the symbol weights.
 //
 // With a natural scatter, the trigger rate is an emergent property of per-cell
 // probability and grid size, and you tune it by guessing at a weight and
@@ -63,11 +63,11 @@ export interface SpawnResult<S = string> {
 
 /** Samplers built per config, not per spin.
  *
- *  `spawnOn` used to call `countSampler(cfg.count)` on every call - revalidating
- *  the distribution and rebuilding its cumulative table on the hot path, in a
- *  library whose own documentation tells you to build a sampler once at module
- *  scope. The config object is the natural key: a game builds one and reuses it,
- *  so the cache holds one entry per configured spawn.
+ *  Building the sampler inside `spawnOn` would revalidate the distribution and
+ *  rebuild its cumulative table on every spin, in a library whose own docs tell
+ *  you to build a sampler once at module scope. The config object is the natural
+ *  key: a game builds one and reuses it, so the cache holds one entry per
+ *  configured spawn.
  *
  *  Weak, so a config built per spin by a caller that insists on it is still
  *  collectable rather than a leak. */
@@ -175,7 +175,7 @@ function drawSome<T>(pool: readonly T[], count: number, next: () => number): T[]
  * one per reel chosen, then one per cell within a reel. With `onePerReel` off,
  * it is one float per cell chosen.
  *
- * WHEN THE BOARD CANNOT HOST THE DRAW. If protections or exclusions leave fewer
+ * When the board cannot host the draw. If protections or exclusions leave fewer
  * legal cells than the count drawn, this places what it can and reports both
  * numbers rather than throwing or silently under-delivering. Throwing would
  * crash a legitimate spin; silence would break the declared trigger rate with

@@ -15,7 +15,7 @@
 // buffer, and msgpack-decodes the returned bytes. RNG resolution is shared with
 // loadTsMath (secure system CSPRNG by default; fail-closed in production).
 //
-// COMPLEX STATE BOUNDARY. A complex round's `state` (contract `RoundState`) is
+// Complex state boundary. A complex round's `state` (contract `RoundState`) is
 // an opaque STRING that core stores and threads back into step / is_terminal /
 // close. A WASM kernel's state is raw bytes (its own layout), so this loader
 // owns the boundary: the kernel emits `state` as a MessagePack `bin` and the

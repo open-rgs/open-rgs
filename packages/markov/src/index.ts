@@ -8,7 +8,7 @@
 // THE FIX. Draw each column as a Markov chain: the symbol at row r depends on
 // the symbol at row r-1. High P(same | same) produces natural stacks.
 //
-// WHY THIS IS NOT A TRADE-OFF. Build the transitions with `sticky(base, s)`:
+// Why this is not a trade-off. Build the transitions with `sticky(base, s)`:
 //
 //     P(j | i) = s * [i = j] + (1 - s) * base[j]
 //

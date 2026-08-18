@@ -1,7 +1,7 @@
 // Recursive PII/secret redaction. Drops sensitive values without dropping
 // the surrounding shape, keeps logs structurally useful.
 //
-// Two layers, because key-name matching alone (the old behaviour) leaked:
+// Two layers, because key-name matching alone leaks:
 //   1. Key redaction, a field whose name matches a redact key is replaced.
 //      Matching is separator- and case-insensitive, so configuring
 //      "session_id" (or the defaults below) also catches "session.id",

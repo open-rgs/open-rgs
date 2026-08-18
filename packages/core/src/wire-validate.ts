@@ -1,16 +1,15 @@
 // Shape checks for decoded wire payloads.
 //
 // A transport decodes MessagePack or JSON and hands the result to the
-// orchestrator. Both used to CAST: `payload as ClientRequestSpin`. TypeScript
-// erases at runtime, so nothing checked that `sid` was a string, that `action`
-// was an object, or that `params` was anything at all - and those values are
-// not inert. `sid` becomes a session-store key and an argument to the wallet
-// adapter; `params` is handed to the math untouched; `action` is compared
-// against the awaiting hint and passed to `step`.
+// orchestrator. A cast (`payload as ClientRequestSpin`) checks nothing at
+// runtime: TypeScript erases, and these values are not inert. `sid` becomes a
+// session-store key and an argument to the wallet adapter, `params` is handed
+// to the math untouched, and `action` is compared against the awaiting hint
+// and passed to `step`.
 //
-// So a client could open a session keyed by a number, or by an object. Nothing
-// downstream is written to expect that, and the failure surfaces somewhere far
-// from the cause.
+// Without a check, a client can open a session keyed by a number, or by an
+// object. Nothing downstream expects that, and the failure surfaces far from
+// its cause.
 //
 // These checks are deliberately shallow: types and bounds for the fields the
 // engine itself reads, and nothing about `params`, whose contents belong to the

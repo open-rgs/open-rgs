@@ -56,7 +56,7 @@ function blend(parts: ReadonlyArray<{ n: number; v: number }>): number {
 }
 
 /** Merge N per-shard reports for the SAME mode into one. `expected` is the
- *  mode's `math.expected` (the parent has the manifest), used to recompute
+ *  mode's `math.expected` (the parent has the manifest), which recomputes
  *  deviations exactly from the merged series. Single-element input is
  *  returned unchanged. */
 export function mergeReports(reports: readonly SimulationReport[], expected?: MathExpectations): SimulationReport {

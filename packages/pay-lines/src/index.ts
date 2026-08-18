@@ -4,7 +4,7 @@
 // Evaluation walks it left to right, finds the longest run of one symbol
 // (wilds substituting), and looks up the paytable.
 //
-// THREE RULES THAT ARE EASY TO GET WRONG, and each costs real money:
+// Three rules that are easy to get wrong, and each costs real money:
 //
 //   1. A line pays ONCE, for its longest qualifying run. Paying every prefix
 //      (3-of-a-kind AND 4-of-a-kind AND 5) roughly doubles the game's RTP.

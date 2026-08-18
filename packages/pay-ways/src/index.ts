@@ -10,7 +10,7 @@
 // "1024 ways" is just 4^5; "243 ways" is 3^5. The number is a consequence of
 // the grid, not a setting.
 //
-// TWO THINGS THAT COST MONEY IF YOU GET THEM WRONG:
+// Two things that cost money if you get them wrong:
 //
 //   1. The run must be CONTIGUOUS from column 0. A gap ends it. Counting every
 //      column the symbol appears on, gap or not, inflates both the count and

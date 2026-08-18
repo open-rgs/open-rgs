@@ -4,7 +4,7 @@
 // right - never diagonally), paid by how many cells the group holds. Flood
 // fill from each unvisited cell.
 //
-// WILDS ARE THE WHOLE DIFFICULTY. A wild belongs to every cluster it touches,
+// Wilds are the whole difficulty. A wild belongs to every cluster it touches,
 // so it is not enough to flood-fill once and mark cells visited: a wild sitting
 // between a HIGH cluster and a LOW cluster is legitimately part of both, and
 // consuming it for the first one silently shrinks the second.

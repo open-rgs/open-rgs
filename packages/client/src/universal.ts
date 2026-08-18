@@ -65,12 +65,12 @@ export interface UniversalOptions {
    *  token (the server answers from cache rather than running the round twice)
    *  while a DIFFERENT client cannot collide with it.
    *
-   *  The prefix is the part that matters. The default used to be the counter
-   *  alone - `uc-spin-1` - which is unique only within one object's lifetime.
-   *  Two clients on the same session inside the server's cache window (a
-   *  reconnect, a rerun of a smoke test, two workers) minted identical tokens,
-   *  and the server correctly answered the second run from the first run's
-   *  cache: the run passed without a single round having executed. */
+   *  The prefix is the part that matters. A bare counter (`uc-spin-1`) is
+   *  unique only within one object's lifetime, so two clients on the same
+   *  session inside the server's cache window - a reconnect, a rerun of a smoke
+   *  test, two workers - mint identical tokens. The server then answers the
+   *  second run from the first run's cache, correctly, and the run passes
+   *  without a single round having executed. */
   keyFor?(call: string, n: number): string;
   /** Retries per call on a transport or platform failure. Default 2. Safe
    *  because every retry carries the same token. */

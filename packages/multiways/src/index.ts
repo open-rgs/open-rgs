@@ -9,7 +9,7 @@
 // product of those heights. Six reels at 2..7 span 2^6 = 64 ways to
 // 7^6 = 117,649.
 //
-// HOW LITTLE CODE THIS TAKES. A drawn shape IS the mechanic, and
+// How little code this takes. A drawn shape IS the mechanic, and
 // @open-rgs/grid has been shape-per-column since its first commit, so
 // multiways needs no special grid, no special evaluator, and no changes
 // anywhere downstream: @open-rgs/pay-ways already multiplies real column

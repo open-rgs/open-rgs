@@ -212,10 +212,10 @@ export async function runConformance(
   //
   // ADR-004 makes the adapter authoritative for cross-round state: the RGS
   // hands `carry` and `mathVersion` to the settle, and reads them back from the
-  // next openSession to seed the next round's math. Nothing here used to check
-  // that round trip, so an adapter that dropped either one - or stored it and
-  // never returned it - passed conformance and lost every player's progress on
-  // reconnect, in a way only that player would notice.
+  // next openSession to seed the next round's math. Without these checks an
+  // adapter can drop either one, or store it and never return it, and still
+  // pass conformance while losing every player's progress on reconnect - in a
+  // way only that player notices.
 
   await run("state.carry.round-trip", "state", "carry survives settle -> openSession", async () => {
     const carry = JSON.stringify({ conformance: "carry", n: 7 });

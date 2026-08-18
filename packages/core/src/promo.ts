@@ -41,14 +41,13 @@ export function activeOverride(s: LocalSession, modeId?: string): { promoId: str
 
 /** Consume one round from the pool locally.
  *
- *  The engine owns this countdown. It used to be left entirely to the wallet:
- *  the pool only ever shrank when a receipt carried `promo.remaining`, and that
- *  field is optional on `RoundReceipt` - some wires have no place to put it at
- *  all. Against such a wallet a pool of three free rounds was a pool of
- *  unlimited free rounds, because nothing on this side counted.
+ *  The engine owns this countdown, because the wallet cannot be relied on for
+ *  it: `promo.remaining` is optional on `RoundReceipt`, and some wires have
+ *  nowhere to put it. Leave the counting to the wallet and a pool of three free
+ *  rounds becomes unlimited against any wallet that stays silent.
  *
- *  So a funded round decrements here, and a wallet that DOES report its own
- *  number still wins (see `applyUpdate`) - the local count is the floor, not a
+ *  So a funded round decrements here, and a wallet that does report its own
+ *  number still wins (see `applyUpdate`). The local count is the floor, not a
  *  second opinion. */
 export function consume(s: LocalSession): void {
   if (!s.promo) return;

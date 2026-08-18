@@ -4,7 +4,7 @@
 // from the top, evaluate again. Repeat while something keeps winning, usually
 // with a multiplier that climbs each step.
 //
-// FOUR THINGS THAT ARE EASY TO GET WRONG:
+// Four things that are easy to get wrong:
 //
 //   1. Gravity is PER COLUMN. On a ragged grid a short reel drops its symbols
 //      a shorter distance, and treating the board as a rectangle mixes symbols

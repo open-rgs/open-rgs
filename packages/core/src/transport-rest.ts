@@ -6,7 +6,7 @@
 // smoke test, a curl in a runbook, an integration that cannot hold a socket
 // open, or a client behind something that will not proxy WebSockets.
 //
-// THREE THINGS REST CANNOT DO, and it is better to say so than to pretend.
+// Three things REST cannot do, and it is better to say so than to pretend.
 //
 //   1. NO SERVER PUSH. A balance change from the wallet, or the "kick-old"
 //      supersede frame, has nowhere to go. `closeConnection` is deliberately
@@ -106,15 +106,14 @@ export function restTransport(opts: RestTransportOptions = {}): ClientTransport 
     async start(api: OrchestratorAPI): Promise<{ port: number }> {
       // Connection identity over REST is the session id, and nothing else.
       //
-      // The id used to be minted per request (`rest-1`, `rest-2`, ...), which
-      // made every call look like a NEW connection arriving on a session that
-      // was still bound to the previous one. Nothing ever detaches - REST has
-      // no socket to close, so `onDisconnect` is never called - so
-      // `concurrencyPolicy: "reject-new"` refused every request after the
-      // first, permanently, for the same player. Deriving the id from the sid
-      // means a player's own repeat requests are the SAME connection (no
-      // policy trip) while a genuine second connection - a WebSocket holding
-      // the session - still is a different one and the policy still applies.
+      // A per-request id would make every call look like a new connection
+      // arriving on a session still bound to the previous one, and nothing
+      // ever detaches: REST has no socket to close, so `onDisconnect` never
+      // runs. `concurrencyPolicy: "reject-new"` would then refuse every
+      // request after the first, permanently, for the same player. Keying on
+      // the sid makes a player's own repeat requests one connection, while a
+      // genuine second connection (a WebSocket holding the session) is still a
+      // different one and the policy still applies.
       let anon = 0;
       const metaFor = (sid: string | undefined): ConnectionMeta =>
         ({ connectionId: sid ? `rest:${sid}` : `rest-anon-${++anon}`, sessionId: sid }) as ConnectionMeta;

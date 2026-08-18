@@ -263,11 +263,11 @@ export function createAdminHandler(cfg: AdminConfig): AdminHandler {
 
   /** Operational view of the session cache.
    *
-   *  This used to serialise `sessions.all()` - the whole LocalSession, including
-   *  the math carry and the open round's full ops and action logs. That is
-   *  player game state and it is far more than an operator needs to answer "is
-   *  this session stuck?". The summary keeps what an operator acts on (which
-   *  session, which round, how old, how far in) and drops the payloads. */
+   *  A summary, not `sessions.all()`. The full LocalSession carries the math
+   *  carry and the open round's ops and action logs: player game state, and far
+   *  more than an operator needs to answer "is this session stuck?". What is
+   *  left is what an operator acts on - which session, which round, how old,
+   *  how far in. */
   function sessionSummaries() {
     const now = Date.now();
     return sessions.all().map((s) => ({

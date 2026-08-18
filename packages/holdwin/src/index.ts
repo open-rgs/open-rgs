@@ -22,7 +22,7 @@
 // the ones it wants. Adding "collect only from the same column" is a selector,
 // not a new engine.
 //
-// EVERYTHING IS BET-RELATIVE. Values are multiples of the bet, never currency:
+// Everything is bet-relative. Values are multiples of the bet, never currency:
 // math is currency-blind, and the orchestrator multiplies at settle.
 
 import { type Grid, type Pos, countWhere, positionsWhere, sizeOf, withAt } from "@open-rgs/grid";
@@ -220,12 +220,10 @@ export function collector(targets: Selector<Cell> = coinCells(), jp?: JackpotTab
     for (const p of picks) {
       const c = cellAt(grid, p)!;
       if (c.tier && !jp) {
-        // The jackpot table used to default to zeros here, so collecting a
-        // GRAND without passing one absorbed it at nothing and emptied the
-        // cell: the player lost the jackpot and the round's max-win accounting
-        // lost it too, silently, on the shorter of the two call shapes. A tier
-        // coin has no value without the ladder, so refuse rather than invent
-        // one.
+        // A tier coin has no value without the ladder. Defaulting the table
+        // to zeros would absorb a GRAND at nothing and empty its cell: the
+        // player loses the jackpot, the round's max-win accounting loses it
+        // too, and nothing says so. Refuse rather than invent a value.
         throw new Error(
           `collector: collecting a ${c.tier} coin needs the jackpot table  - ` +
           `call collector(targets, jackpots) so the tier can be valued`,

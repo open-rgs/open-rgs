@@ -18,7 +18,7 @@
 //      split across files is the ordinary way to write one, and a gate that
 //      reads only the entry catches nothing that lives one import away.
 //
-// WHAT THE PURITY CHECK IS AND IS NOT. It is a guardrail against ACCIDENTS -
+// What the purity check is and is not. It is a guardrail against ACCIDENTS -
 // overwhelmingly, a math author (increasingly a language model) reaching for
 // `Math.random()` or `Date.now()` because that is the obvious thing to write.
 // It is NOT a sandbox: a determined author evades a source scan trivially
@@ -276,18 +276,15 @@ export function assertPure(src: string, path: string): void {
 
 // -. The math's own files ---------------------------------------------------
 //
-// A math is rarely one file. It used to be treated as one anyway: the loader
-// read the entry, scanned that string for purity, hashed that string as the
-// math's identity, and imported it. Everything the entry imported was
-// invisible. So a helper module could call `Math.random()` and pass the gate,
-// and rewriting a payout table in that helper produced the SAME contentHash -
-// which is the value the audit log carries as proof of which math computed an
-// outcome.
+// A math is rarely one file, so the loader collects every file it is built
+// from before it scans or hashes anything. Read only the entry and a helper
+// module can call `Math.random()` behind the gate's back, while a rewritten
+// payout table in that helper leaves the contentHash unchanged - and that hash
+// is what the audit log carries as proof of which math computed an outcome.
 //
-// So the loader walks the graph first. Only LOCAL specifiers are followed
-// (`./x`, `../y`): a package import is a dependency, out of the author's file
-// tree and pinned by the lockfile, and following it would scan the whole
-// node_modules closure to no purpose.
+// Only local specifiers are followed (`./x`, `../y`). A package import is a
+// dependency: pinned by the lockfile, outside the author's file tree, and
+// following it would scan the whole node_modules closure to no purpose.
 
 /** Graph hash per entry path, so a second load can tell the author their edit
  *  is not being picked up (see loadTsMath). */
@@ -434,7 +431,7 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
   // Identity of the whole math: the provenance stamp below, and the cache-bust
   // for the entry module.
   //
-  // WHAT THE CACHE-BUST CAN AND CANNOT DO. The query re-imports the ENTRY.
+  // What the cache-bust can and cannot do. The query re-imports the ENTRY.
   // Its imports are cached under their own URLs, which nothing here rewrites,
   // so a second load in the same process picks up an edited entry and keeps the
   // already-imported helpers. The hash below sees the edit even when the module
@@ -467,7 +464,7 @@ export async function loadTsMath(path: string, opts: LoadTsMathOptions = {}): Pr
 
   const math = (factory as MathFactory)(host);
   // Read `kind` before the guard: inside the failure branch TS has narrowed
-  // `math` to `never`, so it can no longer be used to build the message.
+  // `math` to `never`, so the message cannot be built from it there.
   const kind: unknown = math?.kind;
   if (!math || (kind !== "simple" && kind !== "complex")) {
     throw new Error(
