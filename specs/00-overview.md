@@ -127,6 +127,9 @@ open-rgs/
 |   +-- core/                  @open-rgs/core  - runtime
 |   +-- platform-mock/           @open-rgs/platform-mock  - dev/test wallet
 |   +-- simulator/             @open-rgs/simulator  - RTP simulator + `open-rgs-sim` CLI
+|   +-- <slot libraries>/       one package per mechanic (grid, weights, pay-*,
+|                               cascade, holdwin, freespins, picks, gamble,
+|                               symbols, meters, strips, ...)
 +-- examples/
 |   +-- hello-spin/            example: the smallest working server
 |   +-- gamble-slot/           example: complex round with a gamble

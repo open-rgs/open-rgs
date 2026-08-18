@@ -37,13 +37,25 @@ open-rgs/
 |   +-- adapter-test-kit/      @open-rgs/adapter-test-kit  - conformance suite
 |   +-- client/                @open-rgs/client  - tiny WS client
 |   +-- simulator/             @open-rgs/simulator  - RTP simulator + reports
+|   |
+|   |   the slot libraries, one package per mechanic:
+|   +-- grid/ weights/ selectors/          substrate
+|   +-- fill/ markov/ recipes/ strips/     making a board
+|   +-- paytable/ pay-lines/ pay-ways/     what a board is worth
+|   +-- pay-anywhere/ pay-cluster/
+|   +-- multiways/ big-symbols/ scatters/  reels, blocks, spawns
+|   +-- symbols/                           mystery, transforms, walking wilds
+|   +-- cascade/ holdwin/ freespins/       features
+|   +-- picks/ gamble/ meters/
 +-- apps/
     +-- site/                  Astro docs site -> open-rgs.dev
 ```
 
 ## What's shipped
 
-- All published `@open-rgs/*` packages (adapter-artube is private, see below)
+- All published `@open-rgs/*` packages: the engine (contract, core, log,
+  platform-mock, adapter-kit, adapter-test-kit, client, simulator) plus 19
+  slot libraries. adapter-artube is private, see below
 - `apps/site`: public docs site (Astro static SSG)
 - Specs `00-10` + `12` + ADRs
 - `deploy/`: reference Docker + k8s templates
