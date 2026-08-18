@@ -155,6 +155,13 @@
         "@open-rgs/weights": "0.1.0",
       },
     },
+    "packages/freespins": {
+      "name": "@open-rgs/freespins",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+      },
+    },
     "packages/grid": {
       "name": "@open-rgs/grid",
       "version": "0.1.0",
@@ -227,6 +234,13 @@
     "packages/paytable": {
       "name": "@open-rgs/paytable",
       "version": "0.1.0",
+    },
+    "packages/picks": {
+      "name": "@open-rgs/picks",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/weights": "0.1.0",
+      },
     },
     "packages/platform-mock": {
       "name": "@open-rgs/platform-mock",
@@ -489,6 +503,8 @@
 
     "@open-rgs/fill": ["@open-rgs/fill@workspace:packages/fill"],
 
+    "@open-rgs/freespins": ["@open-rgs/freespins@workspace:packages/freespins"],
+
     "@open-rgs/grid": ["@open-rgs/grid@workspace:packages/grid"],
 
     "@open-rgs/holdwin": ["@open-rgs/holdwin@workspace:packages/holdwin"],
@@ -508,6 +524,8 @@
     "@open-rgs/pay-ways": ["@open-rgs/pay-ways@workspace:packages/pay-ways"],
 
     "@open-rgs/paytable": ["@open-rgs/paytable@workspace:packages/paytable"],
+
+    "@open-rgs/picks": ["@open-rgs/picks@workspace:packages/picks"],
 
     "@open-rgs/platform-mock": ["@open-rgs/platform-mock@workspace:packages/platform-mock"],
 

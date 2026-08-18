@@ -112,6 +112,12 @@ export interface CascadeStep<S> {
   readonly grid: Grid<S>;
   /** Cells cleared, de-duplicated. */
   readonly cleared: readonly number[];
+  /** Flat indices holding a symbol that fell in from the top on this step.
+   *  Not the same as `cleared`: gravity moves survivors down, so the holes
+   *  that get refilled are at the TOP of each column that lost anything,
+   *  wherever the clears happened to be. A client animating a drop needs
+   *  these, and so does any mechanic that only counts new symbols. */
+  readonly refilled: readonly number[];
   /** Base win for this step, before the ladder. */
   readonly baseMultiplier: number;
   /** Ladder value applied to this step. */
@@ -190,9 +196,16 @@ export function runCascade<S>(
     const stepMultiplier = multiplierForStep(step, ladder);
     const paid = base * stepMultiplier;
     total += paid;
-    steps.push({ step, grid, cleared, baseMultiplier: base, stepMultiplier, paid });
 
-    grid = tumble(grid, cleared, pick, next);
+    // Where the fresh symbols land: the holes after gravity, which is the top
+    // of every column that lost a cell.
+    const holed = collapse(clear(grid, cleared));
+    const refilled: number[] = [];
+    for (let i = 0; i < holed.cells.length; i++) if (holed.cells[i] === null) refilled.push(i);
+
+    steps.push({ step, grid, cleared, refilled, baseMultiplier: base, stepMultiplier, paid });
+
+    grid = refill(holed, pick, next);
   }
 
   return { steps, finalGrid: grid, multiplier: total, truncated };

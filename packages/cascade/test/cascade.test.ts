@@ -263,3 +263,49 @@ describe("cascade on a ragged grid", () => {
     expect(at(r.finalGrid, 1, 2)).toBeUndefined();
   });
 });
+
+describe("a step reports what fell in", () => {
+  const symbols = ["N1", "N2", "N3", "N4", "N5", "N6"];
+  let n = 0;
+  const pick = () => symbols[n++ % symbols.length]!;
+
+  test("refilled cells are the holes after gravity, at the top of each column", () => {
+    // 2x3 board; clear the BOTTOM cell of column 0 -> survivors fall, the hole
+    // ends up at the TOP of that column, not where the clear happened.
+    const grid = fromColumns([["a", "b", "c"], ["d", "e", "f"]]);
+    let seen: readonly number[] = [];
+    runCascade(
+      grid,
+      (g) => (seen.length === 0 ? { multiplier: 1, positions: [2] } : { multiplier: 0, positions: [] }),
+      pick,
+      () => 0.5,
+      { maxSteps: 2 },
+    ).steps.forEach((s) => { if (s.step === 1) seen = s.refilled; });
+    expect(seen).toEqual([0]);            // top of column 0
+  });
+
+  test("clearing a whole column refills all of it", () => {
+    const grid = fromColumns([["a", "b"], ["c", "d"]]);
+    const run = runCascade(
+      grid,
+      (g) => (g.cells[0] === "a" ? { multiplier: 1, positions: [0, 1] } : { multiplier: 0, positions: [] }),
+      pick,
+      () => 0.5,
+      { maxSteps: 2 },
+    );
+    expect(run.steps[0]!.refilled).toEqual([0, 1]);
+  });
+
+  test("cleared and refilled are different lists", () => {
+    const grid = fromColumns([["a", "b", "c"]]);
+    const run = runCascade(
+      grid,
+      (g) => (g.cells[1] === "b" ? { multiplier: 1, positions: [1] } : { multiplier: 0, positions: [] }),
+      pick,
+      () => 0.5,
+      { maxSteps: 2 },
+    );
+    expect(run.steps[0]!.cleared).toEqual([1]);   // the middle cell won
+    expect(run.steps[0]!.refilled).toEqual([0]);  // the top one is what fell in
+  });
+});

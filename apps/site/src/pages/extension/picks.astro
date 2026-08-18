@@ -1,0 +1,82 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/picks, Pick bonuses"
+  description="Pick N of M, keep revealing until a stop symbol, or spin a weighted wheel, with the arithmetic to price each before it ships."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/picks</h1>
+
+    <p class="lede">A pick round is priced by what it removes.</p>
+
+    <p>Three shapes cover nearly every pick bonus, and they differ only in what ends the round: a fixed number of picks, a stop symbol, or a single wheel spin. The prizes are ordinary weighted sets, so the sampler that fills a reel fills a pick pool.</p>
+
+    <h2 data-section="&sect; 1">Reveals remove what they revealed</h2>
+
+    <p>This is the whole pricing model. A pick round takes items off the board, so the odds move as the player picks. Drawing with replacement instead looks identical on screen and pays a different distribution, and the gap widens with every pick.</p>
+
+    <Anim kind="picks-pool" caption="Boxes open one at a time, and what opened is gone." />
+
+    <Code code={`import { pool, pooledFrom, pickN, remainingCount } from "@open-rgs/picks";
+
+// an explicit board
+const boxes = pool(["1", "2", "5", "10", "BOMB", "BOMB"]);
+
+// or one drawn from weights, once, before the picking starts
+const drawn = pooledFrom({ "1": 50, "5": 30, "25": 15, "100": 5 }, 12, host.rng_next);
+
+const { pool: after, picked } = pickN(boxes, 3, host.rng_next);
+remainingCount(after);   // 3`} />
+
+    <p>Reveals are uniform over what is left, deliberately: the weights already shaped the pool when it was built, so weighting the reveal as well would apply them twice. Asking for more picks than the board holds reveals what is there, because a five-pick bonus on a four-box board is an authoring mistake and failing the round mid-flight makes it the player's problem.</p>
+
+    <h2 data-section="&sect; 2">Keep picking until a stop</h2>
+
+    <p>The genre's second shape: collect prizes until the bomb. The stop is included in what was picked, because the player saw it and a report that hides it cannot be reconciled against the screen.</p>
+
+    <Code code={`import { revealUntil } from "@open-rgs/picks";
+
+const round = revealUntil(boxes, (b) => b === "BOMB", host.rng_next);
+
+round.picked;      // everything revealed, the BOMB included
+round.stoppedBy;   // "BOMB", or undefined
+round.exhausted;   // true when the board ran out first`} />
+
+    <p>How long such a round runs is arithmetic rather than a simulation result. With three bombs in twelve boxes it reveals 2.25 prizes on average, so moving the bomb count is moving that number:</p>
+
+    <Code code={`expectedPicksBeforeStop(12, 3);   // 2.25
+expectedPicksBeforeStop(12, 1);   // 5.5
+expectedPicksBeforeStop(12, 6);   // 0.857`} />
+
+    <h2 data-section="&sect; 3">Wheels</h2>
+
+    <p>A wheel is a weighted set with a name for its shape, because that is how a designer talks about it and because the segment list is what a client renders. Equal weights make an evenly divided wheel, which is what a player assumes they are looking at.</p>
+
+    <Anim kind="picks-wheel" caption="One draw from weighted segments." />
+
+    <Code code={`import { wheel, wheelValue } from "@open-rgs/picks";
+
+const w = wheel({ MINI: 50, MINOR: 30, MAJOR: 15, GRAND: 5 });
+
+w.spin(host.rng_next);        // "MINOR"
+w.probabilityOf("GRAND");     // 0.05
+
+// what the bonus is worth, before it ships
+wheelValue(w, (seg) => JACKPOTS[seg]);   // 77.5x`} />
+
+    <p><code>spin</code> takes the generator, while <code>Sampler.pick</code> takes a float. The two read alike at the call site, so passing a number says so rather than failing as "next is not a function".</p>
+
+    <h2 data-section="&sect; 4">Pricing the round</h2>
+
+    <p>Because reveals are uniform without replacement, every item is equally likely to be among the first <em>n</em>, so the expected total is the pool's mean times the number of picks. That closed form is the number a designer tunes against, and it is why the with-replacement mistake is worth naming: it pays the same mean per pick and a different distribution, and a bonus is judged on its distribution.</p>
+
+    <Code code={`expectedPickTotal(pool([1, 2, 3, 9]), 2, (n) => n);   // 7.5
+
+// the same board, simulated 20,000 times, lands on the same number`} />
+  </main>
+</BaseLayout>

@@ -55,6 +55,60 @@ export function placements(shape: Shape, width: number, height: number): Pos[] {
   return out;
 }
 
+// --- the expanding symbol ---------------------------------------------------
+//
+// A block is a symbol that ARRIVES big. An expanding symbol arrives normal and
+// then grows to fill its reel: the book game's special symbol, the expanding
+// wild. Different mechanic, different price, so it is a different function.
+// The geometry is simpler (a whole column, never a rectangle) and the question
+// is which columns qualify rather than where a rectangle fits.
+
+/** Columns holding at least one `symbol`: the candidates to expand. */
+export function columnsHolding<S>(grid: Grid<S>, symbol: S): number[] {
+  const out: number[] = [];
+  for (let col = 0; col < widthOf(grid.shape); col++) {
+    for (let row = 0; row < heightOf(grid.shape, col); row++) {
+      if (grid.cells[indexOf(grid.shape, col, row)] === symbol) { out.push(col); break; }
+    }
+  }
+  return out;
+}
+
+/** Fill one column with a symbol. */
+export function expandColumn<S>(grid: Grid<S>, col: number, symbol: S): Grid<S> {
+  const height = heightOf(grid.shape, col);
+  if (height === 0) return grid;
+  const writes: Array<readonly [Pos, S]> = [];
+  for (let row = 0; row < height; row++) writes.push([{ col, row }, symbol] as const);
+  return withAt(grid, writes);
+}
+
+/**
+ * Expand every column holding `symbol` so it fills that column.
+ *
+ * The evaluator then sees a full column, which is what makes an expanded
+ * symbol pay across the board rather than on the cell it landed on. Ragged
+ * grids expand to each column's own height, so a short reel is filled short.
+ */
+export function expandSymbol<S>(grid: Grid<S>, symbol: S): { grid: Grid<S>; columns: number[] } {
+  const columns = columnsHolding(grid, symbol);
+  let out = grid;
+  for (const col of columns) out = expandColumn(out, col, symbol);
+  return { grid: out, columns };
+}
+
+/** Cells an expansion would write, without writing them: for a client that
+ *  animates the growth before the board changes. */
+export function expansionCells<S>(grid: Grid<S>, symbol: S): number[] {
+  const out: number[] = [];
+  for (const col of columnsHolding(grid, symbol)) {
+    for (let row = 0; row < heightOf(grid.shape, col); row++) {
+      out.push(indexOf(grid.shape, col, row));
+    }
+  }
+  return out;
+}
+
 /** Flat indices a block covers. Empty when it does not fit. */
 export function cellsOf(shape: Shape, block: Block): number[] {
   if (!fits(shape, block.pos, block.width, block.height)) return [];

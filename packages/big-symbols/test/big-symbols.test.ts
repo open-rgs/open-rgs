@@ -4,10 +4,11 @@
 // block that gets clipped instead of refused.
 
 import { describe, expect, test } from "bun:test";
-import { at, countOf, fromColumns, makeGrid, rect } from "@open-rgs/grid";
+import { at, countOf, fromColumns, makeGrid, rect, toColumns } from "@open-rgs/grid";
 import { sampler } from "@open-rgs/weights";
 import {
-  blocksOf, cellsOf, fits, placeBig, placeDrawnBig, placeRandomBig, placements, weightOfBlock,
+  blocksOf, cellsOf, columnsHolding, expandSymbol, expansionCells, fits, placeBig,
+  placeDrawnBig, placeRandomBig, placements, weightOfBlock,
 } from "../src/index.js";
 
 const R55 = rect(5, 5);
@@ -162,5 +163,47 @@ describe("recovering blocks for presentation", () => {
     expect(found).toHaveLength(2);
     const cells = found.flatMap((b) => cellsOf(g.shape, b));
     expect(new Set(cells).size).toBe(cells.length);
+  });
+});
+
+describe("expanding symbols", () => {
+  test("a landed symbol fills its own column, and only its own", () => {
+    const g = fromColumns([["A", "B", "C"], ["D", "SPECIAL", "F"], ["G", "H", "I"]]);
+    const out = expandSymbol(g, "SPECIAL");
+    expect(out.columns).toEqual([1]);
+    expect(toColumns(out.grid)[1]).toEqual(["SPECIAL", "SPECIAL", "SPECIAL"]);
+    expect(toColumns(out.grid)[0]).toEqual(["A", "B", "C"]);
+  });
+
+  test("two columns holding it both expand", () => {
+    const g = fromColumns([["S", "B"], ["C", "D"], ["E", "S"]]);
+    const out = expandSymbol(g, "S");
+    expect(out.columns).toEqual([0, 2]);
+    expect(out.grid.cells.filter((c) => c === "S")).toHaveLength(4);
+  });
+
+  test("a ragged column expands to its own height", () => {
+    const g = fromColumns([["S"], ["A", "B", "C"]]);
+    const out = expandSymbol(g, "S");
+    expect(toColumns(out.grid)[0]).toEqual(["S"]);
+    expect(out.grid.cells).toHaveLength(4);
+  });
+
+  test("no occurrence is a no-op, not an empty board", () => {
+    const g = fromColumns([["A", "B"], ["C", "D"]]);
+    const out = expandSymbol(g, "MISSING");
+    expect(out.columns).toEqual([]);
+    expect(out.grid).toBe(g);
+  });
+
+  test("the cells an expansion would write can be read without writing them", () => {
+    const g = fromColumns([["A", "S"], ["C", "D"]]);
+    expect(expansionCells(g, "S")).toEqual([0, 1]);
+    expect(g.cells[0]).toBe("A");        // untouched
+  });
+
+  test("columnsHolding finds a column once, however many copies it holds", () => {
+    const g = fromColumns([["S", "S", "S"], ["A", "B", "C"]]);
+    expect(columnsHolding(g, "S")).toEqual([0]);
   });
 });

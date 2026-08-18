@@ -276,6 +276,38 @@ const n = (k: number) => Array.from({ length: k });
         <span class="hwc hole new n1"></span><span class="hwc hole new n2"></span><span class="hwc hole new n3"></span>
       </div>
     )}
+    {kind === "fs-multiplier" && (
+      <div class="row gap">
+        <span class="num fsx x1">1&times;</span><span class="num fsx x2">2&times;</span>
+        <span class="num fsx x3">3&times;</span><span class="num fsx x4">5&times;</span>
+        <span class="fsw">win &times; the one showing</span>
+      </div>
+    )}
+    {kind === "fs-retrigger" && (
+      <div class="row gap">
+        <div class="meter"><i class="a"></i><i class="a"></i><i class="a rt3"></i><i class="a rt4"></i><i class="a rt5"></i></div>
+        <span class="num rtlabel">+3</span>
+      </div>
+    )}
+    {kind === "fs-sticky" && (
+      <div class="hw">
+        <span class="hwc coin">W</span><span class="hwc spun s1">A</span><span class="hwc spun s2">K</span>
+        <span class="hwc spun s3">Q</span><span class="hwc coin">W</span><span class="hwc spun s1">J</span>
+        <span class="hwc spun s2">A</span><span class="hwc spun s3">K</span><span class="hwc coin">W</span>
+      </div>
+    )}
+    {kind === "picks-pool" && (
+      <div class="hw">
+        <span class="hwc box b1">?</span><span class="hwc box b2">?</span><span class="hwc box b3">?</span>
+        <span class="hwc box b4">?</span><span class="hwc box b5">?</span><span class="hwc box b6">?</span>
+      </div>
+    )}
+    {kind === "picks-wheel" && (
+      <div class="row gap">
+        <span class="num wseg w1">MINI</span><span class="num wseg w2">MINOR</span>
+        <span class="num wseg w3">MAJOR</span><span class="num wseg w4">GRAND</span>
+      </div>
+    )}
     {kind === "holdwin-full" && (
       <div class="g3">{n(9).map((_, i) => <i class={`a fillseq f${i}`}></i>)}</div>
     )}
@@ -625,6 +657,34 @@ const n = (k: number) => Array.from({ length: k });
   .f3{animation-delay:.36s}.f4{animation-delay:.48s}.f5{animation-delay:.6s}
   .f6{animation-delay:.72s}.f7{animation-delay:.84s}.f8{animation-delay:.96s}
 
+  /* --- free spins: the multiplier, the counter, the held cells ------------- */
+  @keyframes fsStep { 0%,100%{opacity:.22} 18%{opacity:1;color:#0E6B62} }
+  .fsx { opacity: .22; }
+  .x1{animation:fsStep 5s infinite}.x2{animation:fsStep 5s infinite 1.2s}
+  .x3{animation:fsStep 5s infinite 2.4s}.x4{animation:fsStep 5s infinite 3.6s}
+  .fsw { font-size: .7rem; color: var(--dim, #8a8a8a); }
+
+  @keyframes rtOpen { 0%,55%{opacity:.12} 65%,100%{opacity:1} }
+  .meter .rt3, .meter .rt4, .meter .rt5 { animation: rtOpen 4s infinite; }
+  .meter .rt4 { animation-delay: .08s } .meter .rt5 { animation-delay: .16s }
+  @keyframes rtLabel { 0%,52%{opacity:0} 62%,88%{opacity:1} 96%,100%{opacity:0} }
+  .rtlabel { color: #0E6B62; animation: rtLabel 4s infinite; }
+
+  /* the spun cells change, the held ones do not */
+  @keyframes reSpin { 0%,45%{opacity:1} 50%{opacity:.15} 55%,100%{opacity:1} }
+  .hwc.spun { background: rgba(255,255,255,.06); color: #9a9a9a; animation: reSpin 3s infinite; }
+  .hwc.spun.s2 { animation-delay: .06s } .hwc.spun.s3 { animation-delay: .12s }
+
+  /* --- picks: boxes open one at a time, a wheel lands on one segment ------- */
+  .hwc.box { background: rgba(255,255,255,.08); color: #b9b9b9; }
+  @keyframes boxOpen { 0%,20%{opacity:1} 30%,100%{opacity:.16} }
+  .b2{animation:boxOpen 5s infinite .6s}.b5{animation:boxOpen 5s infinite 1.4s}
+  .b3{animation:boxOpen 5s infinite 2.2s}
+  @keyframes segLand { 0%,100%{opacity:.25} 12%{opacity:1;color:#0E6B62} }
+  .wseg { opacity: .25; font-size: .72rem; }
+  .w1{animation:segLand 3.2s infinite}.w2{animation:segLand 3.2s infinite .8s}
+  .w3{animation:segLand 3.2s infinite 1.6s}.w4{animation:segLand 3.2s infinite 2.4s}
+
   /* --- hold & win: a real board, with values on the cells ------------------ */
   .hw { display: grid; grid-template-columns: repeat(3, 34px); gap: 4px; }
   .hwc {
@@ -710,6 +770,8 @@ const n = (k: number) => Array.from({ length: k });
        over, both multipliers on the cell, the row open. A still of the
        before-state would say nothing about the mechanic. */
     .hwc.land, .hwc.new, .hwc.pot .tot, .hwc.q .flip, .hwc .badge { opacity: 1 !important; }
+    .fsx, .wseg, .meter .rt3, .meter .rt4, .meter .rt5, .rtlabel { opacity: 1 !important; }
+    .hwc.box.b2, .hwc.box.b3, .hwc.box.b5 { opacity: .16 !important; }
     .hwc.eat { opacity: .16 !important; color: #6b6b6b !important; }
     .hwc .badge { position: static; margin-left: 3px; }
     .hwc.xcell .badge:not(.b2) { display: none; }

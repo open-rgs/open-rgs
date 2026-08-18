@@ -1,0 +1,102 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/freespins, Free spins"
+  description="Trigger tables, the spin counter, retriggers, a global multiplier that survives the spin that earned it, and symbols that stay put."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/freespins</h1>
+
+    <p class="lede">A spin is paid at the multiplier that was showing.</p>
+
+    <p>A free-spin round is a small state machine: some number of spins, a running total, and whatever persists between them. It does not spin anything. The board still comes from your generator and the win from your evaluator; this owns the bookkeeping in between, which is where the arithmetic errors live.</p>
+
+    <h2 data-section="&sect; 1">The whole feature</h2>
+
+    <Code code={`import { spinsFor, beginFreeSpins, runFreeSpins, applySticky } from "@open-rgs/freespins";
+
+const TABLE = { 3: 10, 4: 15, 5: 25 };            // scatters -> spins
+const CFG = { ladder: { steps: [1, 2, 3, 5] } };  // global multiplier
+
+const feature = runFreeSpins(
+  beginFreeSpins(spinsFor(TABLE, scatters), CFG),
+  (state, next) => {
+    const board = applySticky(drawBoard(next), state.sticky);
+    return { win: evaluate(board) };              // before the multiplier
+  },
+  host.rng_next,
+  CFG,
+);
+
+feature.total;   // a multiple of bet, multipliers already applied`} />
+
+    <h2 data-section="&sect; 2">The trigger is a table</h2>
+
+    <p>Scatters landed to spins awarded, written the way the paytable states it and the way a lab reads it back. Counts <em>above</em> the top entry award the top entry: six scatters on a table that stops at five is a better board, not a broken one, and paying it nothing is the kind of bug that only appears on the boards players remember.</p>
+
+    <Code code={`spinsFor({ 3: 10, 4: 15, 5: 25 }, 3);   // 10
+spinsFor({ 3: 10, 4: 15, 5: 25 }, 6);   // 25, the top entry
+triggers({ 3: 10 }, 2);                 // false
+triggerAt({ 3: 10, 4: 15 });            // 3, the number a tease is built around`} />
+
+    <h2 data-section="&sect; 3">The multiplier survives the spin that earned it</h2>
+
+    <p>The global multiplier lives in the feature's state, and <code>playSpin</code> applies it before the ladder moves. That order is the point: a spin pays at the value that was showing when it was played. The other order pays the first spin at the second spin's multiplier, compounds over the whole feature, and looks perfectly right in a screenshot.</p>
+
+    <Anim kind="fs-multiplier" caption="The ladder climbs between spins. A spin is paid at the step it was played on." />
+
+    <Code code={`const CFG = { ladder: { steps: [1, 2, 3, 5] } };   // last step repeats
+
+let s = beginFreeSpins(4, CFG);   // showing 1x
+s = playSpin(s, 10, CFG);         // pays 10, ladder moves to 2x
+s = playSpin(s, 10, CFG);         // pays 20, ladder moves to 3x
+
+// advance: "per-win" holds the ladder still on a losing spin
+// advance: "manual" leaves it to bumpMultiplier / setMultiplier`} />
+
+    <p><code>per-spin</code> climbs every spin. <code>per-win</code> climbs only on a spin that paid, which is the version that makes a dry spell hurt. <code>manual</code> hands it to the game, for a symbol that bumps the multiplier when it lands.</p>
+
+    <h2 data-section="&sect; 4">A retrigger adds, it never resets</h2>
+
+    <p>Which is why a retrigger late in a feature is worth more than an early one, and why the counter is worth watching rather than just the count.</p>
+
+    <Anim kind="fs-retrigger" caption="Three more spins land on top of what was left." />
+
+    <Code code={`s = retrigger(s, spinsFor(TABLE, scatters));   // adds to spinsLeft
+
+// a feature that can retrigger indefinitely needs a bound of its own
+const CFG = { ladder, maxRetriggerSpins: 60 };`} />
+
+    <p>The max-win cap is a payout rule, not a statement about how long a round runs, so <code>maxRetriggerSpins</code> exists to say the second thing. <code>runFreeSpins</code> also takes a <code>maxSpins</code> backstop, so a retrigger rule that always fires cannot hang a round.</p>
+
+    <h2 data-section="&sect; 5">Sticky cells are re-applied, not remembered</h2>
+
+    <p>A held cell is written onto every board that follows, which means calling <code>applySticky</code> after the draw and before the evaluation. A sticky symbol that is only written on the spin it landed is not sticky, and nothing else in the round will tell you.</p>
+
+    <Anim kind="fs-sticky" caption="The held cells stay while everything around them respins." />
+
+    <Code code={`// inside the spin function
+const board = applySticky(drawBoard(next), state.sticky);
+
+// hold what landed, for the spins that follow
+return { win: evaluate(board), stick: [[{ col: 2, row: 1 }, "WILD"]] };`} />
+
+    <p>Sticking the same cell twice replaces rather than stacking, because two symbols cannot occupy one position and quietly keeping the older one is the surprising half of that.</p>
+
+    <h2 data-section="&sect; 6">What a spin can report</h2>
+
+    <p>Most spins are just a win. The rest of the outcome is optional, and the loop applies it in the order a round actually happens: pay, then extend, then hold.</p>
+
+    <Code code={`return {
+  win: 12,                                  // before the global multiplier
+  retrigger: spinsFor(TABLE, scatters),     // extends the feature
+  stick: [[pos, "WILD"]],                   // held for the spins that follow
+  bump: 1,                                  // for a "manual" ladder
+};`} />
+  </main>
+</BaseLayout>
