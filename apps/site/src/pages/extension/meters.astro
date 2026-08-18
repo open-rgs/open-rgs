@@ -51,7 +51,43 @@ toNext(m, CFG);      // symbols to the next threshold
 progress(m, CFG);    // 0..1 between the last threshold and the next, for the bar
 isFull(m, CFG);      // every threshold awarded`} />
 
-    <h2 data-section="&sect; 4">The cadence is arithmetic</h2>
+    <h2 data-section="&sect; 4">A floor, a ceiling, and spending it down</h2>
+
+    <p>A counter with no ceiling is fine. A multiplier that tops out at 10x is not, and neither is one that starts at 1x rather than at nothing. Bounds make both say so, and collecting past the ceiling clamps rather than throwing, because a spin that collects more than the meter can hold is a good spin.</p>
+
+    <Code code={`const MULT = { thresholds: [...], min: 1, max: 10 };
+
+meter(MULT).count;              // 1, not 0
+fillLevel(m, MULT);             // 0..1 between the floor and the ceiling
+isAtMax(m, MULT);               // time to award something else instead
+
+spend(m, 3, MULT);              // for a meter that is spent as well as filled`} />
+
+    <p><code>fillLevel</code> is not <code>progress</code>: one measures how full the meter is, the other how close the next prize is. A bar drawn toward the top of the meter wants the first; a bar drawn toward the next threshold wants the second.</p>
+
+    <p>Spending down does <strong>not</strong> un-earn a threshold. A player who spends a meter and refills it has collected the symbols twice but is not paid for the same rung twice, unless the game asks for that with <code>reawardAfterSpend</code>. That default is the difference between a meter and a repeatable prize.</p>
+
+    <h2 data-section="&sect; 5">Living in carry, and surviving a change</h2>
+
+    <p>A meter that outlasts a spin has to live in the math's <a href="/carry">carry</a>, because the engine keeps no per-player state of its own. That makes the meter's serialised shape part of the game's persisted state, so a change to that shape meets carry written by the version before it.</p>
+
+    <Code code={`import { toCarry, fromCarry } from "@open-rgs/meters";
+
+// at the end of a spin
+return { multiplier, ops, type, carry: toCarry(m) };
+
+// at the start of the next one
+let m = fromCarry(prev, CFG);                    // "reset" on anything unreadable
+let m = fromCarry(prev, CFG, "keep-count");      // keep progress, forget the rungs
+let m = fromCarry(prev, CFG, (raw) => ({         // or read the old shape yourself
+  count: raw.total, awarded: raw.paid, laps: 0,
+}));`} />
+
+    <p>The engine already has one rule here: a carry whose stored math version differs from the loaded math is discarded, and the session starts fresh. <code>fromCarry</code> covers what that rule does not, which is a meter whose own shape changed while the math version stayed put, and games that would rather migrate than discard.</p>
+
+    <p>The three strategies are a real choice rather than a formality. <strong>Reset</strong> pays nobody twice and reads nothing with the wrong parser. <strong>Keep-count</strong> preserves what the player collected and lets the rungs they already passed pay <em>again</em>, which is generous in some games and paying twice for one collection in others. <strong>A function</strong> is the only one that keeps both progress and awards, and the only one that needs the old shape written down somewhere.</p>
+
+    <h2 data-section="&sect; 6">The cadence is arithmetic</h2>
 
     <p>A meter at 10 that collects 0.4 per spin on average fills in 25 spins, so a ten-spin feature fills it about four times in ten. That is worth knowing before a simulation, because it is the number you are actually choosing when you set the threshold.</p>
 

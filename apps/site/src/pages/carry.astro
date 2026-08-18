@@ -74,6 +74,8 @@ openSession(sid) -> { balance, carry, mathVersion, ... }`} />
       <li><strong>Not a session.</strong> A promo pool, a balance and an open round are engine concepts with their own fields.</li>
     </ul>
 
+    <p><a href="/extension/meters">@open-rgs/meters</a> is a worked example of all of this: a counter that lives in carry, with <code>toCarry</code> / <code>fromCarry</code> and three named strategies for what happens to a player mid-meter when its shape changes.</p>
+
     <p>A simple round has no separate carry field on the wire: <code>roundState</code> doubles as it, because a simple round opens and closes in the same call, so this round's final state <em>is</em> what the next one starts from. A complex round has both, and they are different things: <code>finalState</code> is what this round ended as, <code>carry</code> is what the next one begins with.</p>
   </main>
 </BaseLayout>
