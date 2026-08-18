@@ -97,9 +97,9 @@ See `docs/architecture.drawio` for the colour-coded diagrams (six tabs).
 
 - Repository on GitHub, public.
 - `@open-rgs/contract`, `@open-rgs/core`, `@open-rgs/platform-mock` (and
-  future `@open-rgs/cli`, transports, etc.) published to npm under the
+  future transports, etc.) published to npm under the
   MIT license.
-- Reference example examples (`lucky-digits`, `gamble-cherry`) live in
+- Reference examples (`hello-spin`, `gamble-slot`, `hold-and-win`, ...) live in
   `examples/` and are MIT.
 - Reference deployment template (`deploy/`) is MIT.
 - Math files written by third parties are NOT MIT by association  - each
@@ -126,10 +126,10 @@ open-rgs/
 |   +-- contract/              @open-rgs/contract  - types only
 |   +-- core/                  @open-rgs/core  - runtime
 |   +-- platform-mock/           @open-rgs/platform-mock  - dev/test wallet
-|   +-- cli/                   @open-rgs/cli  - simulator/fuzzer (planned)
+|   +-- simulator/             @open-rgs/simulator  - RTP simulator + `open-rgs-sim` CLI
 +-- examples/
-|   +-- lucky-digits/          example: simple round + buyable FS
-|   +-- gamble-cherry/         example: complex round with gamble
+|   +-- hello-spin/            example: the smallest working server
+|   +-- gamble-slot/           example: complex round with a gamble
 +-- deploy/
     +-- docker/                reference Dockerfile + compose
     +-- k8s/                   reference K8s manifests

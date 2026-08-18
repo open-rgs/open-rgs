@@ -264,7 +264,7 @@ Two patterns:
    shipped to multiple game variants. Manifest imports the package and
    reads `pkg.entryPath` to find the `.ts` / `.wasm` file.
 
-For MIT-published example games (`lucky-digits`, `gamble-cherry`),
+For the in-repo example games (`hello-spin`, `gamble-slot`),
 math is in-tree.
 
 ## Multi-game deployments
@@ -282,7 +282,7 @@ or reverse proxy mapping a path or host per game):
 // one process per game, each its own createServer:
 await createServer({ manifest: luckyDigits, platform, transport: binaryTransport({ port: 8081 }) });
 await createServer({ manifest: gambleCherry, platform, transport: binaryTransport({ port: 8082 }) });
-// edge routes /lucky-digits/* -> :8081, /gamble-cherry/* -> :8082
+// edge routes /hello-spin/* -> :8081, /gamble-slot/* -> :8082
 ```
 
 ## Acceptance criteria

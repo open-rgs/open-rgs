@@ -86,14 +86,28 @@ Math produces byte-identical outputs for byte-identical RNG sequences,
 because no other source of nondeterminism is exposed.
 
 **Delivery (`rngMode`).** By default (`"per-draw"`) each `host.rng_next()`
-calls the injected `rng` directly. The opt-in `"seed-expand"` mode draws one
-seed per math call from `rng` and expands it in-VM with xoshiro256++ (seeded
-by splitmix64), so the math draws with no per-draw JS<->WASM crossing  - a
-large speedup for draw-heavy math. It is reseeded independently per call and
-the generator is hidden from the math. Under `"seed-expand"` the expansion
-joins the outcome-determination path and must be evaluated as part of the RNG
-(re-certify before real-money use); the consumed sequence stays deterministic
-and reconstructable from each call's seed.
+calls the injected `rng` directly. With a CSPRNG that is unpredictable and
+also unreplayable, because a CSPRNG has no seed to write down.
+
+The opt-in `"seed-expand"` mode draws ONE seed per entry-point call from `rng`
+and expands it into a uniform stream (splitmix32 seeding sfc32, two 32-bit
+draws per float for full 53-bit resolution). The math sees the same uniform
+stream; what changes is that the whole call collapses to a single recordable
+number, so recording it replays the round exactly. This is a REPLAY feature,
+not a performance one - in-process TypeScript has no boundary to dodge.
+
+The stream, and the seed it came from, belong to the CALL: they are held in an
+async-local scope that follows the call across its awaits, so two rounds in
+flight at once each draw from their own stream. `lastSeed` reads the most
+recently started call, which is unambiguous only when calls do not overlap;
+`runSeeded(fn)` returns the seed with the call it belongs to and is the form
+that stays correct under concurrency. `withSeed(seed, fn)` pins a seed for its
+own scope, so a replay does not disturb a live round.
+
+Under `"seed-expand"` the expansion joins the outcome-determination path and
+must be evaluated as part of the RNG (re-certify before real-money use); the
+consumed sequence stays deterministic and reconstructable from each call's
+seed.
 
 
 ## WASM runtime details
@@ -200,8 +214,20 @@ for exactly this reason.
 
 ### The purity gate
 
-`loadTsMath` scans the source **before importing it** and refuses a module that
-references:
+`loadTsMath` scans the math **before importing it** and refuses a module that
+references any of the following.
+
+"The math" means every local file it is built from: the loader resolves the
+entry's relative imports, transitively, and scans each one. A math split
+across files is the ordinary way to write one, and a gate that reads only the
+entry catches nothing that lives one import away. Package imports (`@scope/x`,
+`node:fs`) are not followed - a dependency is pinned by the lockfile and is not
+the author's file tree.
+
+The same set of files produces the `contentHash`, so the provenance stamp in
+the audit log identifies the whole math rather than its entry point. Editing a
+helper changes the hash, which is exactly what an auditor reconstructing a
+round needs it to do.
 
 | Denied | Why |
 |--------|-----|
@@ -228,17 +254,28 @@ full authority. Math you do not control belongs in the WASM tier. This tier
 assumes math is authored by the party operating the server, which is the
 documented deployment model (spec 00).
 
-`assertPure(src, path)` is exported separately so CI can gate a math file
-without loading it.
+`assertPure(src, path)` is exported separately so CI can gate a single file
+without loading it; `collectMathSources(entry)` returns the file set the loader
+would scan, and `hashMathSources(entry, files)` the hash it would stamp.
+
+**Reloading edited math.** The loader busts the module cache for the ENTRY file
+only - its imports are cached under their own URLs, which nothing rewrites - so
+a second `loadTsMath` in the same process picks up an edited entry and keeps
+already-imported helpers. It notices: the graph hash changes, and the loader
+warns that the process must restart. It does not pretend to have reloaded.
 
 ## Hot reload
 
-Dev-only. `loadTsMath` cache-busts on the source's content hash, which re-reads the
-source, builds a new VM, and atomically swaps the in-memory math
-reference. Production builds disable the reload endpoint.
+Dev-only, and narrower than it sounds. `loadTsMath` re-reads the math's files,
+rescans them, and re-imports the ENTRY under a cache-busting URL derived from
+the graph hash, so an edited entry takes effect and the caller can swap its
+math reference. Imported helpers are already in the module cache under their
+own URLs and are NOT re-imported - the loader warns when the graph hash moved,
+because the alternative is silently running the old code. Restart the process
+to pick up an edited helper.
 
-In-flight rounds during a reload finish with the OLD math (no surprise
-mid-round behaviour change). New rounds start with the NEW math.
+In-flight rounds during a reload finish with the math reference they started
+on (no surprise mid-round behaviour change). New rounds use the new one.
 
 ## Math file lifecycle
 

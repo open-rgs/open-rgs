@@ -1,7 +1,7 @@
 // twin-slot: the SAME minimal SIMPLE-round slot as
 // maths/slot.zig, written as a TS math module.
 //
-// The three are a matched set. test/twin-slot.test.ts proves they return
+// The two are a matched set. test/twin-slot.test.ts proves they return
 // identical outcomes for the same RNG stream - read them side by side to see
 // the same game in each runtime.
 //

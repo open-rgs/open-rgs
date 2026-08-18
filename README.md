@@ -1,7 +1,7 @@
 # open-rgs
 
 A small, MIT-licensed Remote Game Server. Bun-native orchestrator,
-snap-in maths (TypeScript, TypeScript, or compiled WASM kernels in Zig/Rust),
+snap-in maths (TypeScript, or compiled WASM kernels in Zig/Rust),
 pluggable wallet adapters, binary-msgpack on the wire. One Bun file boots
 a working server.
 
@@ -60,21 +60,26 @@ export default (host: MathHost): SimpleMath => ({
 
 ### Which math tier?
 
-All three return the same `MathModule` and the orchestrator cannot tell them
-apart. Measured on identical math (`bun examples/twin-slot/src/bench.ts`, one
-game written three ways):
+Two tiers. Both return the same `MathModule` and the orchestrator cannot tell
+them apart.
 
-| Tier | spins / sec / core | Reach for it when |
-|------|-------------------:|-------------------|
-| **TS** (`loadTsMath`) | **78,000,000** | Default. Fastest to iterate, best tooling, purity-gated. |
-| Zig/WASM (`loadWasmMath`) | 850,000 | Math you do not control - sandboxed, bit-deterministic floats, hashable artifact. |
-| TypeScript (`loadTsMath`) | 60,000 | Sandboxed and hot-reloadable, and your author prefers TypeScript. |
+| Tier | Reach for it when |
+|------|-------------------|
+| **TypeScript** (`loadTsMath`) | Default. Fastest to iterate, best tooling, purity-gated at load. |
+| **Zig / Rust -> WASM** (`loadWasmMath`) | Math you do not control: sandboxed by construction, bit-deterministic floats, a hashable artifact a lab can certify. |
 
-The spread is the boundary, not the language: TypeScript marshals a table across the
-JS<->TypeScript bridge every call, WASM round-trips MessagePack through linear memory,
-and in-process TS crosses nothing. It makes no difference to serving - compute
-is rounding error against the wallet RPC - and all the difference to a tuning
-run, where a 1M-spin sweep is 17 seconds on TypeScript and 13 milliseconds on TS.
+**On the speed difference.** In-process TypeScript calls nothing across a
+boundary; a WASM kernel round-trips MessagePack through linear memory once per
+call. On a deliberately trivial math - one RNG draw and a four-branch ladder,
+`bun examples/twin-slot/src/bench.ts` - that boundary is the whole measurement:
+roughly 12 ns per call against roughly 1,200 ns, a 100x ratio.
+
+Read that as the cost of the boundary, not as the throughput of a game. A real
+slot does thousands of operations per spin, so the fixed crossing shrinks
+against the work and the ratio narrows. It makes no difference at all to
+serving, where compute is rounding error against the wallet RPC; it makes a
+visible difference to a million-spin tuning sweep, which is the reason the
+default is the in-process tier.
 
 TS math is checked for purity at load: no `Math.random`, no clock, no I/O, no
 implementation-defined float ops. See
@@ -93,7 +98,7 @@ implementation-defined float ops. See
             +-------------------------------+
             |         ORCHESTRATOR          | ◀---- admin http
             |   +-----------------------+   |       /livez /healthz
-            |   |  TypeScript / WASM kernel    |   |       /admin/*
+            |   |  TypeScript / WASM math   |   |       /admin/*
             |   +-----------------------+   |
             +----------------+--------------+
                              |  PlatformAdapter (one interface)
@@ -164,7 +169,7 @@ Plug points (each is one interface):
 - **Wallet adapter** -> implement `PlatformAdapter` (talks to your operator's wallet)
 - **Transport** -> implement `ClientTransport`. Two ship: `binaryTransport` (binary-msgpack over WebSocket, the default) and `restTransport` (plain HTTP and JSON, for tooling and clients that cannot hold a socket open)
 - **Deferred close** -> wrap a simple math with `withDeferredClose` so the client finishes the round explicitly, and an abandoned round can be replayed and closed later
-- **Math** -> `loadTsMath` (default), `loadTsMath`, or `loadWasmMath`; all three return the same `MathModule`
+- **Math** -> `loadTsMath` (default) or `loadWasmMath`; both return the same `MathModule`
 - **Slot libraries** -> `@open-rgs/grid`, `pay-lines`, `cascade`, `holdwin` and friends, imported like any package
 - **Compiled math** -> ship a WASM kernel (`loadWasmMath`) authored in Zig/Rust; run it fail-closed under a worker pool (`createMathPool`)
 - **Metrics / logs** -> bring your own registry / formatter

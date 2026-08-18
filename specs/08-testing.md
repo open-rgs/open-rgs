@@ -3,17 +3,23 @@
 ## Goal
 
 Define the test surface for the orchestrator, the math runtime, and
-individual math files. Specify the simulator/fuzzer/optimizer CLI
-that math designers and labs use.
+individual math files, and the tools math designers and labs use on them.
+
+**What exists today** is `open-rgs-sim`, the `bin` of `@open-rgs/simulator`:
+it simulates a manifest and writes RTP / hit-rate / mark reports. The
+`compare`, `fuzz`, `optimize` and `certify` commands described further down
+are DESIGN, not shipped surface - they are tracked in `specs/09-roadmap.md`,
+and this page marks each one. An earlier draft of this page wrote them all as
+`@open-rgs/cli`, a package that does not exist; that name is retired.
 
 ## Layers
 
 | Layer | What it tests | Tool |
 |-------|---------------|------|
-| Math unit | RTP, hit rate, volatility, mode mix per math file | `@open-rgs/cli simulate` |
-| Math exploit | Are there strategies that beat declared RTP? | `@open-rgs/cli compare`, `fuzz` |
-| Math tuning | Find parameter values that hit target RTP+vol | `@open-rgs/cli optimize` |
-| Math certification | Signed report comparing measured vs declared | `@open-rgs/cli certify` |
+| Math unit | RTP, hit rate, volatility, mode mix per math file | `open-rgs-sim` (shipped) |
+| Math exploit | Are there strategies that beat declared RTP? | `compare` / `fuzz` (planned) |
+| Math tuning | Find parameter values that hit target RTP+vol | `optimize` (planned) |
+| Math certification | Signed report comparing measured vs declared | `certify` (planned) |
 | Orchestrator unit | Round flows, mode resolution, promo, autoclose | `bun:test` against `OrchestratorAPI` |
 | Platform adapter | Native protocol -> canonical contract | per-adapter test suite |
 | Transport | Frame in / frame out | `bun:test` with mock orchestrator |
@@ -35,11 +41,11 @@ optimal-strategy exploit pass over a public-state `view()` projection is
 still planned  - see `compare`/`fuzz`.)
 
 ```bash
-@open-rgs/cli simulate ./examples/lucky-digits/manifest.ts \
-    --mode default --spins 10M --seed 42
+bunx open-rgs-sim ./examples/hello-spin/src/manifest.ts \
+    --spins 1000000 --seed 42
 
 # output:
-# Game: example-game  Mode: default  Math: lucky-digits-base 1.0.0
+# Game: hello-spin  Mode: default  Math: spin 0.1.0
 # Spins: 10,000,000
 # Measured RTP: 0.9097 (declared 0.91  - within 0.5%)
 # Hit rate: 0.252
@@ -69,7 +75,7 @@ end
 ```
 
 ```bash
-@open-rgs/cli simulate ./gamble-slot/manifest.ts \
+bunx open-rgs-sim ./examples/gamble-slot/src/manifest.ts \
     --strategy ./strategies/gamble-slot/to-target.ts \
     --spins 1M
 ```
@@ -80,7 +86,8 @@ end
 and surfaces any strategy that beats declared RTP by more than eps.
 
 ```bash
-@open-rgs/cli compare ./examples/gamble-slot/manifest.ts \
+# PLANNED (specs/09):
+open-rgs-sim compare ./examples/gamble-slot/src/manifest.ts \
     --strategies basic,greedy,always-hit,random \
     --spins 1M
 
@@ -98,7 +105,8 @@ and surfaces any strategy that beats declared RTP by more than eps.
 for unexpected winners:
 
 ```bash
-@open-rgs/cli fuzz ./examples/gamble-slot/manifest.ts \
+# PLANNED (specs/09):
+open-rgs-sim fuzz ./examples/gamble-slot/src/manifest.ts \
     --target-rtp 0.995 --tolerance 0.005 --budget 1000
 
 # Generated 1000 random strategies, 1M spins each.
@@ -140,7 +148,8 @@ that hit target metrics. Math declares parameters in a sibling
 ```
 
 ```bash
-@open-rgs/cli optimize ./examples/lucky-digits/maths/base/play.ts \
+# PLANNED (specs/09):
+open-rgs-sim optimize ./examples/hello-spin/maths/base/play.ts \
     --targets rtp=0.96,volatility=medium \
     --spins-per-eval 500K --budget 200
 
@@ -226,10 +235,11 @@ encode/decode roundtrips. Example assertions:
 
 ## Acceptance criteria
 
-- `@open-rgs/cli simulate ./examples/lucky-digits/manifest.ts --mode default --spins 1M`
+- `bunx open-rgs-sim ./examples/hello-spin/src/manifest.ts --spins 1000000`
   completes in under 60 seconds on a single core and reports RTP within
   0.005 of the declared value.
-- `@open-rgs/cli fuzz ./examples/gamble-slot/manifest.ts --budget 100`
+- `# PLANNED (specs/09):
+open-rgs-sim fuzz ./examples/gamble-slot/src/manifest.ts --budget 100`
   completes and finds zero exploits (assuming the math is clean).
 - The orchestrator unit-test suite covers >= 80% of branches in
   `orchestrator.ts` (planned, not yet measured).

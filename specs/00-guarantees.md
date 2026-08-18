@@ -79,7 +79,12 @@ No bet, no balance, no currency, no clock, no I/O.
   bet or balance (`specs/01-public-contracts.md`). Randomness reaches the math
   only through the injected `host.rng_next`, and `loadTsMath`'s purity gate
   rejects a source that reaches for ambient randomness, the clock, I/O, or the
-  escape hatches that would restore them (`specs/03-math-runtime.md`).
+  escape hatches that would restore them (`specs/03-math-runtime.md`). The gate
+  reads the WHOLE math  - the entry file and every local file it imports  -
+  because a math split across files is the ordinary way to write one, and a
+  gate that reads only the entry catches nothing that lives one import away.
+  Package imports are not followed: a dependency is pinned by the lockfile and
+  is not the author's file tree.
 - **Not a sandbox.** The purity gate is a source scan: it catches the accident,
   not the adversary. A determined author can defeat it, and TypeScript math
   runs with the process's own authority. **Math files are code you ship**  -
@@ -119,16 +124,22 @@ A non-finite multiplier (`NaN`/`+/-Infinity`), a win the bet can't fund, a
 moving money on a bad value.
 
 - **Enforced by:** multiplier sanitization (non-finite -> hard error, negative
-  -> clamp to 0), `assertFundedWin`, the math watchdog (`MATH_TIMEOUT`), and
-  RNG fail-closed under `NODE_ENV=production`
-  (`specs/02-orchestrator.md`, `specs/03-math-runtime.md`). The watchdog is
-  per math runtime: only the TypeScript loader has a true execution watchdog (an in-VM
-  `debug.sethook` count hook that preempts even a tight loop on any platform).
-  WASM has none - `createMathPool` fails the *round* closed on a budget overrun
-  (no bad payout, no hung connection), but killing a tight-loop runaway thread
-  via `worker.terminate()` is platform-dependent (not portable), and bare
-  `loadWasmMath` has no timeout at all - so WASM kernels must be trusted/bounded
-  (a hard cross-platform no-DoS kill needs process isolation).
+  -> clamp to 0), `assertFundedWin`, RNG fail-closed under
+  `NODE_ENV=production`, and - for WASM math run through `createMathPool` - a
+  per-call budget that fails the round with `MATH_TIMEOUT`
+  (`specs/02-orchestrator.md`, `specs/03-math-runtime.md`).
+- **What there is NO watchdog for:** a runaway math file. Neither tier can
+  preempt one. `loadTsMath` imports a module and calls it, so a TypeScript math
+  that loops forever blocks the event loop and no `MATH_TIMEOUT` is ever
+  produced; bare `loadWasmMath` has no timeout either, because a running WASM
+  call cannot be interrupted from JS. `createMathPool` moves WASM math onto
+  worker threads and gives the ROUND a deadline - that part is portable and it
+  is the guarantee: a hung kernel fails its round rather than paying a bad
+  value or leaving a connection open. Whether `worker.terminate()` also kills
+  the runaway thread is platform-dependent (it did on Linux, it did not on
+  Bun + macOS, in our testing), so a hard cross-platform kill still needs
+  process isolation. Treat math files as code you ship and bound them
+  yourself.
 - **Prevents:** a math bug becoming a *maximum* payout (the canonical
   `NaN <= cap` trap), negative settlements, and unauditable randomness in
   real-money play.
@@ -183,7 +194,7 @@ it fires the outcome is stamped so the cap is visible and auditable.
 | 2 | One Round, One Record | atomic settle + reversal contract (latest-first, whole-record) | [05](./05-platform-protocol.md) |
 | 3 | Blind Math | `SpinContext` has no money; injected RNG + purity gate | [01](./01-public-contracts.md), [03](./03-math-runtime.md) |
 | 4 | House Computes, Client Asks | request carries intent only; server computes outcome | [04](./04-wire-protocol.md) |
-| 5 | Fail Closed | sanitize / funded-win / watchdog / RNG fail-closed | [02](./02-orchestrator.md), [03](./03-math-runtime.md) |
+| 5 | Fail Closed | sanitize / funded-win / pool round-deadline / RNG fail-closed | [02](./02-orchestrator.md), [03](./03-math-runtime.md) |
 | 6 | At Most Once | per-session lock + request cache + idempotency keys + op-seq guard | [02](./02-orchestrator.md), [04](./04-wire-protocol.md), [05](./05-platform-protocol.md) |
 | 7 | Bounded Payout | max-win cap enforced engine-side | [02](./02-orchestrator.md) |
 

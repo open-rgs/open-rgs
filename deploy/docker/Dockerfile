@@ -4,7 +4,7 @@
 #   package.json, bun.lock
 #   packages/                  (your wallet adapter + vendored open-rgs packages)
 #   src/                       (manifest.ts + index.ts wiring)
-#   maths/                     (play.lua / play.wasm files)
+#   maths/                     (play.ts / play.wasm files)
 #
 # Outputs:
 #   Bun runtime image that runs `bun src/index.ts` on PORT (default 8080),
@@ -12,8 +12,8 @@
 #   admin all share that one port  - single-port mode (the createServer
 #   default). To isolate admin on a private port, set it in your wiring.
 #
-# Production runs from source  - wasmoon's glue.wasm loads from
-# node_modules/ at runtime, no bundling step required.
+# Production runs from source: Bun executes TypeScript directly, and a WASM
+# kernel is read from maths/ at boot. No bundling step required.
 #
 # Base images use exact version tags for reproducibility; for the strongest
 # guarantee, pin by digest (oven/bun:1.3.11@sha256:...).

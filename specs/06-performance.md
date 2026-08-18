@@ -148,7 +148,7 @@ In rough order of likelihood:
    regulators. The math designer writes Zig instead of TypeScript.
 2. **Simulator binary for billion-spin runs.** A standalone Zig CLI
    that loads the same WASM artifact and runs millions of spins per
-   second. Used by `@open-rgs/cli`.
+   second. Driven by `open-rgs-sim` (`@open-rgs/simulator`).
 3. **Custom RNG sources.** A Zig-built RNG sidecar (e.g., wrapping a
    certified DLL via FFI) is small and predictable.
 4. **Performance-critical orchestrator hot paths.** If profiling shows

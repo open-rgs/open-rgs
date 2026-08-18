@@ -99,8 +99,8 @@ can read them and understand *why*. Format:
 
 ### 11 . Examples are CI-gated
 
-Every example game runs through `@open-rgs/cli simulate` (once it
-ships) on every commit. Contract changes that break an example fail
+Every example game runs through `open-rgs-sim` (the `bin` of
+`@open-rgs/simulator`) on every commit. Contract changes that break an example fail
 CI. Examples can't rot because they always run.
 
 ### 12 . Cull regularly

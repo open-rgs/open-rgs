@@ -11,8 +11,8 @@ Last reality-checked against the code: 2026-06-10.
   resume-on-reconnect.
 - `@open-rgs/platform-mock`  - in-memory dev/test wallet with promo and
   autoclose helpers.
-- Two example games: `lucky-digits` (simple + buyable FS) and
-  `gamble-cherry` (complex round with looping gamble).
+- Example games: `hello-spin` (the smallest working server) and
+  `gamble-slot` (complex round with a looping gamble).
 - Multi-tab drawio architecture diagrams.
 - MIT license + npm-publishable metadata.
 - Spec corpus 00-10 (overview through design philosophy).
@@ -29,7 +29,8 @@ Last reality-checked against the code: 2026-06-10.
   a per-call `terminate()` timeout (the fail-closed watchdog for the WASM tier).
 - Secure-by-default outcome RNG (`cryptoRng` via WebCrypto -> BoringSSL) with
   production fail-closed (the operator must choose an RNG explicitly) and an
-  opt-in deterministic `seed-expand` replay mode (xoshiro256++).
+  opt-in deterministic `seed-expand` replay mode (splitmix32 seeding sfc32,
+  scoped per call so concurrent rounds each replay from their own seed).
 - Worked examples on Zig kernels (e.g. `examples/hold-and-win`).
 - `open-rgs-sim` CLI (the `bin` of `@open-rgs/simulator`)  - covers the
   planned `cli simulate` role: manifest in, spins/seed/`--shards`,
@@ -107,9 +108,9 @@ J  - public-surface freeze v0.5: pending
 
 | Item | Spec | Why |
 |------|------|-----|
-| ~~`@open-rgs/cli simulate`~~ (covered) | 08 | `open-rgs-sim` (bin of `@open-rgs/simulator`) fills this role |
-| `@open-rgs/cli compare` | 08 | Exploit smoke test for CI |
-| `@open-rgs/cli certify` | 08 | Math labs need the report shape |
+| ~~`cli simulate`~~ (covered) | 08 | `open-rgs-sim` (bin of `@open-rgs/simulator`) fills this role |
+| `open-rgs-sim compare` | 08 | Exploit smoke test for CI |
+| `open-rgs-sim certify` | 08 | Math labs need the report shape |
 | ~~Reference deployment template~~ (done) | 07 | shipped under `deploy/docker` + `deploy/k8s` |
 | ~~Cheat fail-closed~~ (done) | 04 | Cheat removed from the wire contract; honored only via `params.cheat` with an explicit opt-in and never in production; loud warning when enabled |
 | Manifest validation: `nextMode` resolution | 01 | Catch typos at boot, not at runtime |
@@ -121,7 +122,7 @@ J  - public-surface freeze v0.5: pending
 | W3C tracing | 06 | Prometheus metrics shipped 2026-06-10 (see Done); tracing remains open |
 | Public/private state split (`view(state)`) | 01, 03, 08 | Required for honest exploit testing |
 | Bonus engine abstraction (promo -> BonusCampaign) | 02 | Jackpots, tournaments, gamification points |
-| `@open-rgs/cli fuzz` & `optimize` | 08 | Round out the math-author DX |
+| `open-rgs-sim fuzz` & `optimize` | 08 | Round out the math-author DX |
 
 ## Deferred / not committed
 

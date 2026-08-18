@@ -1,6 +1,6 @@
 # HorizontalPodAutoscaler  - scale on CPU.
 #
-# RGS is CPU-bound under load (Lua math is the dominant cost). Memory is
+# RGS is CPU-bound under load (math execution is the dominant cost). Memory is
 # bounded by session count which scales with concurrent connections, not
 # linearly with CPU. CPU is the right metric.
 
