@@ -1,0 +1,79 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Code from "../components/Code.astro";
+---
+
+<BaseLayout
+  title="Carry, state that outlives a round"
+  description="How cross-round math state is threaded, who stores it, what happens on reconnect, and why it is discarded when the math version changes."
+>
+  <main>
+    <h1>Carry</h1>
+
+    <p class="lede">The one thing a round leaves behind.</p>
+
+    <p>A round is a pure function of its state and its randomness. Carry is how the <em>next</em> round gets the state: an opaque string the math returns at the end of a round and receives at the start of the following one. Progress meters, a bonus counter, a gamble pot, "the next spin is a free one" all live in it, and nothing else in the engine looks inside.</p>
+
+    <h2 data-section="&sect; 1">The loop</h2>
+
+    <p>The math writes it, the engine passes it to the wallet with the money, the wallet stores it, and the engine reads it back when the session next opens.</p>
+
+    <Code code={`// the math returns it with the outcome
+play(prev, ctx) {
+  const meter = prev ? JSON.parse(prev).meter : 0;
+  return {
+    multiplier: 0,
+    ops: [],
+    type: "loss",
+    carry: JSON.stringify({ meter: meter + 1 }),
+  };
+}
+
+// the engine hands the previous one back on the next round
+play(prev, ctx)   // prev === '{"meter":1}'`} />
+
+    <p>Two rules make that work. The math never stores anything itself, because a math instance is shared by every player on the server: state kept in a module variable belongs to whichever session touched it last. And the format is the math's own business, since the engine treats it as an opaque string.</p>
+
+    <h2 data-section="&sect; 2">The wallet stores it, not the engine</h2>
+
+    <p>The orchestrator keeps carry in memory for a live session, but that copy is a cache. The durable one goes to the wallet inside the same call that moves the money, and comes back on <code>openSession</code>.</p>
+
+    <Code code={`// simple round: roundState IS the carry, since it opens and closes at once
+settleSimple({ sessionId, bet, win, roundState, mathVersion });
+
+// complex round: carry is separate from the round's own final state
+closeComplex({ sessionId, roundId, finalState, carry, mathVersion });
+
+// and it comes back next time the session opens
+openSession(sid) -> { balance, carry, mathVersion, ... }`} />
+
+    <p>That is <a href="https://github.com/open-rgs/open-rgs/blob/main/specs/adr/004-adapter-owns-state.md">ADR-004</a>, and it is what makes the RGS stateless: any pod can serve the next round, because the state arrives with the session rather than living on the machine that dealt the last one. It also means carry rides the same write as the balance, so a round that never paid never leaves progress behind. That is <a href="/overview">Guarantee 1</a>, and it is why "just cache it" is not an alternative.</p>
+
+    <p>An adapter that drops carry produces a game that works perfectly until a player reconnects, and then quietly restarts their progress. The conformance suite checks the round trip for exactly that reason.</p>
+
+    <h2 data-section="&sect; 3">Reconnects</h2>
+
+    <p>A player who drops mid-session and comes back gets their carry from the wallet on the fresh INIT. A player who drops mid-<em>round</em> is a different case: the round is still open, so the engine resumes it from the round's own state and the carry is untouched until that round closes.</p>
+
+    <h2 data-section="&sect; 4">A new math version discards it</h2>
+
+    <p>Carry is written by one version of a math and read by another only if you let it. The engine stores <code>mathVersion</code> beside the carry, and on INIT it compares that against the loaded math:</p>
+
+    <Code code={`// SessionInfo comes back with carry + mathVersion
+// if mathVersion !== the loaded math's version, the carry is dropped
+// and the session starts fresh, with a warn-level log line`} />
+
+    <p>Dropping it is the conservative choice, and the alternative is worse than it sounds: a meter written as <code>{"{ level: 3 }"}</code> by yesterday's math and read as <code>{"{ level, multiplier }"}</code> by today's is not a crash, it is a game paying the wrong thing to one player in a way nothing else will notice. Bump <code>math.version</code> whenever the carry's shape changes, and the engine handles the rest.</p>
+
+    <h2 data-section="&sect; 5">Keep it small, and keep it yours</h2>
+
+    <ul>
+      <li><strong>Small.</strong> It crosses the wire on every settle and is stored per session. A JSON blob of a few fields is right; a board snapshot is not.</li>
+      <li><strong>Yours.</strong> The engine never parses it. Version it inside if you want migrations rather than discards.</li>
+      <li><strong>Not a ledger.</strong> Money lives in the wallet. Carry is what the math needs to keep playing, not a record of what it paid.</li>
+      <li><strong>Not a session.</strong> A promo pool, a balance and an open round are engine concepts with their own fields.</li>
+    </ul>
+
+    <p>A simple round has no separate carry field on the wire: <code>roundState</code> doubles as it, because a simple round opens and closes in the same call, so this round's final state <em>is</em> what the next one starts from. A complex round has both, and they are different things: <code>finalState</code> is what this round ended as, <code>carry</code> is what the next one begins with.</p>
+  </main>
+</BaseLayout>
