@@ -57,8 +57,13 @@ function highlight(src: string): string {
     border-radius: 0;
     margin: 0 0 1rem;
   }
-  .hl :global(.c-str) { color: #c7a96b; }
-  .hl :global(.c-key) { color: #6fc3b5; }
-  .hl :global(.c-num) { color: #d99a7a; }
-  .hl :global(.c-fn)  { color: #8fb8d8; }
+  /* Token colours come in two sets. The originals were picked against a dark
+     panel and hardcoded, so on the light theme - which is the default, since
+     the site follows the OS - they sat pale-on-pale and the highlighting read
+     as plain text. Each token now has a light value and a dark one, and the
+     dark set is the original. */
+  .hl :global(.c-str) { color: var(--code-str); }
+  .hl :global(.c-key) { color: var(--code-key); }
+  .hl :global(.c-num) { color: var(--code-num); }
+  .hl :global(.c-fn)  { color: var(--code-fn); }
 </style>
