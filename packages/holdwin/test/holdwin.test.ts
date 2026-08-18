@@ -7,12 +7,14 @@
 // when it should not.
 
 import { describe, expect, test } from "bun:test";
-import { fromColumns, makeGrid, rect, sizeOf } from "@open-rgs/grid";
+import { type Grid, fromColumns, makeGrid, rect, sizeOf } from "@open-rgs/grid";
 import { sampler } from "@open-rgs/weights";
 import {
   type Cell, type JackpotTable, type RespinConfig,
-  TIERS, EMPTIED, beginRespins, cashCells, coin, coinCells, coinCount, coinSet,
-  coinsShortOfTrigger, collector, emptyCells, isCycleOver, jackpot, mixedCoinSet,
+  TIERS, EMPTIED, addCellMultiplier, awardRespins, beginRespins, cashCells,
+  cellFactorAt, coin, coinCells, coinCount, coinSet, expandBoard, isMystery,
+  landCoins, landCount, mystery, noCellMultipliers, revealMystery, runRespins,
+  coinsShortOfTrigger, collector, countSet, emptyCells, emptyPositions, isCycleOver, jackpot, mixedCoinSet,
   multiplier, payer, settleRespins, spawner, stepRespins, tierCells, totalValue,
   triggers, upgrader, valueOf,
 } from "../src/index.js";
@@ -359,5 +361,255 @@ describe("COLLECTOR - jackpot valuation", () => {
     const g = board({ 0: coin(1), 1: coin(4) });
     const out = collector(cashCells())(g, { col: 0, row: 0 }, R(0));
     expect(out.cells[0]).toEqual(coin(5));
+  });
+});
+
+describe("MYSTERY coins", () => {
+  const JP = { MINI: 10, MINOR: 25, MAJOR: 100, GRAND: 1000 } as const;
+  const SET = sampler([{ item: coin(7), weight: 1 }]);
+
+  test("a face-down coin locks its cell and resets the counter like any other", () => {
+    const g = board({ 0: null, 1: null });
+    const s0 = beginRespins(g, { respins: 2 });
+    const s1 = stepRespins(s0, [[{ col: 0, row: 0 }, mystery()]], { respins: 2 });
+    expect(s1.respinsLeft).toBe(2);          // reset, not decremented
+    expect(coinCount(s1.grid)).toBe(1);
+    expect(isMystery(s1.grid.cells[0]!)).toBe(true);
+  });
+
+  test("pricing one before it turns over throws instead of counting zero", () => {
+    const g = board({ 0: mystery(), 1: coin(4) });
+    expect(() => totalValue(g, JP)).toThrow(/face down/);
+    expect(() => collector(coinCells(), JP)(g, { col: 1, row: 0 }, R(0))).toThrow(/face down/);
+  });
+
+  test("shared reveal turns every hidden cell over to the same coin", () => {
+    const g = board({ 0: mystery(), 1: mystery(), 2: coin(1) });
+    const out = revealMystery(g, SET, R(0));
+    expect(out.cells[0]).toEqual(out.cells[1]);
+    expect(totalValue(out, JP)).toBe(7 + 7 + 1);
+  });
+
+  test("independent reveal draws per cell", () => {
+    const two = sampler([{ item: coin(2), weight: 1 }, { item: coin(20), weight: 1 }]);
+    const g = board({ 0: mystery(), 1: mystery() });
+    const values = new Set<number>();
+    let next = 0;
+    const seq = [0.1, 0.9];
+    const out = revealMystery(g, two, () => seq[next++ % seq.length]!, { shared: false });
+    for (const c of out.cells) if (c) values.add(c.value);
+    expect(values.size).toBe(2);
+  });
+
+  test("revealing an empty board is a no-op", () => {
+    const g = board({ 0: coin(1) });
+    expect(revealMystery(g, SET, R(0))).toBe(g);
+  });
+});
+
+describe("cell multipliers", () => {
+  const JP = { MINI: 10, MINOR: 25, MAJOR: 100, GRAND: 1000 } as const;
+  const cfg = { respins: 3 } as const;
+
+  test("the factor scales whatever finished in that cell", () => {
+    const g = board({ 0: coin(2), 1: coin(3) });
+    const m = addCellMultiplier(noCellMultipliers(), { col: 0, row: 0 }, 5);
+    const state = { grid: g, respinsLeft: 0, spins: 1, full: false };
+    expect(settleRespins(state, cfg, JP)).toBe(5);
+    expect(settleRespins(state, cfg, JP, { cellMultipliers: m })).toBe(2 * 5 + 3);
+  });
+
+  test("a second multiplier on the same cell stacks the way the game says", () => {
+    const at = { col: 1, row: 1 };
+    const add = addCellMultiplier(addCellMultiplier(noCellMultipliers(), at, 2), at, 3);
+    const mul = addCellMultiplier(addCellMultiplier(noCellMultipliers(), at, 2), at, 3, "multiply");
+    const rep = addCellMultiplier(addCellMultiplier(noCellMultipliers(), at, 2), at, 3, "replace");
+    expect(cellFactorAt(add, at)).toBe(5);
+    expect(cellFactorAt(mul, at)).toBe(6);
+    expect(cellFactorAt(rep, at)).toBe(3);
+  });
+
+  test("factors survive an expansion, because they are keyed by position", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    const m = addCellMultiplier(noCellMultipliers(), { col: 1, row: 1 }, 4);
+    const state = expandBoard({ grid: g, respinsLeft: 2, spins: 0, full: false }, rect(2, 4));
+    expect(cellFactorAt(m, { col: 1, row: 1 })).toBe(4);
+    expect(state.grid.shape).toEqual([4, 4]);
+  });
+
+  test("the full-board award is not scaled by a cell factor", () => {
+    const g = makeGrid<Cell>(rect(2, 1), () => coin(1));
+    const m = addCellMultiplier(noCellMultipliers(), { col: 0, row: 0 }, 10);
+    const state = { grid: g, respinsLeft: 0, spins: 3, full: true };
+    // 1x10 + 1 + GRAND
+    expect(settleRespins(state, { respins: 3, fullBoardAward: "GRAND" }, JP, { cellMultipliers: m })).toBe(10 + 1 + 1000);
+  });
+});
+
+describe("extra respins", () => {
+  test("an award adds to the counter, where a landing resets it", () => {
+    const s = { grid: board({ 0: coin(1), 1: null }), respinsLeft: 1, spins: 4, full: false };
+    expect(awardRespins(s, 2).respinsLeft).toBe(3);
+    expect(stepRespins(s, [[{ col: 1, row: 0 }, coin(1)]], { respins: 3 }).respinsLeft).toBe(3);
+  });
+
+  test("a finished board takes no more spins", () => {
+    const s = { grid: board({ 0: coin(1) }), respinsLeft: 0, spins: 9, full: true };
+    expect(awardRespins(s, 5)).toBe(s);
+  });
+});
+
+describe("board expansion", () => {
+  const cfg = { respins: 3, fullBoardAward: "GRAND" } as const;
+
+  test("locked coins keep their cell and the new rows open empty", () => {
+    const g = makeGrid<Cell>(rect(2, 2), (p) => (p.col === 0 && p.row === 0 ? coin(9) : null));
+    const out = expandBoard({ grid: g, respinsLeft: 2, spins: 1, full: false }, rect(2, 3));
+    expect(out.grid.shape).toEqual([3, 3]);
+    expect(out.grid.cells[0]).toEqual(coin(9));
+    expect(coinCount(out.grid)).toBe(1);
+    expect(emptyPositions(out.grid)).toHaveLength(5);
+  });
+
+  test("anchor 'top' opens the new rows above, pushing coins down", () => {
+    const g = makeGrid<Cell>(rect(1, 2), (p) => (p.row === 0 ? coin(9) : null));
+    const out = expandBoard({ grid: g, respinsLeft: 2, spins: 1, full: false }, rect(1, 4), { anchor: "top" });
+    expect(out.grid.cells[0]).toBeNull();
+    expect(out.grid.cells[1]).toBeNull();
+    expect(out.grid.cells[2]).toEqual(coin(9));
+  });
+
+  test("a full board stops being full once it grows", () => {
+    const g = makeGrid<Cell>(rect(2, 1), () => coin(1));
+    const before = beginRespins(g, cfg);
+    expect(before.full).toBe(true);
+    const after = expandBoard(before, rect(2, 2));
+    expect(after.full).toBe(false);
+  });
+
+  test("shrinking is refused, because a locked coin has nowhere to go", () => {
+    const g = makeGrid<Cell>(rect(2, 3), () => null);
+    const s = { grid: g, respinsLeft: 2, spins: 0, full: false };
+    expect(() => expandBoard(s, rect(2, 2))).toThrow(/shrink/);
+    expect(() => expandBoard(s, rect(1, 3))).toThrow(/drop columns/);
+  });
+});
+
+describe("drawing a respin's landings", () => {
+  const ONE = sampler([{ item: coin(1), weight: 1 }]);
+  const cfg = { respins: 3 } as const;
+
+  test("landCoins takes one independent trial per EMPTY cell", () => {
+    const g = makeGrid<Cell>(rect(2, 2), (p) => (p.col === 0 && p.row === 0 ? coin(9) : null));
+    // 3 empty cells: chance roll then value roll for each that lands
+    const seq = [0.0, 0.5,  0.99,  0.0, 0.5];   // land, skip, land
+    let i = 0;
+    const landed = landCoins(g, 0.5, ONE, () => seq[i++]!);
+    expect(landed).toHaveLength(2);
+    for (const [pos] of landed) expect(cellAtTest(g, pos)).toBeNull();
+  });
+
+  test("landCoins never targets a locked cell", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => coin(1));      // full board
+    expect(landCoins(g, 1, ONE, () => 0)).toEqual([]);
+  });
+
+  test("landCoins rejects a chance that is not a probability", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    expect(() => landCoins(g, 1.4, ONE, () => 0)).toThrow(/probability/);
+  });
+
+  test("landCount places the number it drew, in empty cells", () => {
+    const g = makeGrid<Cell>(rect(3, 2), (p) => (p.col === 0 ? coin(1) : null));
+    const landed = landCount(g, 3, ONE, mulberryish());
+    expect(landed).toHaveLength(3);
+    const seen = new Set(landed.map(([p]) => `${p.col}:${p.row}`));
+    expect(seen.size).toBe(3);                                  // distinct cells
+    for (const [pos] of landed) expect(pos.col).not.toBe(0);     // never the locked column
+  });
+
+  test("landCount places what fits rather than throwing when the board is nearly full", () => {
+    const g = makeGrid<Cell>(rect(2, 2), (p) => (p.row === 0 ? null : coin(1)));  // 2 empty
+    expect(landCount(g, 5, ONE, mulberryish())).toHaveLength(2);
+  });
+
+  test("landCount accepts a weighted set of counts", () => {
+    const g = makeGrid<Cell>(rect(3, 3), () => null);
+    const counts = sampler([{ item: 2, weight: 1 }]);
+    expect(landCount(g, counts, ONE, mulberryish())).toHaveLength(2);
+  });
+});
+
+describe("runRespins", () => {
+  const ONE = sampler([{ item: coin(1), weight: 1 }]);
+  const cfg = { respins: 2, fullBoardAward: "GRAND" } as const;
+
+  test("runs the cycle to its end", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    const s = runRespins(beginRespins(g, cfg), cfg, (grid, next) => landCoins(grid, 0.5, ONE, next), mulberryish());
+    expect(isCycleOver(s)).toBe(true);
+    expect(s.spins).toBeGreaterThan(0);
+  });
+
+  test("a board that fills ends the cycle full", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    const s = runRespins(beginRespins(g, cfg), cfg, (grid, next) => landCoins(grid, 1, ONE, next), mulberryish());
+    expect(s.full).toBe(true);
+    expect(coinCount(s.grid)).toBe(4);
+  });
+
+  test("onSpin is where an expansion or an awarded spin goes", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    let expanded = false;
+    const s = runRespins(beginRespins(g, cfg), cfg, (grid, next) => landCoins(grid, 1, ONE, next), mulberryish(), {
+      onSpin: (state) => {
+        if (!expanded && state.full) { expanded = true; return expandBoard(state, rect(2, 3)); }
+        return undefined;
+      },
+    });
+    expect(expanded).toBe(true);
+    expect(s.grid.shape).toEqual([3, 3]);
+  });
+
+  test("maxSpins stops a cycle that never ends", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    // every spin lands a coin somewhere impossible, so the counter never falls
+    const s = runRespins(beginRespins(g, cfg), cfg, () => [], mulberryish(), { maxSpins: 3 });
+    expect(s.spins).toBeLessThanOrEqual(3);
+  });
+});
+
+/** Deterministic enough for placement tests, without importing the simulator. */
+function mulberryish(): () => number {
+  let a = 0x9e3779b9;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Read a cell in tests without exporting the internal helper. */
+function cellAtTest(grid: Grid<Cell>, p: { col: number; row: number }): Cell {
+  let start = 0;
+  for (let c = 0; c < p.col; c++) start += grid.shape[c]!;
+  return grid.cells[start + p.row] ?? null;
+}
+
+describe("countSet", () => {
+  test("draws how many, not what", () => {
+    const counts = countSet({ 2: 1 });
+    expect(counts.pick(0.5)).toBe(2);
+  });
+
+  test("a coin set passed as a count fails with the fix in the message", () => {
+    const g = makeGrid<Cell>(rect(2, 2), () => null);
+    const coins = coinSet({ 1: 1 }) as unknown as ReturnType<typeof countSet>;
+    expect(() => landCount(g, coins, coinSet({ 1: 1 }), () => 0.5)).toThrow(/countSet/);
+  });
+
+  test("rejects a non-integer count", () => {
+    expect(() => countSet({ "1.5": 1 })).toThrow(/non-negative integer/);
   });
 });

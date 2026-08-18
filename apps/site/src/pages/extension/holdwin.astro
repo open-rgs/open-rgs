@@ -6,7 +6,7 @@ import Code from "../../components/Code.astro";
 
 <BaseLayout
   title="@open-rgs/holdwin, Respins"
-  description="Hold and win: a landing resets the counter. Where coins come from each respin, how a mystery coin resolves, and where a multiplier lives."
+  description="Hold and win: coin landings, collectors, mystery coins, cell multipliers, extra spins and a board that grows mid-cycle."
 >
   <main>
     <p class="dim"><a href="/extension">All extensions</a></p>
@@ -14,136 +14,154 @@ import Code from "../../components/Code.astro";
 
     <p class="lede">A landing resets the counter.</p>
 
+    <p>Everything the genre puts on top of that rule is here: coins that collect, pay, multiply and upgrade; face-down coins that turn over at the end; factors printed on cells; spins awarded on top of the counter; and a board that grows while the cycle is running. Each is a small function over the board, so a game composes the ones it wants.</p>
+
     <h2 data-section="&sect; 1">The cycle</h2>
 
-    <p>N coins on a base board trigger respins. Coins lock, and every new coin resets the counter rather than decrementing it. That single rule is what makes the feature feel alive, and it is why a cycle has no natural end: the max-win cap is what makes the round finite.</p>
+    <p>N coins on a base board trigger respins. Coins lock, and every new coin resets the counter rather than decrementing it. That is why a cycle has no natural end, and why the max-win cap is what makes the round finite.</p>
 
     <Anim kind="holdwin-meter" caption="Respins burn down, then a coin lands and the counter snaps back to full." />
 
-    <Code code={`import { triggers, beginRespins, stepRespins, isCycleOver, settleRespins } from "@open-rgs/holdwin";
+    <Code code={`import { triggers, beginRespins, runRespins, landCoins, settleRespins, coinSet } from "@open-rgs/holdwin";
 
 const CONFIG = { respins: 3, fullBoardAward: "GRAND" };
+const JACKPOTS = { MINI: 8, MINOR: 20, MAJOR: 60, GRAND: 400 };
+const COINS = coinSet({ 1: 60, 2: 25, 5: 12, 10: 3 });   // value: weight
 
-if (triggers(grid, 6)) {
-  let s = beginRespins(grid, CONFIG);
-  while (!isCycleOver(s)) s = stepRespins(s, landed, CONFIG);
+if (triggers(board, 6)) {
+  const s = runRespins(
+    beginRespins(board, CONFIG),
+    CONFIG,
+    (grid, next) => landCoins(grid, 0.14, COINS, next),
+    host.rng_next,
+  );
+  const win = settleRespins(s, CONFIG, JACKPOTS);   // a multiple of bet
 }`} />
+
+    <p>That is a whole feature. <code>runRespins</code> is the loop (spin, apply, stop when the counter runs out or the board fills) and <code>landCoins</code> is the draw. Both are below, because both have a decision in them.</p>
 
     <h2 data-section="&sect; 2">Where the coins come from</h2>
 
-    <p>Nothing in this package generates a landing. <code>stepRespins</code> takes the coins that landed and applies them; drawing them is your math's job, and it is where the feature's whole distribution lives. Two lines decide the game: which cells get a chance, and what a coin is worth when it takes.</p>
+    <p>Only empty cells are considered, because a locked coin never moves: a landing aimed at an occupied cell is discarded rather than overwriting it. Which cells get a chance, and how many, is the feature's distribution, so the two shapes the genre uses both ship here.</p>
 
-    <p>Only empty cells are considered. A locked coin never moves, so a landing aimed at an occupied cell is discarded rather than overwriting it, and <code>emptyPositions</code> is the list to iterate.</p>
+    <Anim kind="holdwin-land" caption="Each empty cell takes its own chance. Locked coins sit still, and every landing refills the counter." />
 
-    <Anim kind="holdwin-land" caption="Every empty cell gets its own chance each respin. Locked coins sit still." />
+    <Code code={`import { landCoins, landCount, countSet } from "@open-rgs/holdwin";
 
-    <Code code={`import { emptyPositions } from "@open-rgs/holdwin";
+// one independent trial per empty cell, at 14%
+landCoins(grid, 0.14, COINS, next);
 
-/** One independent trial per empty cell: the usual shape. */
-function land(grid, next) {
-  const out = [];
-  for (const pos of emptyPositions(grid)) {
-    if (next() < LAND_CHANCE) out.push([pos, COINS.pick(next())]);
-  }
-  return out;
-}
+// or: a drawn count, dropped into empty cells at random
+landCount(grid, 2, COINS, next);
+landCount(grid, countSet({ 1: 50, 2: 30, 3: 20 }), COINS, next);  // weighted count`} />
 
-state = stepRespins(state, land(state.grid, host.rng_next), CONFIG);`} />
+    <p>They are different games rather than different spellings. Per-cell trials make landings scale with how empty the board is, so a nearly full board rarely takes another coin and cycles end on their own. A drawn count keeps the rate flat until there is nowhere left to put a coin, so cycles run longer and far more of them reach a full board, which moves the largest single term in the feature's RTP. <code>landCount</code> places what fits rather than throwing when the board is nearly full.</p>
 
-    <p>The alternative is to draw a <em>count</em> first and then place that many coins. Both are legitimate and they are not the same game. Per-cell trials make landings scale with how empty the board is, so a nearly full board almost never lands again and the cycle ends; a fixed count keeps landing at the same rate until there is nowhere left to put a coin, which pushes far more cycles to a full board. Pick one deliberately, because the full-board award is usually the largest single term in the feature's RTP.</p>
+    <p>Face-down coins need no separate path: put <code>mystery()</code> in the coin set and they land at their own weight.</p>
 
-    <p>The counter follows from the landings, not from the values: any coin at all resets it. That is what makes <code>LAND_CHANCE</code> the tuning dial for cycle length, and the coin set the dial for what a cycle pays.</p>
+    <Code code={`import { sampler } from "@open-rgs/weights";
+import { coin, mystery } from "@open-rgs/holdwin";
 
-    <h2 data-section="&sect; 3">Five mechanics, one shape</h2>
+const COINS = sampler([
+  { item: coin(1),   weight: 60 },
+  { item: coin(5),   weight: 12 },
+  { item: mystery(), weight: 8 },
+]);`} />
 
-    <p>Collector, payer, multiplier, upgrader and spawner are the same mechanism with different selectors: a source cell, a set of target cells, and an operation. Adding &quot;collect only from the same column&quot; is a selector, not a new engine.</p>
+    <h2 data-section="&sect; 3">Coins that do something</h2>
 
-    <Anim kind="holdwin-collect" caption="A collector absorbs the value of every coin it targets." />
+    <p>Collector, payer, multiplier, upgrader and spawner are one mechanism with different selectors: a source cell, a set of target cells, an operation. Each returns an <code>Effect</code>, and your math decides when to run it.</p>
 
-    <Code code={`import { collector, payer, upgrader, cashCells, tierCells } from "@open-rgs/holdwin";
+    <Anim kind="holdwin-collect" caption="A collector empties every coin it targets and carries the total itself." />
 
-collector(cashCells(), JACKPOTS);   // absorb every cash coin, leave jackpots
-upgrader(tierCells(["MINI"]));      // bump one rung up the ladder
-payer(5, coinCells());              // add 5x to every coin on the board`} />
+    <Code code={`import { collector, payer, multiplier, upgrader, spawner,
+         coinCells, cashCells, tierCells, coinSet } from "@open-rgs/holdwin";
+import { randomN } from "@open-rgs/selectors";
 
-    <p>Each returns an <code>Effect</code>: <code>(grid, source, next) =&gt; grid</code>. Your math decides <em>when</em> to run one, and that timing is a design decision rather than a detail. A collector that fires the moment it lands harvests a small board; one that fires at the end of the cycle harvests everything. Same effect, different game.</p>
+collector(coinCells(), JACKPOTS)(grid, at, next);   // absorb the board into this cell
+payer(5, coinCells())(grid, at, next);              // +5x onto every other coin
+multiplier(3, randomN(2, cashCells()))(grid, at, next);  // the "sniper": scale 2 at random
+upgrader(tierCells(["MINI"]))(grid, at, next);      // MINI -> MINOR
+spawner(2, coinSet({ 1: 1 }))(grid, at, next);      // two new coins in empty cells`} />
+
+    <p>Timing is the design decision, not a detail. A collector that fires the moment it lands harvests a nearly empty board; the same collector run at the end of the cycle harvests everything. A collected coin is <em>emptied</em> rather than removed, so it still fills its cell for the full-board award and cannot be harvested twice.</p>
+
+    <p>Tiers are deliberately left alone by <code>payer</code> and <code>multiplier</code>: a "2x GRAND" is not a rung on the ladder. Scale cash, upgrade tiers.</p>
 
     <h2 data-section="&sect; 4">Mystery coins</h2>
 
-    <p>A mystery coin lands face down and is worth something only once it turns over, usually when the cycle ends. Model it as a placeholder: land a marker coin, keep it on the board like any other so it locks its cell and resets the counter, and write real values in at reveal.</p>
+    <p>A mystery coin lands face down. It takes its cell and resets the counter like any other coin, and it has no value until the reveal, which is usually the last thing before settle.</p>
 
-    <Anim kind="holdwin-mystery" caption="Hidden cells resolve together, to one value." />
+    <Anim kind="holdwin-mystery" caption="Hidden cells turn over together, to one value." />
 
-    <Code code={`import { positionsWhere, withAt } from "@open-rgs/grid";
+    <Code code={`import { revealMystery, mysteryCells } from "@open-rgs/holdwin";
 
-/** A marker, recognised by identity rather than by value. */
-const MYSTERY = { value: 0 };
+// end of the cycle: turn them over, THEN collect and settle
+const revealed = revealMystery(s.grid, PRIZES, host.rng_next);                    // one value for all
+const each     = revealMystery(s.grid, PRIZES, host.rng_next, { shared: false }); // one each`} />
 
-function landWithMystery(grid, next) {
-  const out = [];
-  for (const pos of emptyPositions(grid)) {
-    if (next() >= LAND_CHANCE) continue;
-    out.push([pos, next() < MYSTERY_SHARE ? MYSTERY : COINS.pick(next())]);
-  }
-  return out;
-}
+    <p><strong>One value or one each.</strong> Turning every hidden cell over to the same coin is the genre convention, and it is a variance decision rather than a cosmetic one. It pays the same on average as drawing per cell and swings much harder: over 200,000 reveals with four hidden cells, mean 10.10 against 10.11, standard deviation 14.04 against 7.01.</p>
 
-/** Classic reveal: every hidden cell turns over to the SAME value. */
-function reveal(grid, next) {
-  const hidden = positionsWhere(grid, (c) => c === MYSTERY);
-  if (hidden.length === 0) return grid;
-  const value = COINS.pick(next());
-  return withAt(grid, hidden.map((p) => [p, value]));
-}`} />
+    <p><strong>Reveal before anything reads a value.</strong> Asking what a face-down coin is worth throws, so a collector or a settle that runs too early fails loudly instead of harvesting the board for nothing:</p>
 
-    <p><strong>One value or one each.</strong> Revealing every hidden cell to the same value is the genre convention, and it is not a cosmetic choice. With four hidden cells and the same coin set, sharing one value pays the same on average as drawing four independently and swings twice as hard: measured over 200,000 reveals, mean 10.10 against 10.11, standard deviation 14.04 against 7.01. Shared reveals are how a mystery feature produces its screenshot moments without moving RTP.</p>
-
-    <p><strong>Where the draw actually happens.</strong> Drawing the value at landing and hiding it in the client is equivalent to drawing it at reveal, with one condition: nothing between the landing and the reveal may read the value. The moment a collector, payer or multiplier runs over the board, that stops being true.</p>
-
-    <p><strong>The ordering trap.</strong> A collector that fires before the reveal harvests every mystery cell at its placeholder value, which is zero. In a five-by-three board with three hidden cells, the same collector took 45 before the reveal and 69 after. Reveal first, then run the effects, unless your paytable is priced for the other order.</p>
-
-    <p>One caveat on the marker: <code>EMPTIED</code>, the coin a collector leaves behind, is also worth zero. Recognise a mystery by identity (<code>c === MYSTERY</code>) or with your own set of positions, never by testing <code>value === 0</code>.</p>
+    <Code code={`valueOf: this coin is still face down. Call revealMystery(grid, coins, next)
+before anything reads values - a collector or a settle running first would
+price the whole board at zero.`} />
 
     <h2 data-section="&sect; 5">Multipliers on coins, multipliers on cells</h2>
 
-    <p>Two different things share the name. A multiplier <em>coin</em> is an effect that scales other coins, and it ships here. A multiplier printed on a <em>cell</em> belongs to the board rather than to any coin, so it lives in your math as a map from cell to factor, and the library never sees it.</p>
+    <p>Two mechanics share the word. A multiplier <em>coin</em> scales other coins and is an effect. A factor printed on a <em>cell</em> belongs to the board: whatever finishes there is worth more, and a second multiplier landing on the same cell raises the factor rather than replacing the coin.</p>
 
-    <Anim kind="holdwin-cellmult" caption="The factor belongs to the cell. Whatever lands there is worth more." />
+    <Anim kind="holdwin-cellmult" caption="The factor belongs to the cell, and a second one stacks onto it." />
 
-    <Code code={`import { multiplier, coinCells, valueOf } from "@open-rgs/holdwin";
+    <Code code={`import { noCellMultipliers, addCellMultiplier, cellFactorAt, settleRespins } from "@open-rgs/holdwin";
 
-// on a coin: this coin scales every other coin on the board
-const x3 = multiplier(3, coinCells());
+let cells = noCellMultipliers();
+cells = addCellMultiplier(cells, { col: 1, row: 1 }, 2);              // x2 lands
+cells = addCellMultiplier(cells, { col: 1, row: 1 }, 3);              // -> x5
+cells = addCellMultiplier(cells, { col: 1, row: 1 }, 3, "multiply");  // -> x15
+cells = addCellMultiplier(cells, { col: 1, row: 1 }, 3, "replace");   // -> x3
 
-// on a cell: the board carries the factor, by flat grid index
-const CELL_MULT = new Map([[4, 2], [7, 3]]);
+settleRespins(s, CONFIG, JACKPOTS, { cellMultipliers: cells });`} />
 
-function settleWithCellMultipliers(grid, jackpots) {
-  let total = 0;
-  for (let i = 0; i < grid.cells.length; i++) {
-    const c = grid.cells[i];
-    if (c) total += valueOf(c, jackpots) * (CELL_MULT.get(i) ?? 1);
-  }
-  return total;
-}`} />
+    <p>How a second factor combines is the whole top of the distribution, so it is spelled out rather than assumed: <code>add</code> is the default, <code>multiply</code> is the aggressive one, <code>replace</code> keeps the best single hit. Factors are keyed by position, so they survive a board that grows.</p>
 
-    <p>Three rules keep either kind priced.</p>
+    <p>The interaction to simulate before shipping is the collector standing on a multiplied cell: it multiplies the <em>merged</em> total, not one coin. On a three by three board of 2x coins with a 3x factor on the centre cell, settling pays 22; running the collector into that cell first pays 54. The factor did not change, the thing it multiplies did. That is where max-win boards come from, and the reason the round still needs <code>maxWinMultiplier</code> whatever the paytable says.</p>
 
-    <p><strong>Tiers are left alone.</strong> <code>multiplier</code> and <code>payer</code> skip a coin carrying a tier, because a &quot;2x GRAND&quot; is not a rung on the ladder and a jackpot that is sometimes worth double is a different jackpot. Scale cash; upgrade tiers.</p>
+    <p>The full-board award is not scaled by a cell factor, since it belongs to the board rather than to a cell.</p>
 
-    <p><strong>Apply once, at a point you can name.</strong> A cell factor applied at settle multiplies whatever finished there. Applied at landing instead, it multiplies the coin that landed and then anything the coin later collects rides on it too. The second is a much larger number, and both are shipped games, so write down which one you built.</p>
+    <h2 data-section="&sect; 6">Extra spins, and a board that grows</h2>
 
-    <p><strong>Multipliers compose with the collector, hard.</strong> A collector that merges a board into one cell, standing on a 3x cell, triples the merged total rather than tripling one coin. That is the interaction that produces max-win boards, so it is the one to simulate before it ships, and the reason the round needs <code>maxWinMultiplier</code> whatever the paytable says.</p>
+    <p>A landing <em>resets</em> the counter to the configured number. A "+1 spin" symbol <em>adds</em> to whatever is left, which is why it is worth most late in a cycle, and that is the tease it exists to create.</p>
 
-    <h2 data-section="&sect; 6">Tiers resolve through one table</h2>
+    <Code code={`import { awardRespins } from "@open-rgs/holdwin";
 
-    <p>A jackpot coin carries a tier, not a number, so retuning GRAND never means touching every coin. A collected coin is emptied rather than removed: it still fills the board, and it cannot be harvested twice.</p>
+s = awardRespins(s, 1);   // 1 left -> 2 left; a landing would have made it 3`} />
+
+    <p>Games also unlock rows partway through, usually on a coin count. Locked coins keep their cell, the new cells open empty and immediately become landing targets, and <code>full</code> is recomputed against the bigger board, so an expansion pushes the full-board award further away and lengthens the cycle.</p>
+
+    <Anim kind="holdwin-expand" caption="A row unlocks mid-cycle. What is locked stays where it is." />
+
+    <Code code={`import { runRespins, expandBoard, awardRespins, coinCount } from "@open-rgs/holdwin";
+import { rect } from "@open-rgs/grid";
+
+// onSpin is where anything that changes the cycle mid-flight belongs
+runRespins(beginRespins(board, CONFIG), CONFIG, land, host.rng_next, {
+  onSpin: (s) => {
+    if (coinCount(s.grid) === 9) return expandBoard(s, rect(5, 4));   // a row below
+    if (coinCount(s.grid) === 12) return expandBoard(s, rect(5, 5), { anchor: "top" });
+  },
+});`} />
+
+    <p>Shrinking is refused: a locked coin has nowhere to go.</p>
+
+    <h2 data-section="&sect; 7">Tiers resolve through one table</h2>
+
+    <p>A jackpot coin carries a tier, not a number, so retuning GRAND never means touching every coin, and an upgrade moves the tier rather than the value.</p>
 
     <Anim kind="holdwin-full" caption="Filling the board pays the top tier." />
 
     <Code code={`import { mixedCoinSet, coin, settleRespins } from "@open-rgs/holdwin";
-
-const JACKPOTS = { MINI: 8, MINOR: 20, MAJOR: 60, GRAND: 400 };
 
 const COINS = mixedCoinSet(
   [{ item: coin(1), weight: 46 }, { item: coin(5), weight: 8 }],
