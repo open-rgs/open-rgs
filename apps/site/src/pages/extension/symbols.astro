@@ -33,6 +33,8 @@ revealMystery(board, "MYSTERY", SYMBOLS, host.rng_next, { shared: false });`} />
 
     <p>Order is the whole behaviour. <code>LOW -&gt; HIGH</code> followed by <code>HIGH -&gt; WILD</code> turns the lows into wilds, which is rarely what the paytable was priced for. <code>upgradeLadder</code> walks the ladder from the top down, so one call moves every symbol exactly one rung and the top rung stays put rather than wrapping.</p>
 
+    <Anim kind="symbols-transform" caption="Every low on the board becomes a premium, in one call." />
+
     <Code code={`import { transform, transformAll, upgradeLadder } from "@open-rgs/symbols";
 
 transform(grid, "LOW", "PREM");                       // and the cells it touched

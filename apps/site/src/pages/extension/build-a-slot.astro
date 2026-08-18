@@ -157,7 +157,27 @@ await createServer({
     <h2 data-section="&sect; 8">Run it</h2>
     <Code code={step8} />
 
-    <h2 data-section="&sect; 9">Then measure</h2>
+    <h2 data-section="&sect; 9">Where the rest of it lives</h2>
+    <p>
+      The walkthrough above builds one base game with a hold-and-win. The
+      pieces for everything else it might grow are separate packages, each with
+      its own page, and each an ordinary import:
+    </p>
+    <ul>
+      <li><a href="/extension/freespins">freespins</a>: the trigger table, the counter, retriggers, a global multiplier, cells held across spins.</li>
+      <li><a href="/extension/picks">picks</a>: pick N of M, reveal until a stop, a weighted wheel.</li>
+      <li><a href="/extension/gamble">gamble</a>: double-or-nothing and collect-or-risk, priced by their edge.</li>
+      <li><a href="/extension/symbols">symbols</a>: mystery reveals, transforms, walking wilds, multiplier wilds, splits.</li>
+      <li><a href="/extension/meters">meters</a>: collect five of these and something happens.</li>
+      <li><a href="/extension/strips">strips</a>: the classic reel, when a port or a lab asks for one.</li>
+    </ul>
+    <p>
+      A feature is a state machine your math steps through between the board
+      and the win, so adding one changes the math file and nothing else: the
+      manifest, the transport and the adapter never learn about it.
+    </p>
+
+    <h2 data-section="&sect; 10">Then measure</h2>
     <p>
       Nothing above tells you the game is any good. Simulate it, and check the
       confidence interval before believing the number: a game with a rare

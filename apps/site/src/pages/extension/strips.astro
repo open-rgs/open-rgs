@@ -1,0 +1,76 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Anim from "../../components/Anim.astro";
+import Code from "../../components/Code.astro";
+---
+
+<BaseLayout
+  title="@open-rgs/strips, Reel strips"
+  description="The classic reel: a fixed symbol sequence, a stop per spin, and the counting tools that make a strip's probabilities as readable as a weighted set's."
+>
+  <main>
+    <p class="dim"><a href="/extension">All extensions</a></p>
+    <h1>@open-rgs/strips</h1>
+
+    <p class="lede">A fixed sequence, a stop, and the window it shows.</p>
+
+    <p>The rest of these libraries prefer <a href="/extension/weights">weighted sets</a>, because a weight is a probability you can read and a strip is one you have to count for. That preference is real. It is also not a reason to pretend strips do not exist.</p>
+
+    <h2 data-section="&sect; 1">When a strip is the right answer</h2>
+
+    <p>Three cases, and if none of them applies to a new game, use weights.</p>
+
+    <ul>
+      <li>A port of an existing game <em>has</em> strips. Reproducing its math means reproducing them, not re-deriving equivalent weights and hoping.</li>
+      <li>Some jurisdictions and labs ask for the strip listing itself.</li>
+      <li>Adjacency is a strip's whole point. What can appear above what is fixed by the sequence, so stacks and near-misses are properties of the reel rather than something a per-cell draw has to be talked into.</li>
+    </ul>
+
+    <h2 data-section="&sect; 2">A spin is a stop per reel</h2>
+
+    <p>The window reads down from the stop and wraps, because a reel is a loop. A spin returns the stops as well as the board: the stops are the smaller and more useful record, and a report that keeps only the board has thrown the replay away.</p>
+
+    <Anim kind="strips-window" caption="The reel is fixed. The window is what moves." />
+
+    <Code code={`import { spinStrips, boardFrom, windowAt } from "@open-rgs/strips";
+import { rect } from "@open-rgs/grid";
+
+const REELS = [
+  ["A", "W", "W", "W", "B", "C", "A", "B"],   // one 3-tall W stack
+  ["A", "B", "C", "W", "B", "A", "C", "B"],
+  ["B", "A", "C", "B", "W", "A", "B", "C"],
+];
+
+const { grid, stops } = spinStrips(REELS, rect(3, 3), host.rng_next);
+
+// or replay one from its stops alone
+boardFrom(REELS, rect(3, 3), stops);`} />
+
+    <p>A window taller than its own reel is refused at build time, because it would show the same symbol twice in one column and quietly change every adjacency the strip was written for.</p>
+
+    <h2 data-section="&sect; 3">The counting a weighted set gives you free</h2>
+
+    <p>This is the part that makes strips workable rather than a leap of faith. Every figure is exact, because a strip is a finite object and its answers are arithmetic rather than simulation results.</p>
+
+    <Code code={`import { cellProbability, windowProbability, expectedInWindow,
+         longestRun, windowCountDistribution } from "@open-rgs/strips";
+
+cellProbability(reel, "W");                 // 3/8, the chance any one row shows it
+windowProbability(reel, "W", 3);            // 5/8, at least one in a 3-row window
+expectedInWindow(reel, "W", 3);             // 9/8, the expected count
+longestRun(reel, "W");                      // 3, how tall the stack can be
+windowCountDistribution(reel, "W", 3);      // [.375, .25, .25, .125] by count`} />
+
+    <p><strong>The trap this exists to close.</strong> At-least-one in a window is <em>not</em> the row chance times the height. On the reel above that formula gives 1.125, which is not even a probability: a stacked symbol appears in several rows of the <em>same</em> window, so multiplying overcounts exactly where a strip game puts its stacks. The expected <em>count</em> is height times the row chance, and that one is exact. Two similar-sounding numbers, one of which is wrong, which is why both are here rather than left to the reader.</p>
+
+    <h2 data-section="&sect; 4">Building a strip from a listing</h2>
+
+    <p>For a new game this is a weighted set with extra steps, and the honest advice is to use one. It is here for the case where a specification names the contents of a reel but not their order.</p>
+
+    <Code code={`import { stripOf } from "@open-rgs/strips";
+
+const reel = stripOf({ LOW: 12, MID: 6, HIGH: 3, WILD: 1 }, host.rng_next);`} />
+
+    <p>The order comes from the stream, so it replays from a seed like everything else. What it cannot give you is adjacency: if the stacks matter, write the sequence.</p>
+  </main>
+</BaseLayout>

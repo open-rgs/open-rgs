@@ -186,3 +186,36 @@ describe("a wild with its own paytable row", () => {
     expect(evalWay(grid, "WILD", pay, { roles })?.multiplier).toBe(4);
   });
 });
+
+describe("both ways", () => {
+  const PAY2 = paytable({ HIGH: { 3: 10, 4: 50, 5: 200 } });
+
+  test("a run anchored on the RIGHT pays when bothWays is on", () => {
+    // HIGH on the last three columns only: nothing from the left.
+    const grid = fromColumns([["LOW"], ["LOW"], ["HIGH"], ["HIGH"], ["HIGH"]]);
+    expect(evalWay(grid, "HIGH", PAY2)).toBeUndefined();
+    expect(evalWay(grid, "HIGH", PAY2, { bothWays: true })?.multiplier).toBe(10);
+  });
+
+  test("the two directions compete, they never add", () => {
+    // HIGH everywhere: five from the left, five from the right, paid ONCE.
+    const grid = fromColumns([["HIGH"], ["HIGH"], ["HIGH"], ["HIGH"], ["HIGH"]]);
+    const win = evalWay(grid, "HIGH", PAY2, { bothWays: true })!;
+    expect(win.multiplier).toBe(200);
+    expect(win.count).toBe(5);
+  });
+
+  test("the better direction wins", () => {
+    // left: 3 columns of 1 way. right: 3 columns, one of which holds two HIGH.
+    const grid = fromColumns([["HIGH", "LOW"], ["HIGH", "LOW"], ["HIGH", "HIGH"], ["LOW", "LOW"], ["LOW", "LOW"]]);
+    const left = evalWay(grid, "HIGH", PAY2)!;
+    const both = evalWay(grid, "HIGH", PAY2, { bothWays: true })!;
+    expect(left.multiplier).toBe(20);       // 10 x 2 ways
+    expect(both.multiplier).toBe(20);       // the right side reaches nothing
+  });
+
+  test("off by default, so an existing game does not silently start paying twice", () => {
+    const grid = fromColumns([["LOW"], ["HIGH"], ["HIGH"], ["HIGH"], ["HIGH"]]);
+    expect(evalWay(grid, "HIGH", PAY2)).toBeUndefined();
+  });
+});

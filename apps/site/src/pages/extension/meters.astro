@@ -20,7 +20,7 @@ import Code from "../../components/Code.astro";
 
     <p>A spin that collects three at once passes every threshold in between, and each one pays, in ascending order. Awarding only the highest is the common bug, and it stays invisible until someone reconciles a big spin against the paytable.</p>
 
-    <Anim kind="fs-retrigger" caption="The bar fills, and everything it passed is paid." />
+    <Anim kind="meter-fill" caption="The bar fills, and everything it passed is paid." />
 
     <Code code={`import { meter, collect } from "@open-rgs/meters";
 

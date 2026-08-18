@@ -308,6 +308,31 @@ const n = (k: number) => Array.from({ length: k });
         <span class="num wseg w3">MAJOR</span><span class="num wseg w4">GRAND</span>
       </div>
     )}
+    {kind === "strips-window" && (
+      <div class="row gap">
+        <div class="strip"><i>A</i><i>W</i><i>W</i><i>W</i><i>B</i><i>C</i><i>A</i><i>B</i><span class="win"></span></div>
+        <span class="fsw">the window slides, the reel does not change</span>
+      </div>
+    )}
+    {kind === "gamble-ladder" && (
+      <div class="row gap">
+        <span class="num gstep g1">1&times;</span><span class="num gstep g2">2&times;</span>
+        <span class="num gstep g3">4&times;</span><span class="num gbust">bust</span>
+      </div>
+    )}
+    {kind === "meter-fill" && (
+      <div class="row gap">
+        <div class="gauge"><span class="mfill"></span></div>
+        <span class="num mpay">MINI</span><span class="num mpay mp2">MINOR</span>
+      </div>
+    )}
+    {kind === "symbols-transform" && (
+      <div class="hw">
+        <span class="hwc coin tf">L</span><span class="hwc coin tf t2">L</span><span class="hwc hole"></span>
+        <span class="hwc hole"></span><span class="hwc coin tf t3">L</span><span class="hwc coin">H</span>
+        <span class="hwc coin tf t4">L</span><span class="hwc hole"></span><span class="hwc hole"></span>
+      </div>
+    )}
     {kind === "holdwin-full" && (
       <div class="g3">{n(9).map((_, i) => <i class={`a fillseq f${i}`}></i>)}</div>
     )}
@@ -657,6 +682,39 @@ const n = (k: number) => Array.from({ length: k });
   .f3{animation-delay:.36s}.f4{animation-delay:.48s}.f5{animation-delay:.6s}
   .f6{animation-delay:.72s}.f7{animation-delay:.84s}.f8{animation-delay:.96s}
 
+  /* --- strips: a fixed reel, a window that slides over it ------------------ */
+  .strip { position: relative; display: flex; flex-direction: column; gap: 2px; }
+  .strip i {
+    width: 26px; height: 15px; border-radius: 2px; background: rgba(255,255,255,.06);
+    color: #9a9a9a; font-family: var(--mono, monospace); font-size: .62rem; font-style: normal;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .strip .win {
+    position: absolute; left: -3px; width: 32px; height: 55px; border: 2px solid #0E6B62;
+    border-radius: 3px; top: 0; animation: slideWin 6s infinite;
+  }
+  @keyframes slideWin { 0%{top:0} 30%{top:51px} 60%{top:17px} 100%{top:0} }
+
+  /* --- gamble: each rung risks the lot -------------------------------------- */
+  @keyframes gClimb { 0%,100%{opacity:.22} 20%{opacity:1;color:#0E6B62} }
+  .gstep { opacity: .22; }
+  .g1{animation:gClimb 5s infinite}.g2{animation:gClimb 5s infinite 1s}.g3{animation:gClimb 5s infinite 2s}
+  @keyframes gBust { 0%,58%{opacity:0} 68%,88%{opacity:1;color:#9E1C2F} 96%,100%{opacity:0} }
+  .gbust { opacity: 0; animation: gBust 5s infinite; }
+
+  /* --- meters: a bar that fills and pays what it passed --------------------- */
+  .gauge .mfill { display:block; height:100%; background:#0E6B62; width:0; animation: mFill 6s infinite; }
+  @keyframes mFill { 0%{width:0} 45%{width:55%} 70%{width:100%} 100%{width:100%} }
+  @keyframes mPay { 0%,40%{opacity:0} 48%,62%{opacity:1;color:#0E6B62} 70%,100%{opacity:0} }
+  @keyframes mPay2 { 0%,66%{opacity:0} 74%,92%{opacity:1;color:#0E6B62} 98%,100%{opacity:0} }
+  .mpay { opacity: 0; animation: mPay 6s infinite; }
+  .mpay.mp2 { animation: mPay2 6s infinite; }
+
+  /* --- symbols: the lows all become premiums at once ----------------------- */
+  @keyframes toPrem { 0%,45%{opacity:1} 55%,100%{opacity:1;background:#0E6B62;color:#041614} }
+  .hwc.tf { animation: toPrem 4s infinite; }
+  .t2{animation-delay:.05s}.t3{animation-delay:.1s}.t4{animation-delay:.15s}
+
   /* --- free spins: the multiplier, the counter, the held cells ------------- */
   @keyframes fsStep { 0%,100%{opacity:.22} 18%{opacity:1;color:#0E6B62} }
   .fsx { opacity: .22; }
@@ -771,6 +829,10 @@ const n = (k: number) => Array.from({ length: k });
        before-state would say nothing about the mechanic. */
     .hwc.land, .hwc.new, .hwc.pot .tot, .hwc.q .flip, .hwc .badge { opacity: 1 !important; }
     .fsx, .wseg, .meter .rt3, .meter .rt4, .meter .rt5, .rtlabel { opacity: 1 !important; }
+    .gstep, .mpay { opacity: 1 !important; }
+    .gbust { opacity: 0 !important; }
+    .gauge .mfill { width: 100% !important; }
+    .strip .win { top: 17px !important; }
     .hwc.box.b2, .hwc.box.b3, .hwc.box.b5 { opacity: .16 !important; }
     .hwc.eat { opacity: .16 !important; color: #6b6b6b !important; }
     .hwc .badge { position: static; margin-left: 3px; }

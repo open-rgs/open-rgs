@@ -295,6 +295,13 @@
         "@open-rgs/core": "1.7.0",
       },
     },
+    "packages/strips": {
+      "name": "@open-rgs/strips",
+      "version": "0.1.0",
+      "dependencies": {
+        "@open-rgs/grid": "0.1.0",
+      },
+    },
     "packages/symbols": {
       "name": "@open-rgs/symbols",
       "version": "0.1.0",
@@ -558,6 +565,8 @@
     "@open-rgs/simulator": ["@open-rgs/simulator@workspace:packages/simulator"],
 
     "@open-rgs/site": ["@open-rgs/site@workspace:apps/site"],
+
+    "@open-rgs/strips": ["@open-rgs/strips@workspace:packages/strips"],
 
     "@open-rgs/symbols": ["@open-rgs/symbols@workspace:packages/symbols"],
 

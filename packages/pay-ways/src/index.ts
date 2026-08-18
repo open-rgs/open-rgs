@@ -33,6 +33,13 @@ import { type Paytable, type Roles, type Win, isScatter, isWild, substitutes } f
 
 export interface WaysOptions<S = string> {
   readonly roles?: Roles<S>;
+  /** Also evaluate right to left and keep the better of the two.
+   *
+   *  A both-ways game pays a run anchored at EITHER end, so the two readings
+   *  COMPETE rather than accumulate. Adding them pays a run that spans the
+   *  whole board twice, which is the single most expensive mistake available
+   *  in a ways game because the widest runs are the dear ones. */
+  readonly bothWays?: boolean;
   /** Whether a wild that has its own paytable row also pays as itself.
    *
    *  Default FALSE: a wild is already counted inside the run it substituted
@@ -69,11 +76,31 @@ export function evalWay<S>(
   // Scatters pay on total count anywhere, which is a different evaluator.
   if (isScatter(symbol, roles)) return undefined;
 
+  const left = evalWayFrom(grid, symbol, pay, roles, "left");
+  if (!opts.bothWays) return left;
+  const right = evalWayFrom(grid, symbol, pay, roles, "right");
+  if (!left) return right;
+  if (!right) return left;
+  return right.multiplier > left.multiplier ? right : left;
+}
+
+/** One direction of one symbol. Right-to-left walks the columns in reverse and
+ *  reports the same shape, so a caller cannot tell which end paid except by
+ *  the positions. */
+function evalWayFrom<S>(
+  grid: Grid<S>,
+  symbol: S,
+  pay: Paytable<S>,
+  roles: Roles<S>,
+  from: "left" | "right",
+): Win<S> | undefined {
+  const width = widthOf(grid.shape);
   let ways = 1;
   let columns = 0;
   const positions: number[] = [];
 
-  for (let col = 0; col < widthOf(grid.shape); col++) {
+  for (let i = 0; i < width; i++) {
+    const col = from === "left" ? i : width - 1 - i;
     const hits = matchesInColumn(grid, col, symbol, roles);
     if (hits.length === 0) break; // the gap ends the run
     ways *= hits.length;

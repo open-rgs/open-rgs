@@ -136,6 +136,39 @@ export function fromColumns<S>(columns: ReadonlyArray<readonly S[]>): Grid<S> {
   return { shape, cells };
 }
 
+/**
+ * Add a column on the right, filled by `fill`.
+ *
+ * The board grows during a round in more games than it used to: a reel added
+ * on every win, a row unlocked at a coin count. Growing a `Grid` is honest
+ * because shape is a height per column, so a wider board is a longer array
+ * rather than a different kind of object, and every evaluator already reads
+ * the shape it is given.
+ *
+ * What it does NOT do is renumber anything: existing columns keep their index
+ * and their cells, so a payline, a sticky cell or a cell multiplier written
+ * against the old board still points where it did.
+ */
+export function appendColumn<S>(grid: Grid<S>, height: number, fill: (pos: Pos) => S): Grid<S> {
+  if (!Number.isInteger(height) || height <= 0) {
+    throw new Error(`appendColumn: height must be a positive integer, got ${height}`);
+  }
+  const col = grid.shape.length;
+  const added: S[] = [];
+  for (let row = 0; row < height; row++) added.push(fill({ col, row }));
+  return { shape: [...grid.shape, height], cells: [...grid.cells, ...added] };
+}
+
+/** Add `count` columns at once, each the same height. */
+export function appendColumns<S>(grid: Grid<S>, count: number, height: number, fill: (pos: Pos) => S): Grid<S> {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error(`appendColumns: count must be a non-negative integer, got ${count}`);
+  }
+  let out = grid;
+  for (let i = 0; i < count; i++) out = appendColumn(out, height, fill);
+  return out;
+}
+
 /** Nested view of a grid, one array per column. Allocates - prefer {@link at}
  *  on a hot path. */
 export function toColumns<S>(grid: Grid<S>): S[][] {

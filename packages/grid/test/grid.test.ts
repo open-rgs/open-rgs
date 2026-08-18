@@ -4,9 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  assertShape, at, column, countOf, countWhere, fromColumns, heightOf, indexOf,
-  isRectangular, makeGrid, mapGrid, neighbours, posOf, positions, positionsOf,
-  positionsWhere, rect, samePos, sizeOf, toColumns, widthOf, withAt,
+  appendColumn, appendColumns, assertShape, at, column, countOf, countWhere, fromColumns, heightOf, indexOf, isRectangular, makeGrid, mapGrid, neighbours, posOf, positions, positionsOf, positionsWhere, rect, samePos, sizeOf, toColumns, widthOf, withAt,
 } from "../src/index.js";
 
 // 4-5-5-5-5-4, the divan-2 shape. Deliberately ragged at both ends.
@@ -189,5 +187,40 @@ describe("neighbours", () => {
   test("samePos compares coordinates", () => {
     expect(samePos({ col: 1, row: 2 }, { col: 1, row: 2 })).toBe(true);
     expect(samePos({ col: 1, row: 2 }, { col: 2, row: 1 })).toBe(false);
+  });
+});
+
+describe("a board that grows mid-round", () => {
+  test("a new column arrives on the right, filled by the callback", () => {
+    const g = makeGrid(rect(2, 3), () => "LOW");
+    const out = appendColumn(g, 3, (p) => `new-${p.col}-${p.row}`);
+    expect(out.shape).toEqual([3, 3, 3]);
+    expect(toColumns(out)[2]).toEqual(["new-2-0", "new-2-1", "new-2-2"]);
+  });
+
+  test("existing columns keep their index and their cells, so anything written against the old board still points where it did", () => {
+    const g = fromColumns([["a", "b"], ["c", "d"]]);
+    const out = appendColumn(g, 2, () => "x");
+    expect(at(out, 0, 0)).toBe("a");
+    expect(at(out, 1, 1)).toBe("d");
+    expect(indexOf(out.shape, 1, 1)).toBe(indexOf(g.shape, 1, 1));
+  });
+
+  test("a taller or shorter new column is fine, because shape is per column", () => {
+    const g = makeGrid(rect(1, 2), () => "LOW");
+    expect(appendColumn(g, 5, () => "x").shape).toEqual([2, 5]);
+  });
+
+  test("several at once", () => {
+    const g = makeGrid(rect(1, 2), () => "LOW");
+    const out = appendColumns(g, 3, 2, () => "x");
+    expect(out.shape).toEqual([2, 2, 2, 2]);
+    expect(sizeOf(out.shape)).toBe(out.cells.length);
+  });
+
+  test("a column with no height is refused rather than producing a hole in the shape", () => {
+    const g = makeGrid(rect(1, 2), () => "LOW");
+    expect(() => appendColumn(g, 0, () => "x")).toThrow(/positive integer/);
+    expect(() => appendColumns(g, -1, 2, () => "x")).toThrow(/non-negative integer/);
   });
 });
