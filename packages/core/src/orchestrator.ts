@@ -28,12 +28,14 @@ import {
   type SimpleMath,
   type ComplexMath,
   type GameMode,
+  type StepOutcome,
   type SpinContext,
   type CheatHint,
   type RoundOutcome,
   type CloseOutcome,
 } from "@open-rgs/contract";
 import * as sessions from "./session.js";
+import type { LocalSession, OpenRound } from "./session.js";
 import * as promo from "./promo.js";
 import { settleAmount } from "./money.js";
 import { deriveIdempotencyKey } from "./idempotency.js";
@@ -709,12 +711,23 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     open.actionLog.push(req.action);
     open.opsLog.push(...stepResult.ops);
 
-    // Record the player action into the tamper-evident game-cycle log (no
-    // money moves on a step, so win/multiplier are 0).
+    // Record the player action into the tamper-evident game-cycle log. Money
+    // moved by this step, if any, is recorded separately below so that each
+    // movement is its own line rather than a footnote on the action.
     recordAudit(mode, {
       sessionId: s.sessionId, roundId: open.roundId, kind: "step",
       type: String(req.action.type), bet: 0, win: 0, multiplier: 0, reason: "",
     });
+
+    // --- mid-round money ----------------------------------------------------
+    //
+    // A round is not always one debit and one credit. Buying a respin takes
+    // money while the round continues; a free spin that pays per spin gives it
+    // back before the round is over. Both are optional on the adapter, so a
+    // wallet that models a round the old way stays conformant - and a game
+    // that asks such a wallet for a mid-round movement fails here rather than
+    // playing on with money nobody agreed to move.
+    const stepMoney = await applyStepMoney(s, open, mode, stepResult);
 
     // Wallet-side action-log checkpoint, if the provider supports it.
     if (typeof platform.updateComplex === "function") {
@@ -737,7 +750,127 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     return {
       ops: stepResult.ops,
       ...(stepResult.awaiting ? { awaiting: stepResult.awaiting } : {}),
+      ...(stepMoney.balance !== undefined ? { balance: stepMoney.balance } : {}),
+      ...(stepMoney.stake !== undefined ? { stake: stepMoney.stake } : {}),
+      ...(stepMoney.win !== undefined ? { win: stepMoney.win } : {}),
     };
+  }
+
+  /** The round's remaining max-win allowance, mid-round awards deducted. */
+  function remainingCap(open: OpenRound, mode: GameMode): number | undefined {
+    return remainingCapFor(
+      open.paidOut ?? 0,
+      open.effectiveCost,
+      mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
+    );
+  }
+
+  /** A mid-round award may not spend more than the round has left. */
+  function capMidRoundAward(
+    open: OpenRound,
+    mode: GameMode,
+    multiplier: number,
+  ): number {
+    const allowance = remainingCap(open, mode);
+    return allowance === undefined ? multiplier : Math.min(multiplier, allowance);
+  }
+
+  /**
+   * Apply whatever money a step asked to move, in the only safe order: take
+   * before you give.
+   *
+   * A mid-round stake raises what the round has cost, so the max-win cap
+   * scales with what the player actually paid. A mid-round award spends part
+   * of that cap, so the close cannot pay the ceiling a second time.
+   */
+  async function applyStepMoney(
+    s: LocalSession,
+    open: OpenRound,
+    mode: GameMode,
+    stepResult: StepOutcome,
+  ): Promise<{ balance?: number; stake?: number; win?: number }> {
+    const wantsStake = typeof stepResult.stake === "number" && stepResult.stake > 0;
+    const wantsAward = typeof stepResult.award === "number" && stepResult.award > 0;
+    if (!wantsStake && !wantsAward) return {};
+
+    // The step index makes each movement's key deterministic, so a client that
+    // resends a step it never saw the answer to gets the same movement rather
+    // than a second one.
+    const stepIndex = open.actionLog.length;
+    const result: { balance?: number; stake?: number; win?: number } = {};
+
+    if (wantsStake) {
+      if (typeof platform.stakeComplex !== "function") {
+        throw new RGSError(
+          "STEP_FAILED",
+          "math asked for a mid-round stake but this wallet adapter does not implement stakeComplex",
+        );
+      }
+      const amount = settleAmount(stepResult.stake!, open.effectiveCost);
+      if (amount > s.balance) {
+        throw new RGSError("INSUFFICIENT_BALANCE", `mid-round stake ${amount} > balance ${s.balance}`);
+      }
+      let receipt;
+      try {
+        receipt = await timedPlatformCall(metrics, "stakeComplex", () => platform.stakeComplex!({
+          sessionId: s.sessionId,
+          roundId: open.roundId,
+          stake: amount,
+          multiplier: stepResult.stake!,
+          state: open.state,
+          ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
+          idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "stake", stepIndex),
+        }));
+      } catch (e) {
+        throw translate(e, "STEP_FAILED");
+      }
+      open.extraStake = (open.extraStake ?? 0) + amount;
+      open.effectiveCost += amount;
+      sessions.setBalance(s.sessionId, receipt.balance);
+      result.balance = receipt.balance;
+      result.stake = amount;
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: open.roundId, kind: "step",
+        type: "stake", bet: amount, win: 0, multiplier: stepResult.stake!, reason: "",
+      });
+    }
+
+    if (wantsAward) {
+      if (typeof platform.awardComplex !== "function") {
+        throw new RGSError(
+          "STEP_FAILED",
+          "math asked for a mid-round award but this wallet adapter does not implement awardComplex",
+        );
+      }
+      assertFundedWin(open.effectiveCost, stepResult.award!);
+      const capped = capMidRoundAward(open, mode, stepResult.award!);
+      const amount = settleAmount(capped, open.effectiveCost);
+      let receipt;
+      try {
+        receipt = await timedPlatformCall(metrics, "awardComplex", () => platform.awardComplex!({
+          sessionId: s.sessionId,
+          roundId: open.roundId,
+          win: amount,
+          multiplier: capped,
+          type: stepResult.awardType ?? "award",
+          state: open.state,
+          ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
+          idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "award", stepIndex),
+        }));
+      } catch (e) {
+        throw translate(e, "STEP_FAILED");
+      }
+      open.paidOut = (open.paidOut ?? 0) + amount;
+      sessions.setBalance(s.sessionId, receipt.balance);
+      result.balance = receipt.balance;
+      result.win = amount;
+      recordAudit(mode, {
+        sessionId: s.sessionId, roundId: open.roundId, kind: "step",
+        type: stepResult.awardType ?? "award", bet: 0, win: amount, multiplier: capped, reason: "",
+      });
+    }
+
+    return result;
   }
 
   // --- COMPLEX CLOSE ------------------------------------------------------
@@ -767,7 +900,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     const cappedClose = applyMaxWinCapClose(
       closeResult,
       open.effectiveCost,
-      mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
+      remainingCap(open, mode),
     );
     const win = settleAmount(cappedClose.multiplier, open.effectiveCost);
     assertFundedWin(open.effectiveCost, cappedClose.multiplier);
@@ -919,7 +1052,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     const cappedClose = applyMaxWinCapClose(
       closeResult,
       open.effectiveCost,
-      mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
+      remainingCap(open, mode),
     );
     const win = settleAmount(cappedClose.multiplier, open.effectiveCost);
     assertFundedWin(open.effectiveCost, cappedClose.multiplier);
@@ -1114,6 +1247,23 @@ export function applyMaxWinCap(
 }
 
 /** Same sanitize-then-cap applied to a complex-round close outcome. */
+/**
+ * What is left of a round's max-win allowance after any mid-round awards.
+ *
+ * Without this a round that pays its ceiling on a step could pay it again on
+ * close, and the cap would only ever have limited a single movement rather
+ * than the round.
+ */
+function remainingCapFor(
+  paidOut: number,
+  effectiveCost: number,
+  maxMultiplier: number | undefined,
+): number | undefined {
+  if (maxMultiplier == null) return undefined;
+  if (paidOut <= 0 || effectiveCost <= 0) return maxMultiplier;
+  return Math.max(0, maxMultiplier - paidOut / effectiveCost);
+}
+
 export function applyMaxWinCapClose(
   outcome: CloseOutcome,
   _bet: number,

@@ -84,6 +84,28 @@ export interface StepOutcome {
   state: RoundState;
   ops: Op[];
   awaiting?: AwaitingHint;     // null = ready to close
+
+  /**
+   * Take more money from the player *now*, without closing the round: a paid
+   * respin, a doubled ante, buying one more pick. Expressed as a multiple of
+   * the round's cost so math stays currency-blind, exactly like `multiplier`.
+   *
+   * Requires an adapter that implements `stakeComplex`. A game that asks for
+   * money the wallet cannot take fails the step rather than continuing on
+   * credit.
+   */
+  stake?: number;
+
+  /**
+   * Pay the player *now*, without closing the round: one free spin's win,
+   * a collected prize, a partial cash-out. A multiple of the round's cost.
+   *
+   * Requires an adapter that implements `awardComplex`.
+   */
+  award?: number;
+
+  /** Tag for a mid-round award, as `type` is for a close. Default "award". */
+  awardType?: string;
 }
 
 /** What a complex-round math returns from close(). */
@@ -477,6 +499,51 @@ export interface UpdateComplex {
   state: RoundState;
 }
 
+/**
+ * Money out of the player, mid-round. The round stays open.
+ *
+ * This exists because a round is not always one bet and one win: buying a
+ * feature, paying for a respin, or doubling an ante all move money while the
+ * round continues. Without it a game has to pretend the extra cost was part of
+ * the opening bet, which makes the operator's ledger a work of fiction.
+ */
+export interface StakeComplex {
+  sessionId: string;
+  roundId: string;
+  /** Amount to debit, integer minor units. */
+  stake: number;
+  /** The multiple of the round's cost this represents, for reporting. */
+  multiplier: number;
+  /** Game-defined reason, e.g. "respin", "ante", "buy". */
+  reason?: string;
+  /** Math state at the moment of the debit. */
+  state: RoundState;
+  mathVersion?: string;
+  /** Deterministic per-step key; a repeat must not debit twice. */
+  idempotencyKey?: string;
+}
+
+/**
+ * Money to the player, mid-round. The round stays open.
+ *
+ * A free-spin round that pays per spin has a win per spin, and a player who
+ * watched three spins pay out should not have to wait for a fourth to see the
+ * money. The wallet books each one as its own movement.
+ */
+export interface AwardComplex {
+  sessionId: string;
+  roundId: string;
+  /** Amount to credit, integer minor units. */
+  win: number;
+  /** The multiple of the round's cost this represents. */
+  multiplier: number;
+  /** Game-defined tag, e.g. "free-spin-win". */
+  type: string;
+  state: RoundState;
+  mathVersion?: string;
+  idempotencyKey?: string;
+}
+
 export interface CloseComplex {
   sessionId: string;
   roundId: string;
@@ -592,6 +659,18 @@ export interface PlatformAdapter {
   openComplex(req: OpenComplex): Promise<RoundReceipt>;
   /** Audit-only state update (no money moves). Optional. */
   updateComplex?(req: UpdateComplex): Promise<void>;
+
+  /**
+   * OPTIONAL. Move money mid-round, in either direction, without closing.
+   *
+   * Both are optional because most wallets model a round as one debit and one
+   * credit, and those wallets stay conformant. A game whose math asks for a
+   * mid-round movement against an adapter that does not implement the matching
+   * method fails the step with a clear error - the orchestrator never invents
+   * money the wallet has not agreed to move.
+   */
+  stakeComplex?(req: StakeComplex): Promise<RoundReceipt>;
+  awardComplex?(req: AwardComplex): Promise<RoundReceipt>;
   /** Close a complex round (credit win). */
   closeComplex(req: CloseComplex): Promise<RoundReceipt>;
 
@@ -742,6 +821,12 @@ export interface ClientResponseOpenRound {
 export interface ClientResponseStepRound {
   ops: Op[];
   awaiting?: AwaitingHint;
+  /** Present when the step moved money: the balance after it did. */
+  balance?: number;
+  /** Money taken by this step, minor units. */
+  stake?: number;
+  /** Money paid by this step, minor units. */
+  win?: number;
 }
 
 export interface ClientResponseCloseRound {

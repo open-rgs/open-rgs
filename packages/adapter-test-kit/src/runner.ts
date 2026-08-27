@@ -4,7 +4,8 @@
 // Coverage:
 //   - lifecycle: connect, isHealthy, diagnostics shape, disconnect
 //   - simple-round: openSession returns SessionInfo, settleSimple debits+credits
-//   - complex-round (if attempted): openComplex -> updateComplex(optional) -> closeComplex
+//   - complex-round (if attempted): openComplex -> updateComplex(optional) ->
+//     stakeComplex/awardComplex (optional, mid-round money) -> closeComplex
 //   - events: onEvent registered, balanceChanged fires when expected
 //   - idempotency: a REPEATED key moves money once and returns the same
 //     receipt  - the property the contract relies on (was advertised but
@@ -247,6 +248,69 @@ export async function runConformance(
       });
     } else {
       skip("complex.updateComplex", "complex-round", "updateComplex (optional)  - not implemented", "adapter does not implement updateComplex");
+    }
+
+    // Mid-round money is optional: a wallet that models a round as one debit
+    // and one credit is conformant. A wallet that DOES implement it must move
+    // the money without closing the round, and must dedupe a repeated key the
+    // same way every other movement does.
+    if (typeof adapter.stakeComplex === "function") {
+      await run("complex.stakeComplex", "complex-round", "stakeComplex debits mid-round without closing", async () => {
+        if (!openReceipt) throw new Error("openReceipt missing");
+        const first = await adapter.stakeComplex!({
+          sessionId: fixture.sessionId,
+          roundId: openReceipt.roundId,
+          stake: fixture.bet,
+          multiplier: 1,
+          state: "mid-state-v1",
+          idempotencyKey: "conf-stake-1",
+        });
+        if (typeof first.balance !== "number") throw new Error("stakeComplex returned no balance");
+        const repeat = await adapter.stakeComplex!({
+          sessionId: fixture.sessionId,
+          roundId: openReceipt.roundId,
+          stake: fixture.bet,
+          multiplier: 1,
+          state: "mid-state-v1",
+          idempotencyKey: "conf-stake-1",
+        });
+        if (repeat.balance !== first.balance) {
+          throw new Error("a repeated stakeComplex key debited twice  - it MUST dedupe");
+        }
+        // The round must still be open: closing it later is what proves it.
+      });
+    } else {
+      skip("complex.stakeComplex", "complex-round", "stakeComplex (optional)  - not implemented", "adapter does not implement stakeComplex");
+    }
+
+    if (typeof adapter.awardComplex === "function") {
+      await run("complex.awardComplex", "complex-round", "awardComplex credits mid-round without closing", async () => {
+        if (!openReceipt) throw new Error("openReceipt missing");
+        const first = await adapter.awardComplex!({
+          sessionId: fixture.sessionId,
+          roundId: openReceipt.roundId,
+          win: fixture.bet,
+          multiplier: 1,
+          type: "award",
+          state: "mid-state-v1",
+          idempotencyKey: "conf-award-1",
+        });
+        if (typeof first.balance !== "number") throw new Error("awardComplex returned no balance");
+        const repeat = await adapter.awardComplex!({
+          sessionId: fixture.sessionId,
+          roundId: openReceipt.roundId,
+          win: fixture.bet,
+          multiplier: 1,
+          type: "award",
+          state: "mid-state-v1",
+          idempotencyKey: "conf-award-1",
+        });
+        if (repeat.balance !== first.balance) {
+          throw new Error("a repeated awardComplex key credited twice  - it MUST dedupe");
+        }
+      });
+    } else {
+      skip("complex.awardComplex", "complex-round", "awardComplex (optional)  - not implemented", "adapter does not implement awardComplex");
     }
     // Bad round id is rejected  - and must leave the real open round intact,
     // so we run it before the valid close.

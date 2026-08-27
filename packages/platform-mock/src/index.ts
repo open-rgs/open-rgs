@@ -21,6 +21,8 @@ import type {
   OpenComplex,
   UpdateComplex,
   CloseComplex,
+  StakeComplex,
+  AwardComplex,
   RoundReceipt,
   ReverseRound,
   ReverseReceipt,
@@ -224,6 +226,42 @@ export class MockPlatform implements PlatformAdapter {
 
   async updateComplex(_req: UpdateComplex): Promise<void> {
     /* audit-only no-op for the mock */
+  }
+
+  // --- mid-round money --------------------------------------------------
+  //
+  // Optional on the contract, implemented here so the conformance suite has
+  // something to hold a real adapter against. Both movements belong to the
+  // round that is already open: they change the balance, they do not close it,
+  // and they are covered by the reversal snapshot taken at open.
+
+  async stakeComplex(req: StakeComplex): Promise<RoundReceipt> {
+    const dup = this.replay(req.idempotencyKey);
+    if (dup) return dup;
+
+    const s = this.must(req.sessionId);
+    assertAmount(req.stake, "stake");
+    if (!s.openRound || s.openRound.roundId !== req.roundId) {
+      throw new Error("InvalidRoundOperation: roundId mismatch");
+    }
+    if (req.stake > s.balance) throw new Error("InsufficientFunds");
+    s.balance -= req.stake;
+    this.emit({ type: "balanceChanged", sessionId: req.sessionId, balance: s.balance, reason: "stake" });
+    return this.remember(req.idempotencyKey, { roundId: req.roundId, balance: s.balance });
+  }
+
+  async awardComplex(req: AwardComplex): Promise<RoundReceipt> {
+    const dup = this.replay(req.idempotencyKey);
+    if (dup) return dup;
+
+    const s = this.must(req.sessionId);
+    assertAmount(req.win, "win");
+    if (!s.openRound || s.openRound.roundId !== req.roundId) {
+      throw new Error("InvalidRoundOperation: roundId mismatch");
+    }
+    s.balance += req.win;
+    this.emit({ type: "balanceChanged", sessionId: req.sessionId, balance: s.balance, reason: "award" });
+    return this.remember(req.idempotencyKey, { roundId: req.roundId, balance: s.balance });
   }
 
   async closeComplex(req: CloseComplex): Promise<RoundReceipt> {

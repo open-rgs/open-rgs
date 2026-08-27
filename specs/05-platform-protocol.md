@@ -21,6 +21,8 @@ interface PlatformAdapter {
 
   openComplex(req: OpenComplex): Promise<RoundReceipt>;
   updateComplex?(req: UpdateComplex): Promise<void>;
+  stakeComplex?(req: StakeComplex): Promise<RoundReceipt>;
+  awardComplex?(req: AwardComplex): Promise<RoundReceipt>;
   closeComplex(req: CloseComplex): Promise<RoundReceipt>;
 
   onEvent(handler: (e: PlatformEvent) => void): void;
@@ -52,6 +54,8 @@ rounding modes.
 | `settleSimple` | Atomically debit `bet` and credit `win`. Single transaction. |
 | `openComplex` | Debit `bet`. Returns `roundId` referenceable by close/update. |
 | `updateComplex` | NO money movement. Pure audit/state-persistence. Idempotent. |
+| `stakeComplex` | OPTIONAL. Debit mid-round. The round stays open. |
+| `awardComplex` | OPTIONAL. Credit mid-round. The round stays open. |
 | `closeComplex` | Credit `win` against the open round. Final transaction. |
 | `reverseRound` | OPTIONAL. Undo a settled round  - money AND carry  - latest-first. |
 
@@ -90,6 +94,43 @@ The wallet guarantees:
   the admin endpoint.
 - `BalanceChangedEvent` is emitted whenever the balance changes for any
   reason (round settle, deposit, withdrawal, manual adjustment).
+
+### Mid-round money (optional)
+
+A round is not always one debit and one credit. Buying a respin takes money
+while the round continues; a free-spin feature that pays per spin gives money
+back before the round is over. `stakeComplex` and `awardComplex` are how a
+wallet accepts those movements without pretending they were part of the
+opening bet.
+
+Both are **optional**, and a wallet that models a round the old way stays
+conformant. The orchestrator never invents money a wallet has not agreed to
+move: a game whose math returns `StepOutcome.stake` or `StepOutcome.award`
+against an adapter that does not implement the matching method fails that step
+with `STEP_FAILED`, naming the missing method.
+
+Math stays currency-blind: `stake` and `award` on a `StepOutcome` are
+multiples of the round's cost, exactly like `multiplier` on a close.
+
+The orchestrator guarantees:
+
+- Within one step, `stakeComplex` runs before `awardComplex`  - take before
+  you give, so a player cannot be paid out of money they have not yet staked.
+- A mid-round stake **raises the round's cost**, so the max-win cap scales with
+  what the player actually paid rather than with the opening bet alone.
+- A mid-round award **spends** the round's max-win allowance. A round that
+  pays its ceiling on a step cannot pay it again at close.
+- Keys are deterministic per step: `"<sessionId>:<roundId>:stake:<stepIndex>"`
+  and the matching `award` form, so a resent step is the same movement rather
+  than a second one.
+
+The wallet guarantees:
+
+- Both are idempotent on `idempotencyKey`, like every other movement.
+- Neither closes the round. A `closeComplex` must still arrive, and the
+  autoclose backstop still applies.
+- A reversal of the round undoes mid-round movements along with the rest of it
+  (Guarantee 2: the round is one record).
 
 ### Reversal (optional)  - Guarantee 2, "One Round, One Record"
 

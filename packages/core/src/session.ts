@@ -45,6 +45,18 @@ export interface OpenRound {
   opsLog: Op[];
   /** Wall-clock ms epoch when the round opened. */
   openedAt: number;
+  /**
+   * Money taken mid-round by `StepOutcome.stake`, in minor units. It is added
+   * to what the round has cost, so the max-win cap scales with what the player
+   * actually paid rather than with the opening bet alone.
+   */
+  extraStake?: number;
+  /**
+   * Money already paid out mid-round by `StepOutcome.award`, in minor units.
+   * The close's cap allowance is reduced by it, so a round cannot pay its
+   * ceiling once per step.
+   */
+  paidOut?: number;
 }
 
 export interface LocalSession {
