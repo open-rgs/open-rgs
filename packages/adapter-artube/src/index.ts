@@ -168,9 +168,21 @@ interface ArtubeFreeRoundCampaign {
   total_win: number;
   is_complete: boolean;
 }
+interface ArtubePlatformMaxWin {
+  is_visible: boolean;
+  base_currency?: string;
+  base_currency_value: number;
+  player_currency_value: number;
+}
+interface ArtubeRtpSettings {
+  is_visible: boolean;
+  shown_rtp?: number;
+}
 interface ArtubeGameSettings {
   default_bet_index: number;
   allowed_bets: number[];
+  platform_max_win?: ArtubePlatformMaxWin;
+  rtp_settings?: ArtubeRtpSettings;
   /** Smallest representable amount in the session currency (0.01 for a
    *  2-decimal currency, 1 for a 0-decimal one). Optional on the wire;
    *  when absent we fall back to the adapter's `currencyDecimals`. */
@@ -198,6 +210,10 @@ interface SessionInfoResponsePayload {
   security_hash: string;
   currency: string;
   balance: number;
+  /** Token the game's own UI needs to start its tournament / promotion
+   *  widget. The docs are explicit that the backend forwards it unchanged. */
+  gamification_token?: string;
+  history?: Array<{ win: number; possible_win: number; is_own: boolean }>;
   last_round?: ArtubeLastRound;
   game_settings: ArtubeGameSettings;
   free_round_campaign?: ArtubeFreeRoundCampaign;
@@ -346,6 +362,12 @@ export interface ArtubeAdapterOptions {
    *  will make `bet` non-integer on a 2-decimal ladder, which the
    *  orchestrator refuses. Escape hatch, not a tuning knob. */
   amountScaling?: "minor-units" | "verbatim";
+  /** How many settled idempotency keys to remember, so a repeat of one
+   *  replays its receipt instead of paying twice. Default 10000. */
+  settleCacheSize?: number;
+  /** How long to wait for the socket to come back before giving up on asking
+   *  the wallet whether an unanswered settle landed. Default 10000. */
+  reconcileTimeoutMs?: number;
   /** `round_state_version` sent when the RGS has no math version to stamp
    *  (the orchestrator omits it on a complex open). Default "1". */
   defaultRoundStateVersion?: string;
@@ -444,6 +466,21 @@ export class ArtubeAdapter implements PlatformAdapter {
   private readonly currencyDecimals: number;
   private readonly scaleAmounts: boolean;
   private readonly defaultRoundStateVersion: string;
+  private readonly reconcileTimeoutMs: number;
+  /**
+   * Settles already sent, by idempotency key.
+   *
+   * The wallet cannot dedupe - no field for it - so the same key arriving
+   * twice would be two settles and two payments. The orchestrator derives one
+   * key per (session, round) for a close, which is exactly what a client
+   * close racing an autoclose produces, so "twice" is not hypothetical.
+   *
+   * In-process only, and honest about it: a retry that lands on another pod
+   * is not covered by this, which is what the reconciliation path is for.
+   * Bounded so a long-lived process cannot grow it without limit.
+   */
+  private readonly settled = new Map<string, Promise<RoundReceipt>>();
+  private readonly settledMax: number;
   private readonly schemaVersion: 1 | 2;
 
   private readonly gameId: string;
@@ -471,6 +508,8 @@ export class ArtubeAdapter implements PlatformAdapter {
     this.currencyDecimals     = opts.currencyDecimals     ?? 2;
     this.scaleAmounts         = (opts.amountScaling ?? "minor-units") === "minor-units";
     this.defaultRoundStateVersion = opts.defaultRoundStateVersion ?? "1";
+    this.reconcileTimeoutMs   = opts.reconcileTimeoutMs   ?? 10_000;
+    this.settledMax           = opts.settleCacheSize       ?? 10_000;
     this.schemaVersion        = opts.schemaVersion        ?? 1;
 
     // Caller can hand us a server-core logger so everything flows
@@ -560,6 +599,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       heartbeat_timeout_ms:   this.heartbeatTimeoutMs,
       heartbeat_silent_ms:    this.lastPongAt ? Date.now() - this.lastPongAt : null,
       open_complex_rounds:    this.rounds.size,
+      settle_keys_remembered: this.settled.size,
       wallet_reported_open_rounds: this.orphans.size,
       schema_version:         this.schemaVersion,
       amount_scaling:         this.scaleAmounts ? "minor-units" : "verbatim",
@@ -726,7 +766,58 @@ export class ArtubeAdapter implements PlatformAdapter {
     });
   }
 
-  async settleSimple(req: SettleSimple): Promise<RoundReceipt> {
+  /**
+   * One settle per idempotency key, even when the duplicates are concurrent.
+   *
+   * The key is claimed BEFORE the request goes out, and what is stored is the
+   * in-flight promise rather than the finished receipt. Storing the receipt
+   * meant a read-then-write race: two concurrent settles with the same key
+   * both missed the cache, both went to the wallet, and both were paid. (The
+   * adapter test kit's concurrency certification found that, on the first run
+   * where it was switched on.)
+   *
+   * A settle that FAILS releases its key, so a later genuine retry is not
+   * refused by the memory of an attempt that never moved money.
+   */
+  private dedupe(sessionId: string, rawKey: string | undefined, run: () => Promise<RoundReceipt>): Promise<RoundReceipt> {
+    if (rawKey === undefined) return run();
+    // Scoped to the session. An idempotency key means "this settle, on this
+    // session": the orchestrator's own keys are derived from the session and
+    // round, but a client-supplied one carries no such guarantee, and two
+    // players whose keys happened to collide would have one of them silently
+    // not paid.
+    const key = `${sessionId}\u0000${rawKey}`;
+
+    const existing = this.settled.get(key);
+    if (existing) {
+      this.log.warn("Duplicate settle key, replaying the first settle instead of paying again", {
+        "event.category": "artube",
+        "event.action":   "settle_deduped",
+        "artube.session_id": sessionId,
+        "artube.idempotency_key": rawKey,
+      });
+      return existing;
+    }
+
+    const attempt = run();
+    this.settled.set(key, attempt);
+    attempt.catch(() => {
+      if (this.settled.get(key) === attempt) this.settled.delete(key);
+    });
+    // Oldest out first; Map iterates in insertion order.
+    while (this.settled.size > this.settledMax) {
+      const oldest = this.settled.keys().next().value;
+      if (oldest === undefined) break;
+      this.settled.delete(oldest);
+    }
+    return attempt;
+  }
+
+  settleSimple(req: SettleSimple): Promise<RoundReceipt> {
+    return this.dedupe(req.sessionId, req.idempotencyKey, () => this.settleSimpleOnce(req));
+  }
+
+  private async settleSimpleOnce(req: SettleSimple): Promise<RoundReceipt> {
     // Artube's PlayRoundRequest validator requires round_state to be a
     // non-empty string. core ≥0.3.0's orchestrator now always sends a
     // non-empty envelope (math carry, or a synthesised {type,multiplier,
@@ -739,12 +830,22 @@ export class ArtubeAdapter implements PlatformAdapter {
       win_multiplier:      req.multiplier,
       ...(req.promoId ? { free_round_campaign_id: req.promoId } : {}),
       round_state_version: req.mathVersion ?? "1",
-      round_state:         req.roundState,
+      round_state:         packRoundState(req.roundState, req.roundState, req.idempotencyKey),
     };
-    const env = await this.rpc<PlayRoundRequestPayload, PlayRoundResponsePayload>(
-      "PlayRoundRequest",
-      payload,
-    );
+    let env: Envelope<PlayRoundResponsePayload>;
+    try {
+      env = await this.rpc<PlayRoundRequestPayload, PlayRoundResponsePayload>(
+        "PlayRoundRequest",
+        payload,
+      );
+    } catch (e) {
+      // The request went out and nothing definitive came back, so the settle
+      // may or may not have landed. Retrying blind is how a player gets paid
+      // twice; failing blind is how they get paid never. Go and look.
+      const settled = await this.reconcileSettle(req.sessionId, req.idempotencyKey, e);
+      if (settled) return settled;
+      throw e;
+    }
     const receipt: RoundReceipt = {
       roundId: env.payload.round_id,
       balance: this.toMinor(env.payload.balance, req.sessionId),
@@ -752,6 +853,10 @@ export class ArtubeAdapter implements PlatformAdapter {
     if (env.payload.free_round_campaign) {
       receipt.promo = { remaining: env.payload.free_round_campaign.rounds_left };
     }
+    // The wallet's own cap, applied wallet-side. The RGS cannot infer it -
+    // the balance is simply smaller than the multiplier implies - so it is
+    // only knowable because the wallet says so here.
+    if (env.payload.is_platform_max_win_reached === true) receipt.platformMaxWinReached = true;
     return receipt;
   }
 
@@ -836,7 +941,11 @@ export class ArtubeAdapter implements PlatformAdapter {
     });
   }
 
-  async closeComplex(req: CloseComplex): Promise<RoundReceipt> {
+  closeComplex(req: CloseComplex): Promise<RoundReceipt> {
+    return this.dedupe(req.sessionId, req.idempotencyKey, () => this.closeComplexOnce(req));
+  }
+
+  private async closeComplexOnce(req: CloseComplex): Promise<RoundReceipt> {
     const book = this.rounds.get(req.roundId);
     if (!book) {
       // An unknown round is not something to paper over: the money for it
@@ -864,7 +973,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       ...(features.length > 0 ? { features: features.map((t) => ({ type: t })) } : {}),
       round_version:       book.version,
       round_state_version: req.mathVersion ?? book.stateVersion,
-      round_state:         packRoundState(req.finalState, req.carry),
+      round_state:         packRoundState(req.finalState, req.carry, req.idempotencyKey),
     };
 
     let env: Envelope<CloseRoundResponsePayload>;
@@ -872,6 +981,14 @@ export class ArtubeAdapter implements PlatformAdapter {
       env = await this.onRound(book, () =>
         this.rpc<CloseRoundRequestPayload, CloseRoundResponsePayload>(type, payload));
     } catch (e) {
+      // Same question as a simple settle: did the credit land? A close is
+      // addressed to a known round id, so the answer is cheap to get and the
+      // cost of guessing is a double credit.
+      const settled = await this.reconcileSettle(req.sessionId, req.idempotencyKey, e, req.roundId);
+      if (settled) {
+        this.rounds.delete(req.roundId);
+        return settled;
+      }
       // Leave the book entry in place. The round is still open wallet-side,
       // and the orchestrator keeps its own open round for a retry or an
       // autoclose; dropping our version here would make that retry fail for
@@ -908,7 +1025,88 @@ export class ArtubeAdapter implements PlatformAdapter {
     if (env.payload.free_round_campaign) {
       receipt.promo = { remaining: env.payload.free_round_campaign.rounds_left };
     }
+    if (env.payload.is_platform_max_win_reached === true) receipt.platformMaxWinReached = true;
     return receipt;
+  }
+
+  /**
+   * Did a settle that gave no answer actually land?
+   *
+   * `PlayRoundRequest` and `CloseRoundRequest` carry no idempotency field, so
+   * the wallet cannot dedupe a retry and a lost response is indistinguishable
+   * from a lost request. The key the RGS generated rides inside the round
+   * state instead (see {@link RoundStateEnvelope.key}), which makes the
+   * question answerable: read the session's last round back, and if it
+   * carries this key, the settle landed and its receipt is right there.
+   *
+   * Returns the receipt when it landed, `undefined` when it provably did not
+   * or when the answer cannot be had - and `undefined` means the caller
+   * surfaces the original failure, which is the safe direction.
+   */
+  private async reconcileSettle(
+    sessionId: string,
+    key: string | undefined,
+    cause: unknown,
+    expectRoundId?: string,
+  ): Promise<RoundReceipt | undefined> {
+    if (key === undefined || !mayHaveLanded(cause)) return undefined;
+
+    // The socket may be mid-reconnect. Give it a bounded moment; without a
+    // connection there is no question to ask.
+    const deadline = Date.now() + this.reconcileTimeoutMs;
+    while (!this.ready && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200));
+    if (!this.ready) {
+      this.log.error("Settle unresolved and the wallet is unreachable to ask", {
+        "event.category": "artube",
+        "event.action":   "settle_unreconciled",
+        "artube.session_id": sessionId,
+        "artube.idempotency_key": key,
+      });
+      return undefined;
+    }
+
+    try {
+      const env = await this.rpc<SessionInfoRequestPayload, SessionInfoResponsePayload>(
+        "SessionInfoRequest",
+        { session_id: sessionId, player_connection_info: { player_connection_id: "reconcile" } },
+      );
+      const last = env.payload.last_round;
+      const landed = last !== undefined
+        && settleKeyOf(last.round_state) === key
+        && (expectRoundId === undefined || last.round_id === expectRoundId);
+      if (!last || !landed) {
+        this.log.warn("Settle did not land; the failure stands", {
+          "event.category": "artube",
+          "event.action":   "settle_not_landed",
+          "artube.session_id": sessionId,
+          "artube.idempotency_key": key,
+        });
+        return undefined;
+      }
+      this.log.warn("Settle had landed after all; replaying its receipt instead of retrying", {
+        "event.category": "artube",
+        "event.action":   "settle_reconciled",
+        "artube.session_id": sessionId,
+        "artube.round_id":   last.round_id,
+        "artube.idempotency_key": key,
+      });
+      const scale = this.scaleFor(env.payload.game_settings);
+      this.sessionScale.set(sessionId, scale);
+      const receipt: RoundReceipt = {
+        roundId: last.round_id,
+        balance: scale === 1 ? env.payload.balance : Math.round(env.payload.balance * scale),
+      };
+      if (last.is_platform_max_win_reached === true) receipt.platformMaxWinReached = true;
+      return receipt;
+    } catch (e) {
+      this.log.error("Could not ask the wallet whether the settle landed", {
+        "event.category": "artube",
+        "event.action":   "settle_reconcile_failed",
+        "artube.session_id": sessionId,
+        "error.message":  e instanceof Error ? e.message : String(e),
+      });
+      return undefined;
+    }
   }
 
   /** Run `fn` after everything already queued on this round, and keep the
@@ -1522,6 +1720,36 @@ function artubeSessionToContract(
     allowedBets:     p.game_settings.allowed_bets.map(conv),
     defaultBetIndex: p.game_settings.default_bet_index,
   };
+  // Everything the wallet says that belongs to the CLIENT and not to the
+  // engine. The RGS reads none of it; without it a real game's UI cannot be
+  // built on this adapter at all, because the client talks to the RGS and
+  // never to the wallet.
+  const clientData: Record<string, unknown> = {};
+  if (p.gamification_token !== undefined) clientData["gamificationToken"] = p.gamification_token;
+  if (p.game_settings.platform_max_win) {
+    const mw = p.game_settings.platform_max_win;
+    clientData["platformMaxWin"] = {
+      isVisible: mw.is_visible,
+      // Amounts, so they cross the same way every other amount does.
+      playerCurrencyValue: scale === 1 ? mw.player_currency_value : Math.round(mw.player_currency_value * scale),
+      baseCurrencyValue: scale === 1 ? mw.base_currency_value : Math.round(mw.base_currency_value * scale),
+      ...(mw.base_currency !== undefined ? { baseCurrency: mw.base_currency } : {}),
+    };
+  }
+  if (p.game_settings.rtp_settings) {
+    clientData["rtp"] = {
+      isVisible: p.game_settings.rtp_settings.is_visible,
+      ...(p.game_settings.rtp_settings.shown_rtp !== undefined ? { shownRtp: p.game_settings.rtp_settings.shown_rtp } : {}),
+    };
+  }
+  if (p.game_settings.available_auto_spin_counts) {
+    clientData["autoSpinCounts"] = p.game_settings.available_auto_spin_counts;
+  }
+  if (p.game_settings.rtp_options) clientData["rtpOptions"] = p.game_settings.rtp_options;
+  if (p.history) clientData["history"] = p.history;
+  if (p.security_hash) clientData["securityHash"] = p.security_hash;
+  if (Object.keys(clientData).length > 0) info.clientData = clientData;
+
   if (p.free_round_campaign && !p.free_round_campaign.is_complete) {
     info.promo = artubeCampaignToPromo(p.free_round_campaign, scale);
   }
@@ -1595,6 +1823,21 @@ interface RoundStateEnvelope {
    *  carry look absent - the player's meters reset - while a genuinely open
    *  round stays invisible. */
   open?: true;
+  /**
+   * The RGS's idempotency key for the settle that wrote this state.
+   *
+   * `PlayRoundRequest` and `CloseRoundRequest` have no idempotency field, so
+   * the wallet cannot dedupe a retried settle - which makes a lost RESPONSE
+   * indistinguishable from a lost REQUEST, and a blind retry able to pay
+   * twice. The key cannot travel in a field that does not exist, but it can
+   * travel in the one field the game owns: after a settle that timed out,
+   * reading the session's last round back and finding this key is proof the
+   * settle landed.
+   *
+   * It does not make the wallet idempotent. It makes the ambiguity
+   * answerable, which is the part that was missing.
+   */
+  key?: string;
   state: unknown;
   carry?: unknown;
 }
@@ -1612,14 +1855,28 @@ function fromJsonOrString(v: unknown): string {
 
 /** `state` alone when there is no carry to keep; both under the marker
  *  when there is. */
-function packRoundState(state: string, carry?: string): string {
-  if (carry === undefined) return state;
+function packRoundState(state: string, carry?: string, key?: string): string {
+  if (carry === undefined && key === undefined) return state;
   const env: RoundStateEnvelope = {
     [RGS_ENVELOPE_MARK]: 1,
+    ...(key !== undefined ? { key } : {}),
     state: asJsonOrString(state),
-    carry: asJsonOrString(carry),
+    ...(carry !== undefined ? { carry: asJsonOrString(carry) } : {}),
   };
   return JSON.stringify(env);
+}
+
+/** The idempotency key stamped on a stored round state, if any. */
+function settleKeyOf(roundState: string): string | undefined {
+  return parseEnvelope(roundState)?.key;
+}
+
+/** Errors after which the settle MIGHT have landed: the request went out and
+ *  no definitive answer came back. An `Error` frame from the wallet is a
+ *  definitive answer and is not one of these. */
+function mayHaveLanded(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /RPC timeout|WS closed|not connected|disconnected/i.test(msg);
 }
 
 /** The state of a round that is still in flight, marked as such. */

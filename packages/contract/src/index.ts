@@ -414,6 +414,26 @@ export interface SessionInfo {
   promo?: PromoFreeRounds;
   /** Open round to resume on reconnect, if any. */
   openRound?: OpenRoundResume;
+  /**
+   * Platform data that belongs to the CLIENT, forwarded verbatim.
+   *
+   * Every wallet has some of this: a token the game's UI needs to initialise
+   * a tournament widget, the max win to print in the rules, the auto-spin
+   * counts an operator allows, the RTP to display. None of it is the RGS's
+   * business - it never reads it, never validates it, never acts on it - but
+   * the client cannot get it any other way, because the client talks to the
+   * RGS and not to the wallet.
+   *
+   * Typing each field would mean putting one platform's vocabulary in a
+   * neutral contract, and dropping them (which is what happened before this
+   * existed) means a real game's UI cannot be built on this RGS at all. So:
+   * an opaque bag, adapter-filled, handed to the client untouched.
+   *
+   * NOT for anything the RGS must act on. A number the engine has to respect
+   * - a cap it must enforce, a balance it must trust - belongs in a real
+   * field with real semantics, not in here.
+   */
+  clientData?: Record<string, unknown>;
   /** Last math carry from this player's most recent COMPLETED round.
    *  Adapter is the source of truth for cross-round state, it stores the
    *  carry alongside its own round-settle records and returns it here on
@@ -575,6 +595,16 @@ export interface RoundReceipt {
    *  about the bonus (cumulative win, completion flags, leaderboard
    *  contribution, ...) is platform-side and never crosses this surface. */
   promo?: { remaining: number };
+  /**
+   * The PLATFORM says this round hit its own maximum-win limit.
+   *
+   * Distinct from the engine's `maxWinMultiplier`, which the RGS enforces
+   * itself and reports as outcome type `max_win_reached`. This one is the
+   * wallet's cap, applied wallet-side, and the RGS finds out only because the
+   * wallet says so on the receipt. A game that shows "MAX WIN" needs to know,
+   * and an operator reconciling a capped round needs it in the log.
+   */
+  platformMaxWinReached?: boolean;
 }
 
 /** Reverse (roll back) an already-settled round, a chargeback, a
@@ -765,6 +795,9 @@ export interface ClientResponseInit {
   /** Active promo free-rounds pool surfaced to the client for the
    *  opt-in offer. Mirrors `SessionInfo.promo`. Absent when none. */
   promo?: { id: string; bet: number; remaining: number; total?: number; label?: string; validTo?: string };
+  /** Platform data forwarded verbatim from {@link SessionInfo.clientData}.
+   *  The RGS neither reads nor validates it; see that field. */
+  clientData?: Record<string, unknown>;
   /** A round was in flight when the player disconnected, replay it.
    *  ops:        full cumulative ops sequence (open + every step) so the
    *              client can rebuild the visual state.
@@ -788,6 +821,9 @@ export interface ClientResponseSpin {
   /** Updated promo pool view after this round, if a promo was consumed.
    *  `done: true` when the pool has been drained (remaining === 0). */
   promo?: { remaining: number; done: boolean };
+  /** The platform capped this round at its own maximum win. See
+   *  {@link RoundReceipt.platformMaxWinReached}. */
+  platformMaxWin?: true;
 }
 
 export interface ClientResponseOpenRound {
@@ -810,6 +846,9 @@ export interface ClientResponseCloseRound {
   win: number;
   multiplier: number;
   type: string;
+  /** The platform capped this round at its own maximum win. See
+   *  {@link RoundReceipt.platformMaxWinReached}. */
+  platformMaxWin?: true;
 }
 
 export interface ClientResponsePromoAccept {

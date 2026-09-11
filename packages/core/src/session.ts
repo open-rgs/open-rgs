@@ -53,6 +53,10 @@ export interface OpenRound {
 
 export interface LocalSession {
   readonly sessionId: string;
+  /** Platform data for the client, verbatim from SessionInfo. Kept so a
+   *  resume answers with the same thing a fresh INIT did - a client that
+   *  reconnected has not stopped needing its tournament token. */
+  clientData?: Record<string, unknown>;
   /** Connection currently attached to this session; null once that
    *  connection dropped (detached). The concurrency policy arbitrates on
    *  this: a second INIT while non-null hits kick-old / reject-new; a

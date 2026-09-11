@@ -212,15 +212,43 @@ The practical consequences:
   assuming a length or a set of values; it is whatever that wallet says it is
   on that session, and nothing here hardcodes it.
 
-## Known limitations
+## Idempotency, without an idempotency field
 
-**`idempotencyKey` is dropped.** `PlayRoundRequest` has no idempotency field,
-so the key open-rgs generates never reaches the wallet. A retried settle after
-a timeout or a reconnect is **not deduplicated wallet-side**. If the socket
-drops between send and reply, the RGS cannot tell a lost request from a lost
-response, and a retry can move money twice. Mitigate operationally -
-reconciliation against the wallet's own round records - until the protocol
-grows a field for it. This is the adapter's most significant gap.
+`PlayRoundRequest` and `CloseRoundRequest` have no idempotency field, so the
+key open-rgs generates cannot reach the wallet and the wallet cannot dedupe.
+Three things close most of that gap; read what each one does and does not
+cover before relying on it.
+
+**The same key is settled once per process.** The key is claimed *before* the
+request goes out and what is remembered is the in-flight promise, so two
+concurrent settles with one key produce one payment rather than a race. (The
+earlier version remembered the finished receipt, which was a read-then-write
+race — both missed, both paid. `@open-rgs/adapter-test-kit`'s concurrency
+certification found it the first time it was switched on.) Keys are scoped per
+session: a client-supplied key from one player can never suppress another's
+settle. A settle that *fails* releases its key, so a genuine retry is not
+refused by the memory of an attempt that moved no money.
+
+**An unanswered settle is checked, not retried blind.** The key rides inside
+the round state the adapter writes:
+
+```json
+{ "$rgs": 1, "key": "…", "state": { … }, "carry": { … } }
+```
+
+so when a settle times out or the socket drops, the adapter reads the session's
+last round back and looks for that key. Found: the settle landed, and its
+receipt is returned instead of a failure that would provoke a retry. Not found:
+the failure stands, which is the safe direction. This is what turns "lost
+request or lost response?" — the question that makes a blind retry dangerous —
+into one the adapter can answer.
+
+**What is still not covered.** A retry that lands on a *different pod* meets a
+cold dedupe cache; the reconciliation path is what catches it, and it needs the
+wallet reachable. If the wallet is unreachable *and* the answer was lost, the
+settle is genuinely unresolved and is logged as
+`event.action: settle_unreconciled` for reconciliation against the wallet's own
+records. A field on the wire would still be better than all of this.
 
 ## Conformance results
 
@@ -234,11 +262,32 @@ those are allowlisted with their reason rather than faked green:
 
 | Check | Why it cannot pass |
 |-------|--------------------|
-| `idempotency.duplicate-key` | No idempotency field on the wire (see above). |
 | `errors.insufficient-funds` | The probe drives `bet`, and this wire carries no amount by design. A test-kit fix that drives `priceMultiplier` instead is pending. |
+
+`idempotency.duplicate-key` used to be on that list and passes now — see above.
+The concurrency certification is switched on (it is opt-in, and was not), which
+is how the dedupe race was found. `concurrency.reverse-interleave` is skipped
+rather than failed: this wire has no game-initiated rollback message, so
+`reverseRound` has nothing to call.
 
 A second test asserts those two are *still* failing, so if the wire or the test
 kit changes, the allowlist goes red instead of quietly over-permitting.
+
+## What the wallet says for the client
+
+`SessionInfo.clientData` carries the per-session things a game's UI needs and
+the RGS has no business reading: the `gamification_token` their docs say to
+forward unchanged, the platform max win to print in the rules, the allowed
+auto-spin counts, the RTP to display, the win history, the security hash. They
+reach the client verbatim in the INIT response. Before this they were parsed
+off the wire and dropped, which meant a real game's UI could not be built on
+this adapter at all.
+
+`is_platform_max_win_reached` is the one that is *not* cosmetic: it is the
+wallet capping a round on its own side, which the RGS cannot infer — the
+balance is simply smaller than the multiplier implies. It comes back on the
+receipt as `platformMaxWinReached` and reaches the client as `platformMaxWin`
+on the spin and close responses.
 
 ## Configuration
 
@@ -248,6 +297,8 @@ kit changes, the allowlist goes red instead of quietly over-permitting.
 | `gameId` | Sent as the `X-Game-ID` header. |
 | `authToken` | Sent as the `X-Api-Key` header. Required in production. |
 | `rpcTimeoutMs` | Per-request deadline. Default 30000. |
+| `reconcileTimeoutMs` | How long to wait for the socket before asking whether an unanswered settle landed. Default 10000. |
+| `settleCacheSize` | Settled keys remembered per process. Default 10000. |
 | `currencyDecimals` | Fallback precision when the wallet sends no `currency_minimal_unit`. Default 2. |
 | `amountScaling` | `"minor-units"` (default) converts inbound amounts; `"verbatim"` passes them through. |
 | `defaultRoundStateVersion` | `round_state_version` when the RGS has no math version to stamp. Default `"1"`. |

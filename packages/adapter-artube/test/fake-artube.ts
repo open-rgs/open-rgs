@@ -57,6 +57,14 @@ export interface FakeArtubeOptions {
   eventSuffix?: boolean;
   /** Answer Welcome with this schema. */
   welcomeSchema?: number;
+  /** Process these request types but send no response, as a wallet whose
+   *  reply is lost in the network does. The state change still happens. */
+  swallowReplyFor?: string[];
+  /** Report every settle as having hit the platform's own maximum win. */
+  maxWinReached?: boolean;
+  /** Send the session fields a client needs: gamification token, max win,
+   *  auto-spin counts, RTP display. */
+  clientExtras?: boolean;
   /** Session ids for which the wallet returns no currency - Artube's one and
    *  only marker for a demo session. */
   demoSessions?: string[];
@@ -71,6 +79,7 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
   const sendMinimalUnit = opts.sendMinimalUnit ?? true;
   const evt = (name: string) => (opts.eventSuffix === false ? name : `${name}Event`);
   const demoSessions = new Set(opts.demoSessions ?? []);
+  const swallow = new Set(opts.swallowReplyFor ?? []);
 
   const balances = new Map<string, number>();      // minor units
   const known = new Set<string>();
@@ -102,12 +111,16 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
         received.push({ type: msg.type, id: msg.id, schema: msg.schema, payload: msg.payload ?? {} });
         const p = msg.payload ?? {};
 
-        const reply = (type: string, payload: unknown) =>
+        const reply = (type: string, payload: unknown) => {
+          // The round happened; only the answer went missing. That is the
+          // case the RGS cannot tell from "the round never happened".
+          if (swallow.has(msg.type)) return;
           ws.send(JSON.stringify({
             proto: 1, schema: 1, chan: "rpc", type,
             id: `r-${msg.id}`, corr_id: msg.id, op_seq: 0,
             timestamp: new Date().toISOString(), payload,
           }));
+        };
         const err = (code: string, message: string) =>
           ws.send(JSON.stringify({
             proto: 1, schema: 1, chan: "rpc", type: "Error",
@@ -135,9 +148,19 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             currency: demoSessions.has(sid) ? null : "USD",
             balance: major(balances.get(sid)!),
             ...(last ? { last_round: last } : {}),
+            ...(opts.clientExtras ? { gamification_token: "tok-123" } : {}),
             game_settings: {
               default_bet_index: 0,
               allowed_bets: ladderMajor,
+              ...(opts.clientExtras ? {
+                platform_max_win: {
+                  is_visible: true,
+                  base_currency: "EUR",
+                  base_currency_value: 1000,
+                  player_currency_value: 870,
+                },
+                rtp_settings: { is_visible: true, shown_rtp: 96.5 },
+              } : {}),
               ...(sendMinimalUnit ? { currency_minimal_unit: 1 / MINOR } : {}),
               available_auto_spin_counts: [10, 25, 50],
               rtp_options: [{ rtp: 0.96, game_mode: "default" }],
@@ -179,10 +202,11 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             round_version: 0,
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),
-            is_platform_max_win_reached: false,
+            is_platform_max_win_reached: opts.maxWinReached === true,
           });
           reply("PlayRoundResponse", {
             round_id: roundId, balance: major(balances.get(sid)!), win: major(win),
+            is_platform_max_win_reached: opts.maxWinReached === true,
           });
           pushBalance(sid, "Win");
           return;
