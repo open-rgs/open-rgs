@@ -33,8 +33,71 @@ await createServer({
   waiting for a TCP timeout that may never come.
 - **RPC deadlines.** Every request has one, so a wallet that goes quiet fails
   the round rather than hanging it.
+- **Simple rounds.** `settleSimple` is one `PlayRoundRequest`.
+- **Complex rounds.** `openComplex` / `updateComplex` / `closeComplex` are
+  `OpenRoundRequest` / `UpdateRoundStateRequest` / `CloseRoundRequest`.
+- **Autoclose.** An `AutocloseRequestEvent` from the platform surfaces as
+  `PlatformEvent{type:"autocloseRequested"}`, and the close it provokes goes
+  back out as `AutocloseRoundRequest`.
 - **Events.** `BalanceChanged` and `SessionClosed` are surfaced as
-  `PlatformEvent`s.
+  `PlatformEvent`s, with or without the `Event` suffix the docs use in
+  places.
+
+## Complex rounds
+
+`OpenRound` debits the stake and names the round; `UpdateRoundState` leaves
+the player's action log on the wallet; `CloseRound` credits the win. Three
+things in that flow are this wire's own and worth knowing before you meet
+them at integration time.
+
+**`round_version` is the platform's counter, not yours.** Open returns it,
+every update returns the next one, and each request must echo the newest one
+the wallet handed back. Send a stale number and the round is refused with
+`InvalidRoundOperation`. open-rgs has no concept of it, so the adapter tracks
+it per round. Two consequences: a close for a round this adapter never opened
+is refused locally rather than sent with a guessed version, and a close that
+fails leaves the round's bookkeeping in place so a retry (or an autoclose) can
+still use it.
+
+**One `round_state` slot, two pieces of state.** A close carries the round's
+final state *and* the carry the next round starts from; the wallet stores one
+opaque string. The adapter packs both:
+
+```json
+{ "$rgs": 1, "state": { "step": 9 }, "carry": { "meterPoints": 42 } }
+```
+
+`openSession` unpacks `carry` out of it again. A string that was never packed
+(a simple round's state, or anything written before this existed) is returned
+verbatim, so no meter resets on the first read after an upgrade. Because the
+wallet only persists the state of a round that moved money, this envelope is
+also the only cross-round storage a game gets here - there is no player-level
+bucket to put a meter in.
+
+**Features come from the math's own state.** `CloseComplex` has no features
+field, and putting an Artube concept in the neutral contract would be the
+wrong fix. Instead the math names them in its state under a reserved key:
+
+```ts
+{ "$features": ["PlayedGamble"], "step": 4 }
+```
+
+The adapter reads `$features` from the open, each update and the close, and
+sends the union on close - which is what the platform's merge rule asks for.
+`"$status": "cancelled"` in the final state closes the round as cancelled;
+anything else, a zero-win round included, is `completed`.
+
+## Amounts are converted, on purpose
+
+Artube states money in major units (`"balance": 150.75`). open-rgs counts
+integer minor units and refuses a fractional bet outright, so an unconverted
+`allowed_bets: [0.10, 0.25]` fails every round with `INVALID_BET`.
+
+Everything inbound - balance, the bet ladder, promo bet, `BalanceChanged` - is
+multiplied by the scale in `game_settings.currency_minimal_unit`, or by
+`10^currencyDecimals` when the wallet does not send one. Nothing outbound needs
+converting: this wire is amount-blind. `amountScaling: "verbatim"` turns it off
+for a wallet already configured in minor units.
 
 ## Amount-blindness is deliberate
 
@@ -60,14 +123,6 @@ The practical consequences:
 
 ## Known limitations
 
-Two, both properties of the Artube Games API rather than gaps in this code.
-They are listed because finding them at integration time is far worse than
-reading them now.
-
-**Complex rounds are not supported.** The API is one-shot, so `openComplex`,
-`updateComplex` and `closeComplex` throw rather than silently no-oping. This
-adapter serves simple-round games only.
-
 **`idempotencyKey` is dropped.** `PlayRoundRequest` has no idempotency field,
 so the key open-rgs generates never reaches the wallet. A retried settle after
 a timeout or a reconnect is **not deduplicated wallet-side**. If the socket
@@ -79,9 +134,12 @@ grows a field for it. This is the adapter's most significant gap.
 ## Conformance results
 
 `test/conformance.test.ts` runs `@open-rgs/adapter-test-kit` against a fake
-Artube server speaking the real wire protocol. Everything passes except two
-checks that the wire cannot express, and those are allowlisted with their
-reason rather than faked green:
+Artube server speaking the real wire protocol (`test/fake-artube.ts`, which
+refuses unknown sessions, stale `round_version`s and closed rounds the way the
+platform does). `test/complex.test.ts` asserts the frames themselves: which
+message type went out, which version rode on it, what landed in the state
+slot. Everything passes except two checks that the wire cannot express, and
+those are allowlisted with their reason rather than faked green:
 
 | Check | Why it cannot pass |
 |-------|--------------------|
@@ -99,6 +157,10 @@ kit changes, the allowlist goes red instead of quietly over-permitting.
 | `gameId` | Sent as the `X-Game-ID` header. |
 | `authToken` | Sent as the `X-Api-Key` header. Required in production. |
 | `rpcTimeoutMs` | Per-request deadline. Default 30000. |
+| `currencyDecimals` | Fallback precision when the wallet sends no `currency_minimal_unit`. Default 2. |
+| `amountScaling` | `"minor-units"` (default) converts inbound amounts; `"verbatim"` passes them through. |
+| `defaultRoundStateVersion` | `round_state_version` when the RGS has no math version to stamp. Default `"1"`. |
+| `schemaVersion` | Hello schema, 1 (default) or 2. Schema 2 declares all 16 contract types; a type left undeclared is never delivered on that connection. |
 | `handshakeTimeoutMs` | Hello to Welcome. Default 10000. |
 | `heartbeatIntervalMs` | Ping cadence. |
 | `heartbeatTimeoutMs` | How long a silent socket lives before it is terminated. |

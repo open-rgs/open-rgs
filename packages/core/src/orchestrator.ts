@@ -341,12 +341,20 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     return requested ?? manifest.defaultMode;
   }
 
-  function buildSpinContext(modeId: string, cheatRaw?: Record<string, unknown>, params?: Record<string, unknown>): SpinContext {
+  function buildSpinContext(
+    modeId: string,
+    bet: { betIndex: number; priceMultiplier: number },
+    cheatRaw?: Record<string, unknown>,
+    params?: Record<string, unknown>,
+  ): SpinContext {
     // Cheats are fully off unless explicitly enabled outside production
     // (see OrchestratorConfig.cheatsEnabled), a forced-outcome path can
     // never be reached in a production build.
     const cheat = cheatsEnabled ? parseCheat(cheatRaw) : undefined;
-    return { mode: modeId, cheat, params };
+    // betIndex/priceMultiplier come from computeBet, never straight off the
+    // wire: they are the same numbers the wallet is charged against, so a
+    // math reading them cannot be fed one stake and settled at another.
+    return { mode: modeId, betIndex: bet.betIndex, priceMultiplier: bet.priceMultiplier, cheat, params };
   }
 
   function computeBet(
@@ -634,7 +642,12 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     // Dev cheats (when enabled) ride inside params.cheat, never a
     // first-class wire field. Ignored entirely when cheatsEnabled is false.
-    const ctx = buildSpinContext(requestedMode, req.params?.["cheat"] as Record<string, unknown> | undefined, req.params);
+    const ctx = buildSpinContext(
+      requestedMode,
+      { betIndex: betInfo.betIndex, priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier },
+      req.params?.["cheat"] as Record<string, unknown> | undefined,
+      req.params,
+    );
     const math = mode.math as SimpleMath;
     const mathStart = performance.now();
     const outcome = await Promise.resolve(math.play(s.carry, ctx));
@@ -762,7 +775,12 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
-    const ctx = buildSpinContext(requestedMode, undefined, req.params);
+    const ctx = buildSpinContext(
+      requestedMode,
+      { betIndex: betInfo.betIndex, priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier },
+      undefined,
+      req.params,
+    );
     const math = mode.math as ComplexMath;
     const mathStart = performance.now();
     const open = await Promise.resolve(math.open(s.carry, ctx));
@@ -776,6 +794,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         betIndex: betInfo.betIndex,
         priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier,
         initialState: open.state,
+        ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
         idempotencyKey: initiatingIdemKey(s.sessionId, "open", req.idempotencyKey),
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
       }));
