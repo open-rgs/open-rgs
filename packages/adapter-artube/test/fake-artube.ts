@@ -167,6 +167,7 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             win_multiplier: winMul,
             win: major(win),
             started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
             round_version: 0,
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),
@@ -214,9 +215,9 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             win_multiplier: 0,
             win: 0,
             started_at: new Date().toISOString(),
-            // No finished_at. The real wire omits it on FINISHED rounds too,
-            // which is exactly why the adapter cannot use it to tell an open
-            // round from a closed one - so the fake must not offer it either.
+            // No finished_at: that is what an open round looks like, and it
+            // is the wire's own answer to "is this round still open". The
+            // sandbox returns exactly this shape.
             round_version: 0,
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),
@@ -263,6 +264,7 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             win_multiplier: winMul,
             win: major(win),
             started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
             round_version: Number(p["round_version"] ?? 0),
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),

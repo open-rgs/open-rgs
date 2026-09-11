@@ -434,6 +434,8 @@ export class ArtubeAdapter implements PlatformAdapter {
   // open. Keyed by session, replaced on every openSession, cleared when the
   // round is closed.
   private readonly orphans = new Map<string, ArtubeOpenRound>();
+  // The wallet's own last_round, verbatim, per session. Diagnostics only.
+  private readonly lastRounds = new Map<string, ArtubeLastRound>();
   // Per-session minor-unit scale, learned from SessionInfo. Events carry a
   // balance but no currency metadata, so without this an out-of-band
   // BalanceChanged would arrive in different units than every other amount.
@@ -589,6 +591,22 @@ export class ArtubeAdapter implements PlatformAdapter {
   }
 
   /**
+   * Exactly what the wallet said its last round was, from the most recent
+   * `openSession`.
+   *
+   * For looking at, not for deciding with. When a session is refused with
+   * `Round is already opened` the only question that matters is which round
+   * the wallet means, and every field that might answer it - is
+   * `finished_at` there, does the state carry the open marker, what is the
+   * `round_version` - is otherwise visible only in a log line on a pod you
+   * may not be able to read. Contains no secret: it is this player's own
+   * round, already theirs to see in the client.
+   */
+  lastRoundFor(sessionId: string): Readonly<ArtubeLastRound> | undefined {
+    return this.lastRounds.get(sessionId);
+  }
+
+  /**
    * Claim one round by id, so a close for it can be sent.
    *
    * The last escape hatch, for the case `last_round` cannot reach: a complex
@@ -674,13 +692,9 @@ export class ArtubeAdapter implements PlatformAdapter {
    *  since it would otherwise be guessing a round_version - and the session
    *  stays wedged. Here the version is not a guess: the wallet just gave it. */
   private adoptOpenRound(sessionId: string, last: ArtubeLastRound | undefined): void {
-    // `finished_at` would be the obvious signal and it is not usable: it is
-    // documented optional and this wire omits it on finished rounds too, so
-    // treating its absence as "still open" makes every carry look absent -
-    // resetting the player's meters - while telling you nothing true. The
-    // marker this adapter writes into the state on open is the signal; a
-    // present `finished_at` is still believed when it says the round is done.
-    if (!last || last.finished_at || !isOpenState(last.round_state)) {
+    if (last) this.lastRounds.set(sessionId, last);
+    else this.lastRounds.delete(sessionId);
+    if (!last || !isRoundOpen(last)) {
       this.orphans.delete(sessionId);
       return;
     }
@@ -1519,15 +1533,14 @@ function artubeSessionToContract(
   // it as a brand-new player - silently resetting the meters of anyone whose
   // pod restarted mid-round.
   //
-  // `unpackCarry` decides which it is, from the marker this adapter writes
-  // into an in-flight round's state. Not from `finished_at`: that field is
-  // documented optional and this wire omits it on finished rounds too, so
-  // requiring it drops every carry there is.
+  // `isRoundOpen` decides which it is: the wire's own `finished_at`, plus the
+  // marker this adapter writes into an in-flight round's state as a second
+  // opinion that does not depend on an optional field staying present.
   //
   // No carry is the honest answer for an open round: unknown, not empty. The
   // orchestrator resumes from its own memory when it still has the session,
   // and this path is what runs when it does not.
-  if (p.last_round) {
+  if (p.last_round && !isRoundOpen(p.last_round)) {
     const carry = unpackCarry(p.last_round.round_state);
     if (carry !== "") info.carry = carry;
     // `round_state_version` is the field the settle WRITES mathVersion into
@@ -1632,6 +1645,23 @@ function parseEnvelope(roundState: string): RoundStateEnvelope | undefined {
  *  when it was written. */
 function isOpenState(roundState: string): boolean {
   return parseEnvelope(roundState)?.open === true;
+}
+
+/**
+ * Is the round the wallet just described still open?
+ *
+ * `finished_at` is the wire's own answer and it is the one to believe: it is
+ * `null` on an open round and set on a closed one. (An earlier build here
+ * refused to trust it, on the strength of one session that was ALREADY wedged
+ * - whose last_round was therefore an open round, with a null finished_at.
+ * That was the field working correctly, read as evidence that it did not.)
+ *
+ * The marker this adapter writes into an in-flight round's state is kept as a
+ * second opinion. It costs nothing, it does not depend on an optional field
+ * staying present, and a round is open if either says so.
+ */
+function isRoundOpen(last: ArtubeLastRound): boolean {
+  return !last.finished_at || isOpenState(last.round_state);
 }
 
 /** The math's own state, out of whichever envelope it arrived in. */

@@ -89,10 +89,15 @@ yields **no carry at all** — unknown, not empty: its state is the math's
 in-flight state, and handing that back is how a pod restart mid-round silently
 resets a player's meters.
 
-The marker is what says which, and it has to be, because the field that ought
-to answer does not: `last_round.finished_at` is documented optional and this
-wire omits it on finished rounds too. Requiring it drops every carry there is;
-treating its absence as "still open" makes every round look abandoned. A string that was never packed
+Which round is which comes from `last_round.finished_at` - `null` while the
+round is open, set once it closes - with the marker as a second opinion. A
+round is treated as open if either says so.
+
+(An earlier build here refused to trust `finished_at`, on the strength of one
+session that was already wedged: its `last_round` WAS an open round, so the
+null was the field working correctly, read as evidence that it did not. The
+marker stays because it costs nothing and does not depend on an optional field
+staying present - not because the wire is untrustworthy.) A string that was never packed
 (a simple round's state, or anything written before this existed) is returned
 verbatim, so no meter resets on the first read after an upgrade. Because the
 wallet only persists the state of a round that moved money, this envelope is
