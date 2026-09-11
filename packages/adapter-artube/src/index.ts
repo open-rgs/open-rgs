@@ -77,6 +77,37 @@ import pkg from "../package.json" with { type: "json" };
  *  see exactly which adapter is running in the pod. */
 export const ARTUBE_ADAPTER_VERSION: string = pkg.version;
 
+/** A round the WALLET says is still open on a session.
+ *
+ *  The recovery gap, in one shape. A round is opened - and debited - by one
+ *  process; that process dies, or the pod rolls, or the player comes back on
+ *  another instance. The RGS has no memory of the round, the wallet still
+ *  does, and every subsequent round on that session is refused with
+ *  `InvalidRoundOperation: Round is already opened`. The player is stuck
+ *  until someone closes it by hand.
+ *
+ *  Artube's SessionInfo answers the question the open-rgs contract cannot ask
+ *  yet (ADR-007): `last_round` with no `finished_at` IS the open round, with
+ *  the state, the version and the price it was opened at. The adapter surfaces
+ *  it here, and adopts the round so a close for it works. What to settle it
+ *  at is the game's decision, not the adapter's - it owns the math that can
+ *  value the state. */
+export interface ArtubeOpenRound {
+  roundId: string;
+  /** The round's state as the wallet last stored it. `ComplexMath.autoclose`
+   *  takes exactly this. */
+  state: string;
+  /** What the round was opened at, so a settle can be priced:
+   *  `allowedBets[betIndex] * priceMultiplier`. */
+  betIndex: number;
+  priceMultiplier: number;
+  /** Math version that wrote the state, when the wire carried one. A state
+   *  written by math that is no longer loaded must not be valued by the math
+   *  that replaced it. */
+  mathVersion?: string;
+  startedAt?: string;
+}
+
 // ── Wire types ────────────────────────────────────────────────────────
 
 type Channel = "rpc" | "events" | "control";
@@ -399,6 +430,10 @@ export class ArtubeAdapter implements PlatformAdapter {
   // round must echo; `features` accumulates so the close can send the
   // open-union-close set the docs ask for. The entry dies with the close.
   private readonly rounds = new Map<string, OpenRoundBook>();
+  // Rounds the wallet reported open on a session that this process did not
+  // open. Keyed by session, replaced on every openSession, cleared when the
+  // round is closed.
+  private readonly orphans = new Map<string, ArtubeOpenRound>();
   // Per-session minor-unit scale, learned from SessionInfo. Events carry a
   // balance but no currency metadata, so without this an out-of-band
   // BalanceChanged would arrive in different units than every other amount.
@@ -523,6 +558,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       heartbeat_timeout_ms:   this.heartbeatTimeoutMs,
       heartbeat_silent_ms:    this.lastPongAt ? Date.now() - this.lastPongAt : null,
       open_complex_rounds:    this.rounds.size,
+      wallet_reported_open_rounds: this.orphans.size,
       schema_version:         this.schemaVersion,
       amount_scaling:         this.scaleAmounts ? "minor-units" : "verbatim",
     };
@@ -542,7 +578,51 @@ export class ArtubeAdapter implements PlatformAdapter {
     );
     const scale = this.scaleFor(env.payload.game_settings);
     this.sessionScale.set(sessionId, scale);
+    this.adoptOpenRound(sessionId, env.payload.last_round);
     return artubeSessionToContract(sessionId, env.payload, scale, this.currencyDecimals);
+  }
+
+  /** The round the wallet says is open on this session and this process did
+   *  not open, if any. Populated by the most recent `openSession`. */
+  openRoundFor(sessionId: string): ArtubeOpenRound | undefined {
+    return this.orphans.get(sessionId);
+  }
+
+  /** Take ownership of a round the wallet reports open, so a close for it can
+   *  be sent. Without the book entry `closeComplex` refuses locally - rightly,
+   *  since it would otherwise be guessing a round_version - and the session
+   *  stays wedged. Here the version is not a guess: the wallet just gave it. */
+  private adoptOpenRound(sessionId: string, last: ArtubeLastRound | undefined): void {
+    if (!last || last.finished_at) {
+      this.orphans.delete(sessionId);
+      return;
+    }
+    const orphan: ArtubeOpenRound = {
+      roundId: last.round_id,
+      state: last.round_state,
+      betIndex: last.bet_index,
+      priceMultiplier: last.price_multiplier,
+      ...(last.round_state_version ? { mathVersion: last.round_state_version } : {}),
+      ...(last.started_at ? { startedAt: last.started_at } : {}),
+    };
+    this.orphans.set(sessionId, orphan);
+    if (!this.rounds.has(orphan.roundId)) {
+      this.rounds.set(orphan.roundId, {
+        sessionId,
+        version: last.round_version,
+        stateVersion: last.round_state_version,
+        features: new Set(),
+        chain: Promise.resolve(),
+      });
+    }
+    this.log.warn("Artube reports a round this process did not open", {
+      "event.category": "artube",
+      "event.action":   "orphan_round_adopted",
+      "artube.session_id":    sessionId,
+      "artube.round_id":      orphan.roundId,
+      "artube.round_version": last.round_version,
+      "artube.started_at":    orphan.startedAt,
+    });
   }
 
   async settleSimple(req: SettleSimple): Promise<RoundReceipt> {
@@ -706,6 +786,9 @@ export class ArtubeAdapter implements PlatformAdapter {
     }
 
     this.rounds.delete(req.roundId);
+    if (this.orphans.get(req.sessionId)?.roundId === req.roundId) {
+      this.orphans.delete(req.sessionId);
+    }
 
     this.log.info("Artube complex round closed", {
       "event.category": "artube",

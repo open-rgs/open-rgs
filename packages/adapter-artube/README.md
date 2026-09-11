@@ -102,6 +102,33 @@ sends the union on close - which is what the platform's merge rule asks for.
 `"$status": "cancelled"` in the final state closes the round as cancelled;
 anything else, a zero-win round included, is `completed`.
 
+## A round the wallet has open and you do not
+
+A round is opened - and debited - by one process. That process dies, or the
+pod rolls, or the player returns on another instance. The RGS has no memory of
+the round, the wallet still does, and every subsequent round on that session is
+refused with `InvalidRoundOperation: Round is already opened`. The player is
+stuck until someone closes it by hand.
+
+Artube's `SessionInfo` answers the question the open-rgs contract cannot ask
+yet (ADR-007): `last_round` with no `finished_at` IS the open round, carrying
+its state, its `round_version` and the price it was opened at. On every
+`openSession` the adapter surfaces it:
+
+```ts
+const orphan = adapter.openRoundFor(sessionId);
+// { roundId, state, betIndex, priceMultiplier, mathVersion?, startedAt? }
+```
+
+and adopts the round, so a `closeComplex` for it works - the version is the
+wallet's own, not a guess.
+
+What to settle it at is deliberately NOT the adapter's decision. The game owns
+the math that can value the state (`ComplexMath.autoclose` takes exactly this
+string), and only the game knows whether its policy is to pay what was on the
+table or to forfeit it. Close it with a `reason`, which makes it an
+`AutocloseRoundRequest` - it was not the player who asked.
+
 ## Amounts are converted, on purpose
 
 Artube states money in major units (`"balance": 150.75`). open-rgs counts
