@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/grid",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shape-agnostic grid substrate for slot math: ragged columns, flat column-major cells, position queries. The layer every reel mechanic and pay evaluator reads.",
   "license": "MIT",
   "repository": {

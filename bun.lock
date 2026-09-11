@@ -56,9 +56,9 @@
       "name": "hello-spin",
       "version": "0.1.0",
       "dependencies": {
-        "@open-rgs/contract": "^0.3.1",
-        "@open-rgs/core": "^0.5.1",
-        "@open-rgs/platform-mock": "^0.3.1",
+        "@open-rgs/contract": "^2.0.0",
+        "@open-rgs/core": "^2.0.0",
+        "@open-rgs/platform-mock": "^1.2.2",
       },
       "devDependencies": {
         "@types/bun": "^1.3.14",
@@ -80,10 +80,10 @@
     },
     "packages/adapter-kit": {
       "name": "@open-rgs/adapter-kit",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "dependencies": {
-        "@open-rgs/contract": "0.3.1",
-        "@open-rgs/log": "0.1.0",
+        "@open-rgs/contract": "2.0.0",
+        "@open-rgs/log": "1.0.0",
         "ws": "^8.21.0",
       },
       "devDependencies": {
@@ -92,7 +92,7 @@
     },
     "packages/adapter-test-kit": {
       "name": "@open-rgs/adapter-test-kit",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "bin": {
         "open-rgs-adapter-conform": "src/cli.ts",
       },
@@ -105,7 +105,7 @@
     },
     "packages/big-symbols": {
       "name": "@open-rgs/big-symbols",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
@@ -113,43 +113,46 @@
     },
     "packages/cascade": {
       "name": "@open-rgs/cascade",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
       },
     },
     "packages/client": {
       "name": "@open-rgs/client",
-      "version": "1.0.2",
+      "version": "1.1.0",
+      "bin": {
+        "open-rgs-play": "./src/cli.ts",
+      },
       "dependencies": {
         "@msgpack/msgpack": "^3.1.3",
-        "@open-rgs/contract": "0.3.1",
+        "@open-rgs/contract": "2.0.0",
       },
       "devDependencies": {
-        "@open-rgs/core": "0.5.0",
-        "@open-rgs/log": "0.1.0",
-        "@open-rgs/platform-mock": "0.3.0",
+        "@open-rgs/core": "2.0.0",
+        "@open-rgs/log": "1.0.0",
+        "@open-rgs/platform-mock": "1.2.2",
       },
     },
     "packages/contract": {
       "name": "@open-rgs/contract",
-      "version": "1.2.0",
+      "version": "2.0.0",
     },
     "packages/core": {
       "name": "@open-rgs/core",
-      "version": "1.7.0",
+      "version": "2.0.0",
       "dependencies": {
         "@msgpack/msgpack": "^3.1.3",
-        "@open-rgs/contract": "1.2.0",
+        "@open-rgs/contract": "2.0.0",
         "@open-rgs/log": "1.0.0",
       },
       "devDependencies": {
-        "@open-rgs/platform-mock": "1.2.1",
+        "@open-rgs/platform-mock": "1.2.2",
       },
     },
     "packages/fill": {
       "name": "@open-rgs/fill",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
@@ -157,22 +160,22 @@
     },
     "packages/freespins": {
       "name": "@open-rgs/freespins",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
       },
     },
     "packages/gamble": {
       "name": "@open-rgs/gamble",
-      "version": "0.1.0",
+      "version": "0.2.0",
     },
     "packages/grid": {
       "name": "@open-rgs/grid",
-      "version": "0.1.0",
+      "version": "0.2.0",
     },
     "packages/holdwin": {
       "name": "@open-rgs/holdwin",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/selectors": "0.1.0",
@@ -185,7 +188,7 @@
     },
     "packages/markov": {
       "name": "@open-rgs/markov",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
@@ -193,11 +196,11 @@
     },
     "packages/meters": {
       "name": "@open-rgs/meters",
-      "version": "0.1.0",
+      "version": "0.2.0",
     },
     "packages/multiways": {
       "name": "@open-rgs/multiways",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
@@ -209,7 +212,7 @@
     },
     "packages/pay-anywhere": {
       "name": "@open-rgs/pay-anywhere",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/paytable": "0.1.0",
@@ -217,7 +220,7 @@
     },
     "packages/pay-cluster": {
       "name": "@open-rgs/pay-cluster",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/paytable": "0.1.0",
@@ -225,7 +228,7 @@
     },
     "packages/pay-lines": {
       "name": "@open-rgs/pay-lines",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/paytable": "0.1.0",
@@ -233,7 +236,7 @@
     },
     "packages/pay-ways": {
       "name": "@open-rgs/pay-ways",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/paytable": "0.1.0",
@@ -241,25 +244,25 @@
     },
     "packages/paytable": {
       "name": "@open-rgs/paytable",
-      "version": "0.1.0",
+      "version": "0.2.0",
     },
     "packages/picks": {
       "name": "@open-rgs/picks",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/weights": "0.1.0",
       },
     },
     "packages/platform-mock": {
       "name": "@open-rgs/platform-mock",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "dependencies": {
-        "@open-rgs/contract": "1.2.0",
+        "@open-rgs/contract": "2.0.0",
       },
     },
     "packages/recipes": {
       "name": "@open-rgs/recipes",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/selectors": "0.1.0",
@@ -268,7 +271,7 @@
     },
     "packages/scatters": {
       "name": "@open-rgs/scatters",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
@@ -276,14 +279,14 @@
     },
     "packages/selectors": {
       "name": "@open-rgs/selectors",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
       },
     },
     "packages/simulator": {
       "name": "@open-rgs/simulator",
-      "version": "1.2.1",
+      "version": "1.3.0",
       "bin": {
         "open-rgs-sim": "./src/cli.ts",
       },
@@ -297,14 +300,14 @@
     },
     "packages/strips": {
       "name": "@open-rgs/strips",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
       },
     },
     "packages/symbols": {
       "name": "@open-rgs/symbols",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@open-rgs/grid": "0.1.0",
         "@open-rgs/weights": "0.1.0",
@@ -312,7 +315,7 @@
     },
     "packages/weights": {
       "name": "@open-rgs/weights",
-      "version": "0.1.0",
+      "version": "0.2.0",
     },
   },
   "packages": {

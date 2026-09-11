@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/strips",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Classic reel strips: a symbol sequence per reel, a stop per spin, and the window the player sees, with the tools to read a strip's real probabilities.",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,7 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0"
+    "@open-rgs/grid": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

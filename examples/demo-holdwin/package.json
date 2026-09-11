@@ -4,11 +4,21 @@
   "private": true,
   "description": "Worked example: a 5x3 slot with stacked reels, a declared tease, three paylines and a 6-coin hold-and-win. Exercises every library end to end.",
   "license": "MIT",
-  "type": "module", "main": "src/math.ts",
+  "type": "module",
+  "main": "src/math.ts",
   "dependencies": {
-    "@open-rgs/grid": "0.1.0", "@open-rgs/weights": "0.1.0", "@open-rgs/selectors": "0.1.0",
-    "@open-rgs/markov": "0.1.0", "@open-rgs/recipes": "0.1.0", "@open-rgs/holdwin": "0.1.0",
-    "@open-rgs/paytable": "0.1.0", "@open-rgs/pay-lines": "0.1.0", "@open-rgs/pay-anywhere": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/weights": "0.2.0",
+    "@open-rgs/selectors": "0.2.0",
+    "@open-rgs/markov": "0.2.0",
+    "@open-rgs/recipes": "0.2.0",
+    "@open-rgs/holdwin": "0.2.0",
+    "@open-rgs/paytable": "0.2.0",
+    "@open-rgs/pay-lines": "0.2.0",
+    "@open-rgs/pay-anywhere": "0.2.0"
   },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test" }
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  }
 }

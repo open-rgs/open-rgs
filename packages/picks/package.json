@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/picks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pick-and-reveal bonus rounds: pick N of M, keep picking until a stop symbol, and weighted wheels.",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,7 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/weights": "0.1.0"
+    "@open-rgs/weights": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

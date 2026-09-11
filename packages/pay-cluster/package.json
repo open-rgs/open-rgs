@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/pay-cluster",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cluster-pays evaluation: orthogonally connected groups, with wilds bridging clusters.",
   "license": "MIT",
   "repository": {
@@ -29,8 +29,8 @@
     "paytable"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/paytable": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/paytable": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

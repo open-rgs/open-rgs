@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/pay-lines",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Payline evaluation: left-to-right and both-ways runs with wild substitution, over grids of any shape.",
   "license": "MIT",
   "repository": {
@@ -29,8 +29,8 @@
     "paytable"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/paytable": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/paytable": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

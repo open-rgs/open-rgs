@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/paytable",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Paytable, wild and scatter roles for slot math. Shared by every pay evaluator so a symbol means the same thing in all of them.",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/recipes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mixture-of-recipes grid generation. Named board shapes with explicit probabilities, so teases and features are priced into RTP and measurable instead of bolted on.",
   "license": "MIT",
   "repository": {
@@ -30,9 +30,9 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/selectors": "0.1.0",
-    "@open-rgs/weights": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/selectors": "0.2.0",
+    "@open-rgs/weights": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

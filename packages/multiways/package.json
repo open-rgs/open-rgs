@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/multiways",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Multiways reels: each reel draws its own height per spin, so the ways count varies with the board. Built on the shape-agnostic grid.",
   "license": "MIT",
   "repository": {
@@ -30,16 +30,16 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/weights": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/weights": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
   "devDependencies": {
-    "@open-rgs/paytable": "0.1.0",
-    "@open-rgs/pay-ways": "0.1.0"
+    "@open-rgs/paytable": "0.2.0",
+    "@open-rgs/pay-ways": "0.2.0"
   },
   "homepage": "https://open-rgs.dev/extension/multiways"
 }

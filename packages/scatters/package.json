@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/scatters",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Spawn scatters as a declared event on top of a generated board - weighted count, reel exclusions, protected symbols, at most one per reel - so the trigger rate is a parameter rather than an emergent property.",
   "license": "MIT",
   "repository": {
@@ -30,8 +30,8 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/weights": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/weights": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/cascade",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tumble / cascade mechanics: clear winning cells, apply gravity, refill from the top, and repeat with a rising multiplier.",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,7 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0"
+    "@open-rgs/grid": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
