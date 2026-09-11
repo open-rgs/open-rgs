@@ -182,6 +182,16 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
 
         if (msg.type === "OpenRoundRequest") {
           if (!known.has(sid)) { err("SessionInvalid", "unknown session"); return; }
+          // The platform validates the chain: a previous_round_id that is not
+          // this session's actual previous round is "Invalid rounds sequence",
+          // and the open fails. The fake did not model this, so an adapter
+          // that chained every round looked fine here and failed on the
+          // sandbox after the first simple round.
+          const chain = p["previous_round_id"];
+          if (chain !== undefined && chain !== null && chain !== lastRounds.get(sid)?.["round_id"]) {
+            err("InvalidRoundOperation", "Invalid rounds sequence.");
+            return;
+          }
           const bet = betOf();
           const have = balances.get(sid) ?? START;
           if (bet > have) { err("InsufficientFunds", "not enough balance"); return; }

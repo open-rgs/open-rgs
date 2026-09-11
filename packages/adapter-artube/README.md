@@ -50,6 +50,16 @@ the player's action log on the wallet; `CloseRound` credits the win. Three
 things in that flow are this wire's own and worth knowing before you meet
 them at integration time.
 
+**A round is not chained to whatever came before it.** `previous_round_id`
+links a round to the one it continues - a bonus to the base round that
+triggered it - and the platform validates the link: an id that is not this
+session's actual previous round is refused with `InvalidRoundOperation`
+("Invalid rounds sequence") and the open fails. The adapter does not send it.
+Guessing from the last round it happened to close is a different claim and is
+wrong the moment a simple settle, another pod or a restart comes between; and
+the contract has no field for a deliberate chain to forward. When it grows
+one, it belongs in `OpenComplex` rather than inferred here.
+
 **`round_version` is the platform's counter, not yours.** Open returns it,
 every update returns the next one, and each request must echo the newest one
 the wallet handed back. Send a stale number and the round is refused with

@@ -399,9 +399,6 @@ export class ArtubeAdapter implements PlatformAdapter {
   // round must echo; `features` accumulates so the close can send the
   // open-union-close set the docs ask for. The entry dies with the close.
   private readonly rounds = new Map<string, OpenRoundBook>();
-  // Last round we closed on a session, sent as `previous_round_id` on the
-  // next open so the wallet can chain them. Purely informational upstream.
-  private readonly lastClosedRound = new Map<string, string>();
   // Per-session minor-unit scale, learned from SessionInfo. Events carry a
   // balance but no currency metadata, so without this an out-of-band
   // BalanceChanged would arrive in different units than every other amount.
@@ -579,14 +576,22 @@ export class ArtubeAdapter implements PlatformAdapter {
   async openComplex(req: OpenComplex): Promise<RoundReceipt> {
     const stateVersion = req.mathVersion ?? this.defaultRoundStateVersion;
     const features = extractFeatures(req.initialState);
-    const previous = this.lastClosedRound.get(req.sessionId);
 
+    // No `previous_round_id`. It chains one round to another - a bonus
+    // continuing the base round that triggered it - and the platform
+    // validates the chain: a round id that is not actually this session's
+    // previous round is refused with InvalidRoundOperation ("Invalid rounds
+    // sequence"), which fails the open and strands nothing but the player's
+    // patience. Sending the last round this adapter happened to close is not
+    // the same claim: simple settles do not update it, another pod may have
+    // served the round in between, and either way the RGS has no concept of
+    // a deliberate chain to tell us about. When open-rgs grows one, it
+    // belongs in OpenComplex as an explicit field rather than inferred here.
     const payload: OpenRoundRequestPayload = {
       session_id:          req.sessionId,
       price_multiplier:    req.priceMultiplier,
       bet_index:           req.betIndex,
       ...(req.promoId  ? { free_round_campaign_id: req.promoId } : {}),
-      ...(previous     ? { previous_round_id: previous } : {}),
       ...(features.length > 0 ? { features: features.map((type) => ({ type })) } : {}),
       round_state_version: stateVersion,
       round_state:         packRoundState(req.initialState),
@@ -695,7 +700,6 @@ export class ArtubeAdapter implements PlatformAdapter {
     }
 
     this.rounds.delete(req.roundId);
-    this.lastClosedRound.set(req.sessionId, req.roundId);
 
     this.log.info("Artube complex round closed", {
       "event.category": "artube",

@@ -25,6 +25,11 @@ Two fixes that were latent before complex rounds made them urgent:
   `Event` suffix; both spellings appear in Artube's docs and the suffixed ones
   were being dropped as unknown types.
 
+`previous_round_id` is not sent. It chains a round to the one it continues and
+the platform validates the link, so guessing it from the last round the adapter
+closed fails every open that follows a simple settle - found against the
+sandbox, and the fake server now models the refusal.
+
 Also: a close carries both the round's final state and the next round's carry
 into one wallet slot via a marked envelope (unmarked strings still read back
 verbatim); features are read from a `$features` key in the math's own state and

@@ -183,6 +183,41 @@ describe("complex rounds", () => {
     expect((bal as { balance: number }).balance).toBe(fake.balanceMinor("s6"));
   });
 
+  test("an open does not chain itself to whatever round came before", async () => {
+    // previous_round_id links a round to the one it continues - a bonus to
+    // the base round that triggered it. Sending the last round this adapter
+    // happened to close is a different claim, and the platform refuses it
+    // with "Invalid rounds sequence" whenever the guess is wrong: after a
+    // simple settle, after another pod served a round, after a restart.
+    const { fake, adapter } = await connect();
+    await adapter.openSession("chain", "c1");
+    await adapter.settleSimple({
+      sessionId: "chain", bet: 100, betIndex: 2, priceMultiplier: 1,
+      win: 0, multiplier: 0, type: "loss", roundState: "{}",
+    });
+    const first = await adapter.openComplex({
+      sessionId: "chain", bet: 100, betIndex: 2, priceMultiplier: 1, initialState: "{}",
+    });
+    await adapter.closeComplex({
+      sessionId: "chain", roundId: first.roundId,
+      finalState: "{}", win: 0, multiplier: 0, type: "loss",
+    });
+    // The one that used to fail: a complex open straight after a complex
+    // close, with a simple round's settle in between having moved the
+    // wallet's idea of "previous" on.
+    await adapter.settleSimple({
+      sessionId: "chain", bet: 100, betIndex: 2, priceMultiplier: 1,
+      win: 0, multiplier: 0, type: "loss", roundState: "{}",
+    });
+    const second = await adapter.openComplex({
+      sessionId: "chain", bet: 100, betIndex: 2, priceMultiplier: 1, initialState: "{}",
+    });
+    expect(second.roundId).toBeTruthy();
+    for (const frame of fake.sent("OpenRoundRequest")) {
+      expect(frame.payload["previous_round_id"]).toBeUndefined();
+    }
+  });
+
   test("closing a round this adapter never opened is refused locally", async () => {
     // Not forwarded as a guessed round_version: the money for such a round
     // was moved by an open we never saw, and a wrong version is either
