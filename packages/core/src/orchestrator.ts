@@ -495,8 +495,17 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       // Fresh INIT, go to platform, build a new LocalSession from
       // the SessionInfo it returns (per ADR-004, platform is the
       // source of truth for carry / nextMode / mathVersion).
-      info = await timedPlatformCall(metrics, "openSession",
-        () => platform.openSession(req.sid, conn.connectionId));
+      // translate(), the same as every other platform call. Without it an
+      // upstream refusal arrived as a bare Error, became INTERNAL_ERROR at
+      // the transport, and reached the client as "internal error (ref: ...)"
+      // - so the single most common integration failure, a session the
+      // wallet does not recognise, was also the least legible one.
+      try {
+        info = await timedPlatformCall(metrics, "openSession",
+          () => platform.openSession(req.sid, conn.connectionId));
+      } catch (e) {
+        throw translate(e, "INIT_FAILED");
+      }
       conn.sessionId = req.sid;
       conn.demo = !info.currency;
 
