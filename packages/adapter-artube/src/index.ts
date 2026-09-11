@@ -480,6 +480,12 @@ export class ArtubeAdapter implements PlatformAdapter {
 
   disconnect(): void {
     this.shouldReconnect = false;
+    // Synchronously, before the socket has finished closing. `ready` was
+    // cleared in the close handler, so between calling disconnect() and the
+    // event landing the adapter still answered isHealthy: true - and a caller
+    // that asks is deciding whether to route a round at it. A machine fast
+    // enough to fire close inside the same tick hides this; CI is not.
+    this.ready = false;
     this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

@@ -183,6 +183,17 @@ describe("complex rounds", () => {
     expect((bal as { balance: number }).balance).toBe(fake.balanceMinor("s6"));
   });
 
+  test("disconnect() takes effect before the socket finishes closing", async () => {
+    // Whoever asks isHealthy is deciding whether to route a round at this
+    // adapter. "I told it to disconnect and it says it is fine" is wrong at
+    // any speed; it only LOOKS fine on a machine where close fires in the
+    // same tick.
+    const { adapter } = await connect();
+    expect(adapter.isHealthy).toBe(true);
+    adapter.disconnect();
+    expect(adapter.isHealthy).toBe(false);
+  });
+
   test("an unfinished round is not read back as a carry", async () => {
     // last_round is whatever the session touched last, and while a round is
     // open that is the open round - whose round_state is the math's in-flight

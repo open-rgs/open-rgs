@@ -25,6 +25,12 @@ Two fixes that were latent before complex rounds made them urgent:
   `Event` suffix; both spellings appear in Artube's docs and the suffixed ones
   were being dropped as unknown types.
 
+`disconnect()` marks the adapter unhealthy synchronously. It was cleared in
+the socket's close handler, so between the call and the event landing
+`isHealthy` still read `true` - and whoever asks is deciding whether to route
+a round at it. Local machines fire close in the same tick and hide it; CI
+does not.
+
 A carry is read only from a round that finished. `last_round` is whatever the
 session touched last; while a round is open that is the open round, and its
 `round_state` is the math's in-flight state. Handing it back as the carry
