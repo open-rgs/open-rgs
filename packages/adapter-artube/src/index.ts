@@ -588,6 +588,87 @@ export class ArtubeAdapter implements PlatformAdapter {
     return this.orphans.get(sessionId);
   }
 
+  /**
+   * Claim one round by id, so a close for it can be sent.
+   *
+   * The last escape hatch, for the case `last_round` cannot reach: a complex
+   * round left open while simple rounds kept settling after it. Each of those
+   * is its own round, so the open one is not the session's last round and
+   * nothing in SessionInfo points at it - but the wallet still refuses every
+   * new round with `InvalidRoundOperation: Round is already opened`.
+   *
+   * The id comes from wherever the open was recorded: this adapter's own
+   * `round_open` log line, the operator's back office, a client's replay.
+   * `roundVersion` is the wallet's counter for it - 0 for a round that was
+   * opened and never updated, which is the usual shape of an abandoned one.
+   *
+   * Nothing here is inferred, which is the point: an adapter guessing at
+   * which round to close is how you settle the wrong one.
+   */
+  claimRound(sessionId: string, roundId: string, roundVersion = 0, stateVersion?: string): void {
+    this.rounds.set(roundId, {
+      sessionId,
+      version: roundVersion,
+      stateVersion: stateVersion ?? this.defaultRoundStateVersion,
+      features: new Set(),
+      chain: Promise.resolve(),
+    });
+    this.log.warn("Artube round claimed by id", {
+      "event.category": "artube",
+      "event.action":   "round_claimed_by_id",
+      "artube.session_id":    sessionId,
+      "artube.round_id":      roundId,
+      "artube.round_version": roundVersion,
+    });
+  }
+
+  /**
+   * Claim `last_round` as open whatever it looks like, and hand it back.
+   *
+   * The escape hatch for a round the marker cannot identify: written before
+   * the marker existed, or by another implementation of this wire. The
+   * symptom is unambiguous - every round on the session is refused with
+   * `InvalidRoundOperation: Round is already opened` - but the state alone
+   * does not say so, and there is no way to ask.
+   *
+   * Deliberately not automatic. It closes whatever the wallet last recorded,
+   * which is wrong if the session is not actually wedged, so it is something
+   * an operator invokes with the refusal in front of them.
+   */
+  async claimLastRound(sessionId: string, connectionId = "claim"): Promise<ArtubeOpenRound | undefined> {
+    const env = await this.rpc<SessionInfoRequestPayload, SessionInfoResponsePayload>(
+      "SessionInfoRequest",
+      { session_id: sessionId, player_connection_info: { player_connection_id: connectionId } },
+    );
+    const last = env.payload.last_round;
+    if (!last) return undefined;
+    this.sessionScale.set(sessionId, this.scaleFor(env.payload.game_settings));
+    const orphan: ArtubeOpenRound = {
+      roundId: last.round_id,
+      state: unwrapState(last.round_state),
+      betIndex: last.bet_index,
+      priceMultiplier: last.price_multiplier,
+      ...(last.round_state_version ? { mathVersion: last.round_state_version } : {}),
+      ...(last.started_at ? { startedAt: last.started_at } : {}),
+    };
+    this.orphans.set(sessionId, orphan);
+    this.rounds.set(orphan.roundId, {
+      sessionId,
+      version: last.round_version,
+      stateVersion: last.round_state_version,
+      features: new Set(),
+      chain: Promise.resolve(),
+    });
+    this.log.warn("Artube round claimed by hand", {
+      "event.category": "artube",
+      "event.action":   "orphan_round_claimed",
+      "artube.session_id":    sessionId,
+      "artube.round_id":      orphan.roundId,
+      "artube.round_version": last.round_version,
+    });
+    return orphan;
+  }
+
   /** Take ownership of a round the wallet reports open, so a close for it can
    *  be sent. Without the book entry `closeComplex` refuses locally - rightly,
    *  since it would otherwise be guessing a round_version - and the session
