@@ -183,6 +183,55 @@ describe("complex rounds", () => {
     expect((bal as { balance: number }).balance).toBe(fake.balanceMinor("s6"));
   });
 
+  test("a round the wallet has open but this process did not open is recoverable", async () => {
+    // The wedge: open a round, lose the process that opened it, come back.
+    // The wallet still has the round; without adopting it every later round
+    // on that session is refused with "Round is already opened" and the
+    // player is stuck until someone closes it by hand.
+    const { fake, adapter } = await connect();
+    await adapter.openSession("orphan", "c1");
+    const opened = await adapter.openComplex({
+      sessionId: "orphan", bet: 100, betIndex: 2, priceMultiplier: 1,
+      initialState: JSON.stringify({ phase: "decide", pending: 3 }),
+      mathVersion: "1.0.0",
+    });
+
+    // A new adapter: a different pod, or this one after a restart.
+    const fresh = new ArtubeAdapter({
+      wsUrl: fake.url, gameId: "complex-test", authToken: "test-key",
+      handshakeTimeoutMs: 5_000, rpcTimeoutMs: 5_000,
+    });
+    await fresh.connect();
+    try {
+      expect(fresh.openRoundFor("orphan")).toBeUndefined();
+      await fresh.openSession("orphan", "c2");
+
+      const orphan = fresh.openRoundFor("orphan");
+      expect(orphan).toBeDefined();
+      expect(orphan!.roundId).toBe(opened.roundId);
+      expect(orphan!.betIndex).toBe(2);
+      expect(orphan!.priceMultiplier).toBe(1);
+      expect(orphan!.mathVersion).toBe("1.0.0");
+      // The state is what a valuation is computed from, so it has to survive.
+      expect(JSON.parse(orphan!.state)).toMatchObject({ phase: "decide", pending: 3 });
+
+      // And it can actually be closed - the round_version came from the
+      // wallet, so this is not a guess.
+      const closed = await fresh.closeComplex({
+        sessionId: "orphan", roundId: orphan!.roundId,
+        finalState: orphan!.state, win: 300, multiplier: 3,
+        type: "recovered", reason: "orphaned-round",
+      });
+      expect(closed.balance).toBe(1_000_000 - 100 + 300);
+      expect(fresh.openRoundFor("orphan")).toBeUndefined();
+      // Settled by the platform's autoclose message, because it was not the
+      // player who asked for it.
+      expect(fake.sent("AutocloseRoundRequest").length).toBe(1);
+    } finally {
+      fresh.disconnect();
+    }
+  });
+
   test("disconnect() takes effect before the socket finishes closing", async () => {
     // Whoever asks isHealthy is deciding whether to route a round at this
     // adapter. "I told it to disconnect and it says it is fine" is wrong at
@@ -215,6 +264,9 @@ describe("complex rounds", () => {
     // Unknown, not empty, and above all not the open round's own state.
     const during = await adapter.openSession("open-carry", "c3");
     expect(during.carry).toBeUndefined();
+    // And it is the marker in the state that says so, not finished_at - this
+    // wire omits that on finished rounds too.
+    expect(adapter.openRoundFor("open-carry")).toBeDefined();
   });
 
   test("an open does not chain itself to whatever round came before", async () => {

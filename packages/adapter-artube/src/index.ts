@@ -77,6 +77,37 @@ import pkg from "../package.json" with { type: "json" };
  *  see exactly which adapter is running in the pod. */
 export const ARTUBE_ADAPTER_VERSION: string = pkg.version;
 
+/** A round the WALLET says is still open on a session.
+ *
+ *  The recovery gap, in one shape. A round is opened - and debited - by one
+ *  process; that process dies, or the pod rolls, or the player comes back on
+ *  another instance. The RGS has no memory of the round, the wallet still
+ *  does, and every subsequent round on that session is refused with
+ *  `InvalidRoundOperation: Round is already opened`. The player is stuck
+ *  until someone closes it by hand.
+ *
+ *  Artube's SessionInfo answers the question the open-rgs contract cannot ask
+ *  yet (ADR-007): `last_round` with no `finished_at` IS the open round, with
+ *  the state, the version and the price it was opened at. The adapter surfaces
+ *  it here, and adopts the round so a close for it works. What to settle it
+ *  at is the game's decision, not the adapter's - it owns the math that can
+ *  value the state. */
+export interface ArtubeOpenRound {
+  roundId: string;
+  /** The round's state as the wallet last stored it. `ComplexMath.autoclose`
+   *  takes exactly this. */
+  state: string;
+  /** What the round was opened at, so a settle can be priced:
+   *  `allowedBets[betIndex] * priceMultiplier`. */
+  betIndex: number;
+  priceMultiplier: number;
+  /** Math version that wrote the state, when the wire carried one. A state
+   *  written by math that is no longer loaded must not be valued by the math
+   *  that replaced it. */
+  mathVersion?: string;
+  startedAt?: string;
+}
+
 // ── Wire types ────────────────────────────────────────────────────────
 
 type Channel = "rpc" | "events" | "control";
@@ -399,6 +430,10 @@ export class ArtubeAdapter implements PlatformAdapter {
   // round must echo; `features` accumulates so the close can send the
   // open-union-close set the docs ask for. The entry dies with the close.
   private readonly rounds = new Map<string, OpenRoundBook>();
+  // Rounds the wallet reported open on a session that this process did not
+  // open. Keyed by session, replaced on every openSession, cleared when the
+  // round is closed.
+  private readonly orphans = new Map<string, ArtubeOpenRound>();
   // Per-session minor-unit scale, learned from SessionInfo. Events carry a
   // balance but no currency metadata, so without this an out-of-band
   // BalanceChanged would arrive in different units than every other amount.
@@ -523,6 +558,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       heartbeat_timeout_ms:   this.heartbeatTimeoutMs,
       heartbeat_silent_ms:    this.lastPongAt ? Date.now() - this.lastPongAt : null,
       open_complex_rounds:    this.rounds.size,
+      wallet_reported_open_rounds: this.orphans.size,
       schema_version:         this.schemaVersion,
       amount_scaling:         this.scaleAmounts ? "minor-units" : "verbatim",
     };
@@ -542,7 +578,138 @@ export class ArtubeAdapter implements PlatformAdapter {
     );
     const scale = this.scaleFor(env.payload.game_settings);
     this.sessionScale.set(sessionId, scale);
+    this.adoptOpenRound(sessionId, env.payload.last_round);
     return artubeSessionToContract(sessionId, env.payload, scale, this.currencyDecimals);
+  }
+
+  /** The round the wallet says is open on this session and this process did
+   *  not open, if any. Populated by the most recent `openSession`. */
+  openRoundFor(sessionId: string): ArtubeOpenRound | undefined {
+    return this.orphans.get(sessionId);
+  }
+
+  /**
+   * Claim one round by id, so a close for it can be sent.
+   *
+   * The last escape hatch, for the case `last_round` cannot reach: a complex
+   * round left open while simple rounds kept settling after it. Each of those
+   * is its own round, so the open one is not the session's last round and
+   * nothing in SessionInfo points at it - but the wallet still refuses every
+   * new round with `InvalidRoundOperation: Round is already opened`.
+   *
+   * The id comes from wherever the open was recorded: this adapter's own
+   * `round_open` log line, the operator's back office, a client's replay.
+   * `roundVersion` is the wallet's counter for it - 0 for a round that was
+   * opened and never updated, which is the usual shape of an abandoned one.
+   *
+   * Nothing here is inferred, which is the point: an adapter guessing at
+   * which round to close is how you settle the wrong one.
+   */
+  claimRound(sessionId: string, roundId: string, roundVersion = 0, stateVersion?: string): void {
+    this.rounds.set(roundId, {
+      sessionId,
+      version: roundVersion,
+      stateVersion: stateVersion ?? this.defaultRoundStateVersion,
+      features: new Set(),
+      chain: Promise.resolve(),
+    });
+    this.log.warn("Artube round claimed by id", {
+      "event.category": "artube",
+      "event.action":   "round_claimed_by_id",
+      "artube.session_id":    sessionId,
+      "artube.round_id":      roundId,
+      "artube.round_version": roundVersion,
+    });
+  }
+
+  /**
+   * Claim `last_round` as open whatever it looks like, and hand it back.
+   *
+   * The escape hatch for a round the marker cannot identify: written before
+   * the marker existed, or by another implementation of this wire. The
+   * symptom is unambiguous - every round on the session is refused with
+   * `InvalidRoundOperation: Round is already opened` - but the state alone
+   * does not say so, and there is no way to ask.
+   *
+   * Deliberately not automatic. It closes whatever the wallet last recorded,
+   * which is wrong if the session is not actually wedged, so it is something
+   * an operator invokes with the refusal in front of them.
+   */
+  async claimLastRound(sessionId: string, connectionId = "claim"): Promise<ArtubeOpenRound | undefined> {
+    const env = await this.rpc<SessionInfoRequestPayload, SessionInfoResponsePayload>(
+      "SessionInfoRequest",
+      { session_id: sessionId, player_connection_info: { player_connection_id: connectionId } },
+    );
+    const last = env.payload.last_round;
+    if (!last) return undefined;
+    this.sessionScale.set(sessionId, this.scaleFor(env.payload.game_settings));
+    const orphan: ArtubeOpenRound = {
+      roundId: last.round_id,
+      state: unwrapState(last.round_state),
+      betIndex: last.bet_index,
+      priceMultiplier: last.price_multiplier,
+      ...(last.round_state_version ? { mathVersion: last.round_state_version } : {}),
+      ...(last.started_at ? { startedAt: last.started_at } : {}),
+    };
+    this.orphans.set(sessionId, orphan);
+    this.rounds.set(orphan.roundId, {
+      sessionId,
+      version: last.round_version,
+      stateVersion: last.round_state_version,
+      features: new Set(),
+      chain: Promise.resolve(),
+    });
+    this.log.warn("Artube round claimed by hand", {
+      "event.category": "artube",
+      "event.action":   "orphan_round_claimed",
+      "artube.session_id":    sessionId,
+      "artube.round_id":      orphan.roundId,
+      "artube.round_version": last.round_version,
+    });
+    return orphan;
+  }
+
+  /** Take ownership of a round the wallet reports open, so a close for it can
+   *  be sent. Without the book entry `closeComplex` refuses locally - rightly,
+   *  since it would otherwise be guessing a round_version - and the session
+   *  stays wedged. Here the version is not a guess: the wallet just gave it. */
+  private adoptOpenRound(sessionId: string, last: ArtubeLastRound | undefined): void {
+    // `finished_at` would be the obvious signal and it is not usable: it is
+    // documented optional and this wire omits it on finished rounds too, so
+    // treating its absence as "still open" makes every carry look absent -
+    // resetting the player's meters - while telling you nothing true. The
+    // marker this adapter writes into the state on open is the signal; a
+    // present `finished_at` is still believed when it says the round is done.
+    if (!last || last.finished_at || !isOpenState(last.round_state)) {
+      this.orphans.delete(sessionId);
+      return;
+    }
+    const orphan: ArtubeOpenRound = {
+      roundId: last.round_id,
+      state: unwrapState(last.round_state),
+      betIndex: last.bet_index,
+      priceMultiplier: last.price_multiplier,
+      ...(last.round_state_version ? { mathVersion: last.round_state_version } : {}),
+      ...(last.started_at ? { startedAt: last.started_at } : {}),
+    };
+    this.orphans.set(sessionId, orphan);
+    if (!this.rounds.has(orphan.roundId)) {
+      this.rounds.set(orphan.roundId, {
+        sessionId,
+        version: last.round_version,
+        stateVersion: last.round_state_version,
+        features: new Set(),
+        chain: Promise.resolve(),
+      });
+    }
+    this.log.warn("Artube reports a round this process did not open", {
+      "event.category": "artube",
+      "event.action":   "orphan_round_adopted",
+      "artube.session_id":    sessionId,
+      "artube.round_id":      orphan.roundId,
+      "artube.round_version": last.round_version,
+      "artube.started_at":    orphan.startedAt,
+    });
   }
 
   async settleSimple(req: SettleSimple): Promise<RoundReceipt> {
@@ -600,7 +767,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       ...(req.promoId  ? { free_round_campaign_id: req.promoId } : {}),
       ...(features.length > 0 ? { features: features.map((type) => ({ type })) } : {}),
       round_state_version: stateVersion,
-      round_state:         packRoundState(req.initialState),
+      round_state:         packOpenState(req.initialState),
     };
 
     const env = await this.rpc<OpenRoundRequestPayload, OpenRoundResponsePayload>(
@@ -647,7 +814,7 @@ export class ArtubeAdapter implements PlatformAdapter {
           round_id:            req.roundId,
           round_version:       book.version,
           round_state_version: book.stateVersion,
-          round_state:         packRoundState(req.state),
+          round_state:         packOpenState(req.state),
         },
       );
       for (const f of extractFeatures(req.state)) book.features.add(f);
@@ -706,6 +873,9 @@ export class ArtubeAdapter implements PlatformAdapter {
     }
 
     this.rounds.delete(req.roundId);
+    if (this.orphans.get(req.sessionId)?.roundId === req.roundId) {
+      this.orphans.delete(req.sessionId);
+    }
 
     this.log.info("Artube complex round closed", {
       "event.category": "artube",
@@ -1349,11 +1519,17 @@ function artubeSessionToContract(
   // it as a brand-new player - silently resetting the meters of anyone whose
   // pod restarted mid-round.
   //
-  // No carry is the honest answer here: it is unknown, not empty. The
+  // `unpackCarry` decides which it is, from the marker this adapter writes
+  // into an in-flight round's state. Not from `finished_at`: that field is
+  // documented optional and this wire omits it on finished rounds too, so
+  // requiring it drops every carry there is.
+  //
+  // No carry is the honest answer for an open round: unknown, not empty. The
   // orchestrator resumes from its own memory when it still has the session,
   // and this path is what runs when it does not.
-  if (p.last_round && p.last_round.finished_at) {
-    info.carry = unpackCarry(p.last_round.round_state);
+  if (p.last_round) {
+    const carry = unpackCarry(p.last_round.round_state);
+    if (carry !== "") info.carry = carry;
     // `round_state_version` is the field the settle WRITES mathVersion into
     // (see settleSimple), so it is the field to read it back from.
     // `round_version` is the wallet's own round counter, an unrelated number:
@@ -1396,6 +1572,16 @@ const RGS_ENVELOPE_MARK = "$rgs";
 
 interface RoundStateEnvelope {
   [RGS_ENVELOPE_MARK]: 1;
+  /** Present and true while the round is in flight. This is how a later
+   *  SessionInfo tells "the last round is still open" from "the last round
+   *  finished and left a carry".
+   *
+   *  It has to be a marker we write, because the field that ought to answer
+   *  does not: `last_round.finished_at` is documented optional and this wire
+   *  omits it on finished rounds too. Reading it as the signal makes every
+   *  carry look absent - the player's meters reset - while a genuinely open
+   *  round stays invisible. */
+  open?: true;
   state: unknown;
   carry?: unknown;
 }
@@ -1423,15 +1609,44 @@ function packRoundState(state: string, carry?: string): string {
   return JSON.stringify(env);
 }
 
+/** The state of a round that is still in flight, marked as such. */
+function packOpenState(state: string): string {
+  const env: RoundStateEnvelope = {
+    [RGS_ENVELOPE_MARK]: 1,
+    open: true,
+    state: asJsonOrString(state),
+  };
+  return JSON.stringify(env);
+}
+
+function parseEnvelope(roundState: string): RoundStateEnvelope | undefined {
+  const parsed = asJsonOrString(roundState);
+  if (parsed !== null && typeof parsed === "object"
+      && (parsed as Record<string, unknown>)[RGS_ENVELOPE_MARK] === 1) {
+    return parsed as unknown as RoundStateEnvelope;
+  }
+  return undefined;
+}
+
+/** True when this round_state belongs to a round that was still in flight
+ *  when it was written. */
+function isOpenState(roundState: string): boolean {
+  return parseEnvelope(roundState)?.open === true;
+}
+
+/** The math's own state, out of whichever envelope it arrived in. */
+function unwrapState(roundState: string): string {
+  const env = parseEnvelope(roundState);
+  return env === undefined ? roundState : fromJsonOrString(env.state);
+}
+
 /** What the next round should start from: the carry out of a packed
  *  envelope, or the whole string when it was never packed. */
 function unpackCarry(roundState: string): string {
-  const parsed = asJsonOrString(roundState);
-  if (parsed !== null && typeof parsed === "object" && (parsed as Record<string, unknown>)[RGS_ENVELOPE_MARK] === 1) {
-    const env = parsed as unknown as RoundStateEnvelope;
-    return env.carry === undefined ? "" : fromJsonOrString(env.carry);
-  }
-  return roundState;
+  const env = parseEnvelope(roundState);
+  if (env === undefined) return roundState;   // written before the envelope existed
+  if (env.open === true) return "";           // a round in flight carries nothing
+  return env.carry === undefined ? "" : fromJsonOrString(env.carry);
 }
 
 /** Features the math declared, read from a reserved key in its own state.
@@ -1439,7 +1654,7 @@ function unpackCarry(roundState: string): string {
  *  Artube concept in the neutral surface, so the math says it where it
  *  already says everything else. */
 function extractFeatures(state: string): string[] {
-  const parsed = asJsonOrString(state);
+  const parsed = asJsonOrString(unwrapState(state));
   if (parsed === null || typeof parsed !== "object") return [];
   const raw = (parsed as Record<string, unknown>)["$features"];
   if (!Array.isArray(raw)) return [];
@@ -1451,7 +1666,7 @@ function extractFeatures(state: string): string[] {
 /** "cancelled" only when the math asks for it by name. Everything else,
  *  a zero-win round included, is a round that completed. */
 function closeStatus(state: string): "completed" | "cancelled" {
-  const parsed = asJsonOrString(state);
+  const parsed = asJsonOrString(unwrapState(state));
   if (parsed !== null && typeof parsed === "object"
       && (parsed as Record<string, unknown>)["$status"] === "cancelled") {
     return "cancelled";
