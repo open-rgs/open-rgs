@@ -341,12 +341,20 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     return requested ?? manifest.defaultMode;
   }
 
-  function buildSpinContext(modeId: string, cheatRaw?: Record<string, unknown>, params?: Record<string, unknown>): SpinContext {
+  function buildSpinContext(
+    modeId: string,
+    bet: { betIndex: number; priceMultiplier: number },
+    cheatRaw?: Record<string, unknown>,
+    params?: Record<string, unknown>,
+  ): SpinContext {
     // Cheats are fully off unless explicitly enabled outside production
     // (see OrchestratorConfig.cheatsEnabled), a forced-outcome path can
     // never be reached in a production build.
     const cheat = cheatsEnabled ? parseCheat(cheatRaw) : undefined;
-    return { mode: modeId, cheat, params };
+    // betIndex/priceMultiplier come from computeBet, never straight off the
+    // wire: they are the same numbers the wallet is charged against, so a
+    // math reading them cannot be fed one stake and settled at another.
+    return { mode: modeId, betIndex: bet.betIndex, priceMultiplier: bet.priceMultiplier, cheat, params };
   }
 
   function computeBet(
@@ -487,8 +495,17 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       // Fresh INIT, go to platform, build a new LocalSession from
       // the SessionInfo it returns (per ADR-004, platform is the
       // source of truth for carry / nextMode / mathVersion).
-      info = await timedPlatformCall(metrics, "openSession",
-        () => platform.openSession(req.sid, conn.connectionId));
+      // translate(), the same as every other platform call. Without it an
+      // upstream refusal arrived as a bare Error, became INTERNAL_ERROR at
+      // the transport, and reached the client as "internal error (ref: ...)"
+      // - so the single most common integration failure, a session the
+      // wallet does not recognise, was also the least legible one.
+      try {
+        info = await timedPlatformCall(metrics, "openSession",
+          () => platform.openSession(req.sid, conn.connectionId));
+      } catch (e) {
+        throw translate(e, "INIT_FAILED");
+      }
       conn.sessionId = req.sid;
       conn.demo = !info.currency;
 
@@ -634,7 +651,12 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     // Dev cheats (when enabled) ride inside params.cheat, never a
     // first-class wire field. Ignored entirely when cheatsEnabled is false.
-    const ctx = buildSpinContext(requestedMode, req.params?.["cheat"] as Record<string, unknown> | undefined, req.params);
+    const ctx = buildSpinContext(
+      requestedMode,
+      { betIndex: betInfo.betIndex, priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier },
+      req.params?.["cheat"] as Record<string, unknown> | undefined,
+      req.params,
+    );
     const math = mode.math as SimpleMath;
     const mathStart = performance.now();
     const outcome = await Promise.resolve(math.play(s.carry, ctx));
@@ -762,7 +784,16 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
-    const ctx = buildSpinContext(requestedMode, undefined, req.params);
+    // Same cheat plumbing as spin(). It was passing `undefined` here, so a
+    // forced outcome worked on a simple round and silently did nothing on a
+    // complex one - which is the mode where a deterministic opening draw is
+    // most needed, because everything after it is a branch.
+    const ctx = buildSpinContext(
+      requestedMode,
+      { betIndex: betInfo.betIndex, priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier },
+      req.params?.["cheat"] as Record<string, unknown> | undefined,
+      req.params,
+    );
     const math = mode.math as ComplexMath;
     const mathStart = performance.now();
     const open = await Promise.resolve(math.open(s.carry, ctx));
@@ -776,6 +807,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         betIndex: betInfo.betIndex,
         priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier,
         initialState: open.state,
+        ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
         idempotencyKey: initiatingIdemKey(s.sessionId, "open", req.idempotencyKey),
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),
       }));
@@ -1087,6 +1119,15 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         win,
         multiplier: cappedClose.multiplier,
         type: cappedClose.type,
+        // Same three fields a client close sends. They were missing here, so
+        // an autoclosed round updated the RGS's in-memory carry (below) and
+        // never the wallet's: the next openSession handed back the carry from
+        // before the round, and every meter the round had advanced silently
+        // reset. The wallet is the source of truth for carry, so the write
+        // that reaches it is the one that counts.
+        ...(cappedClose.carry !== undefined ? { carry: cappedClose.carry } : {}),
+        ...(cappedClose.nextMode !== undefined ? { nextMode: cappedClose.nextMode } : {}),
+        ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
         // Same deterministic key as a client close of this round (above)  -
         // a close racing an autoclose collapses to one wallet credit.
         idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "close"),

@@ -112,6 +112,26 @@ export interface CloseOutcome {
 export interface SpinContext {
   /** Mode id resolved by the wrapper (after promo override / nextMode override). */
   mode: string;
+  /** Index into the session's bet ladder for THIS round, as the orchestrator
+   *  resolved it: the client's choice, the session default, or the bet a promo
+   *  locked the round to. Server-authoritative - it is the same number the
+   *  wallet is charged against, so a client cannot desync it from the money.
+   *
+   *  It is an index, not an amount: math stays currency-blind. Use it for
+   *  mechanics whose shape legitimately depends on the stake tier (a meter
+   *  that fills proportionally to the bet, a ladder whose rungs differ per
+   *  tier), never to compute a win amount - that is `multiplier x bet`, and
+   *  bet belongs to the orchestrator.
+   *
+   *  Optional because a math that ignores it must keep compiling, and because
+   *  a host embedding this contract without an orchestrator (the simulator's
+   *  bare harness) has no ladder to index. */
+  betIndex?: number;
+  /** Price multiplier for THIS round (client price x mode stakeMultiplier),
+   *  as resolved by the orchestrator. 1 for an ordinary round, higher for a
+   *  feature buy, 0 for a promo-funded one. Same server-authoritative
+   *  guarantee as {@link betIndex}. */
+  priceMultiplier?: number;
   /** Dev-only forced-outcome hint. Populated by the orchestrator ONLY when
    *  cheats are explicitly enabled (createServer `enableCheats` /
    *  `OPEN_RGS_ENABLE_CHEATS=1`) AND not in production, it is always
