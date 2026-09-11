@@ -144,6 +144,32 @@ string), and only the game knows whether its policy is to pay what was on the
 table or to forfeit it. Close it with a `reason`, which makes it an
 `AutocloseRoundRequest` - it was not the player who asked.
 
+## Demo sessions
+
+Artube's demo mode has no requests of its own — `PlayRound`, `OpenRound`,
+`UpdateRoundState` and `CloseRound` look identical either way. A session is a
+demo session when its **currency is null**; that is the whole marker, and from
+there the backend tracks the virtual balance itself.
+
+```ts
+const platform = withDemoSessions(new ArtubeAdapter({ ... }), {
+  startingBalance: 1_000_000,
+});
+```
+
+A demo session is then answered from memory and never reaches the wire; a real
+one passes straight through. The bet ladder still comes from the wallet — it is
+not money, and a demo player should be able to bet what a real one can — and so
+does the answer to "is this demo at all".
+
+Two things it does not do, both deliberate. It **persists nothing**: a demo
+balance and its carry live as long as the process, which is the platform's own
+behaviour (a demo round is not stored, so a reconnect may not restore one), and
+inventing durability for play money would be worse than not having it. And it
+**never guesses**: a session is demo because the wallet returned no currency
+for it, not because of a session-id prefix or a config flag. Getting that
+backwards is how play money reaches a real balance.
+
 ## Amounts are converted, on purpose
 
 Artube states money in major units (`"balance": 150.75`). open-rgs counts

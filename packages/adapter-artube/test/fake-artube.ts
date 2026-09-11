@@ -17,6 +17,8 @@ export interface FakeArtube {
   stop(): void;
   /** Push an AutocloseRequestEvent for a round the fake has open. */
   requestAutoclose(roundId: string): void;
+  /** Push a SessionClosedEvent for a session. */
+  closeSession(sessionId: string, reason?: string): void;
   /** Every frame the adapter sent, in order. */
   readonly received: WireFrame[];
   /** Frames of one type, oldest first. */
@@ -55,6 +57,9 @@ export interface FakeArtubeOptions {
   eventSuffix?: boolean;
   /** Answer Welcome with this schema. */
   welcomeSchema?: number;
+  /** Session ids for which the wallet returns no currency - Artube's one and
+   *  only marker for a demo session. */
+  demoSessions?: string[];
 }
 
 const MINOR = 100;
@@ -65,6 +70,7 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
   const START = opts.startMinor ?? 1_000_000;
   const sendMinimalUnit = opts.sendMinimalUnit ?? true;
   const evt = (name: string) => (opts.eventSuffix === false ? name : `${name}Event`);
+  const demoSessions = new Set(opts.demoSessions ?? []);
 
   const balances = new Map<string, number>();      // minor units
   const known = new Set<string>();
@@ -124,7 +130,9 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
           const last = lastRounds.get(sid);
           reply("SessionInfoResponse", {
             security_hash: "hash",
-            currency: "USD",
+            // A demo session is one with no currency. That is the whole
+            // marker: same requests, same everything else.
+            currency: demoSessions.has(sid) ? null : "USD",
             balance: major(balances.get(sid)!),
             ...(last ? { last_round: last } : {}),
             game_settings: {
@@ -294,6 +302,14 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
     openRoundIds: () => [...rounds.keys()],
     lastRoundState: (sessionId: string) =>
       lastRounds.get(sessionId)?.["round_state"] as string | undefined,
+    closeSession(sessionId: string, reason = "player left") {
+      const frame = JSON.stringify({
+        proto: 1, schema: 1, chan: "events", type: evt("SessionClosed"),
+        id: crypto.randomUUID(), op_seq: 0, timestamp: new Date().toISOString(),
+        payload: { session_id: sessionId, reason },
+      });
+      for (const ws of sockets) ws.send(frame);
+    },
     requestAutoclose(roundId: string) {
       const r = rounds.get(roundId);
       if (!r) throw new Error(`fake: no open round ${roundId}`);

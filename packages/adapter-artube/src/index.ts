@@ -1703,3 +1703,6 @@ function closeStatus(state: string): "completed" | "cancelled" {
   }
   return "completed";
 }
+
+// Demo sessions (currency: null) served from memory. See ./demo.ts.
+export { withDemoSessions, type DemoSessionsOptions } from "./demo.js";
