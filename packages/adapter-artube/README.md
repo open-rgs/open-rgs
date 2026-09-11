@@ -77,12 +77,22 @@ opaque string. The adapter packs both:
 { "$rgs": 1, "state": { "step": 9 }, "carry": { "meterPoints": 42 } }
 ```
 
-`openSession` unpacks `carry` out of it again - but only from a round that
-*finished*. `last_round` is whatever the session touched last, and while a
-round is open that is the open round, whose `round_state` is the math's
-in-flight state rather than anything to carry forward. Handing that back is
-how a pod restart mid-round silently resets a player's meters, so an
-unfinished round yields no carry at all: unknown, not empty. A string that was never packed
+An in-flight round is written the same way, marked `"open": true`:
+
+```json
+{ "$rgs": 1, "open": true, "state": { "phase": "decide", "pending": 2 } }
+```
+
+`openSession` reads the carry back out of a final envelope, and out of an
+unmarked string (anything written before this existed). A round marked open
+yields **no carry at all** — unknown, not empty: its state is the math's
+in-flight state, and handing that back is how a pod restart mid-round silently
+resets a player's meters.
+
+The marker is what says which, and it has to be, because the field that ought
+to answer does not: `last_round.finished_at` is documented optional and this
+wire omits it on finished rounds too. Requiring it drops every carry there is;
+treating its absence as "still open" makes every round look abandoned. A string that was never packed
 (a simple round's state, or anything written before this existed) is returned
 verbatim, so no meter resets on the first read after an upgrade. Because the
 wallet only persists the state of a round that moved money, this envelope is

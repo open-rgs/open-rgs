@@ -593,13 +593,19 @@ export class ArtubeAdapter implements PlatformAdapter {
    *  since it would otherwise be guessing a round_version - and the session
    *  stays wedged. Here the version is not a guess: the wallet just gave it. */
   private adoptOpenRound(sessionId: string, last: ArtubeLastRound | undefined): void {
-    if (!last || last.finished_at) {
+    // `finished_at` would be the obvious signal and it is not usable: it is
+    // documented optional and this wire omits it on finished rounds too, so
+    // treating its absence as "still open" makes every carry look absent -
+    // resetting the player's meters - while telling you nothing true. The
+    // marker this adapter writes into the state on open is the signal; a
+    // present `finished_at` is still believed when it says the round is done.
+    if (!last || last.finished_at || !isOpenState(last.round_state)) {
       this.orphans.delete(sessionId);
       return;
     }
     const orphan: ArtubeOpenRound = {
       roundId: last.round_id,
-      state: last.round_state,
+      state: unwrapState(last.round_state),
       betIndex: last.bet_index,
       priceMultiplier: last.price_multiplier,
       ...(last.round_state_version ? { mathVersion: last.round_state_version } : {}),
@@ -680,7 +686,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       ...(req.promoId  ? { free_round_campaign_id: req.promoId } : {}),
       ...(features.length > 0 ? { features: features.map((type) => ({ type })) } : {}),
       round_state_version: stateVersion,
-      round_state:         packRoundState(req.initialState),
+      round_state:         packOpenState(req.initialState),
     };
 
     const env = await this.rpc<OpenRoundRequestPayload, OpenRoundResponsePayload>(
@@ -727,7 +733,7 @@ export class ArtubeAdapter implements PlatformAdapter {
           round_id:            req.roundId,
           round_version:       book.version,
           round_state_version: book.stateVersion,
-          round_state:         packRoundState(req.state),
+          round_state:         packOpenState(req.state),
         },
       );
       for (const f of extractFeatures(req.state)) book.features.add(f);
@@ -1432,11 +1438,17 @@ function artubeSessionToContract(
   // it as a brand-new player - silently resetting the meters of anyone whose
   // pod restarted mid-round.
   //
-  // No carry is the honest answer here: it is unknown, not empty. The
+  // `unpackCarry` decides which it is, from the marker this adapter writes
+  // into an in-flight round's state. Not from `finished_at`: that field is
+  // documented optional and this wire omits it on finished rounds too, so
+  // requiring it drops every carry there is.
+  //
+  // No carry is the honest answer for an open round: unknown, not empty. The
   // orchestrator resumes from its own memory when it still has the session,
   // and this path is what runs when it does not.
-  if (p.last_round && p.last_round.finished_at) {
-    info.carry = unpackCarry(p.last_round.round_state);
+  if (p.last_round) {
+    const carry = unpackCarry(p.last_round.round_state);
+    if (carry !== "") info.carry = carry;
     // `round_state_version` is the field the settle WRITES mathVersion into
     // (see settleSimple), so it is the field to read it back from.
     // `round_version` is the wallet's own round counter, an unrelated number:
@@ -1479,6 +1491,16 @@ const RGS_ENVELOPE_MARK = "$rgs";
 
 interface RoundStateEnvelope {
   [RGS_ENVELOPE_MARK]: 1;
+  /** Present and true while the round is in flight. This is how a later
+   *  SessionInfo tells "the last round is still open" from "the last round
+   *  finished and left a carry".
+   *
+   *  It has to be a marker we write, because the field that ought to answer
+   *  does not: `last_round.finished_at` is documented optional and this wire
+   *  omits it on finished rounds too. Reading it as the signal makes every
+   *  carry look absent - the player's meters reset - while a genuinely open
+   *  round stays invisible. */
+  open?: true;
   state: unknown;
   carry?: unknown;
 }
@@ -1506,15 +1528,44 @@ function packRoundState(state: string, carry?: string): string {
   return JSON.stringify(env);
 }
 
+/** The state of a round that is still in flight, marked as such. */
+function packOpenState(state: string): string {
+  const env: RoundStateEnvelope = {
+    [RGS_ENVELOPE_MARK]: 1,
+    open: true,
+    state: asJsonOrString(state),
+  };
+  return JSON.stringify(env);
+}
+
+function parseEnvelope(roundState: string): RoundStateEnvelope | undefined {
+  const parsed = asJsonOrString(roundState);
+  if (parsed !== null && typeof parsed === "object"
+      && (parsed as Record<string, unknown>)[RGS_ENVELOPE_MARK] === 1) {
+    return parsed as unknown as RoundStateEnvelope;
+  }
+  return undefined;
+}
+
+/** True when this round_state belongs to a round that was still in flight
+ *  when it was written. */
+function isOpenState(roundState: string): boolean {
+  return parseEnvelope(roundState)?.open === true;
+}
+
+/** The math's own state, out of whichever envelope it arrived in. */
+function unwrapState(roundState: string): string {
+  const env = parseEnvelope(roundState);
+  return env === undefined ? roundState : fromJsonOrString(env.state);
+}
+
 /** What the next round should start from: the carry out of a packed
  *  envelope, or the whole string when it was never packed. */
 function unpackCarry(roundState: string): string {
-  const parsed = asJsonOrString(roundState);
-  if (parsed !== null && typeof parsed === "object" && (parsed as Record<string, unknown>)[RGS_ENVELOPE_MARK] === 1) {
-    const env = parsed as unknown as RoundStateEnvelope;
-    return env.carry === undefined ? "" : fromJsonOrString(env.carry);
-  }
-  return roundState;
+  const env = parseEnvelope(roundState);
+  if (env === undefined) return roundState;   // written before the envelope existed
+  if (env.open === true) return "";           // a round in flight carries nothing
+  return env.carry === undefined ? "" : fromJsonOrString(env.carry);
 }
 
 /** Features the math declared, read from a reserved key in its own state.
@@ -1522,7 +1573,7 @@ function unpackCarry(roundState: string): string {
  *  Artube concept in the neutral surface, so the math says it where it
  *  already says everything else. */
 function extractFeatures(state: string): string[] {
-  const parsed = asJsonOrString(state);
+  const parsed = asJsonOrString(unwrapState(state));
   if (parsed === null || typeof parsed !== "object") return [];
   const raw = (parsed as Record<string, unknown>)["$features"];
   if (!Array.isArray(raw)) return [];
@@ -1534,7 +1585,7 @@ function extractFeatures(state: string): string[] {
 /** "cancelled" only when the math asks for it by name. Everything else,
  *  a zero-win round included, is a round that completed. */
 function closeStatus(state: string): "completed" | "cancelled" {
-  const parsed = asJsonOrString(state);
+  const parsed = asJsonOrString(unwrapState(state));
   if (parsed !== null && typeof parsed === "object"
       && (parsed as Record<string, unknown>)["$status"] === "cancelled") {
     return "cancelled";

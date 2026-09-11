@@ -264,6 +264,9 @@ describe("complex rounds", () => {
     // Unknown, not empty, and above all not the open round's own state.
     const during = await adapter.openSession("open-carry", "c3");
     expect(during.carry).toBeUndefined();
+    // And it is the marker in the state that says so, not finished_at - this
+    // wire omits that on finished rounds too.
+    expect(adapter.openRoundFor("open-carry")).toBeDefined();
   });
 
   test("an open does not chain itself to whatever round came before", async () => {

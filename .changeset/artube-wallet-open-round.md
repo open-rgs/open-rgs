@@ -11,8 +11,12 @@ refused with `InvalidRoundOperation: Round is already opened` — the player is
 stuck until someone closes it by hand.
 
 Artube's `SessionInfo` answers the question the contract cannot ask yet
-(ADR-007): `last_round` with no `finished_at` is the open round, with its
-state, its `round_version` and the price it was opened at.
+(ADR-007): `last_round` is the open round, with its state, its `round_version`
+and the price it was opened at. Which round that is comes from a marker the
+adapter writes into an in-flight round's state, not from `finished_at` — that
+field is documented optional and this wire omits it on finished rounds too, so
+requiring it drops every carry there is and treating its absence as "still
+open" makes every round look abandoned.
 `adapter.openRoundFor(sessionId)` returns it after every `openSession`, and the
 round is adopted so a `closeComplex` for it works — the version is the wallet's
 own rather than a guess.
