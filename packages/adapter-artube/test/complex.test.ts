@@ -252,17 +252,24 @@ describe("complex rounds", () => {
   }, 15_000);
 
   test("a settle that never landed still fails", async () => {
-    // The safe direction. An unanswered settle that the wallet has no record
-    // of must surface as a failure, not be quietly treated as done.
-    const { adapter } = await connect({}, { rpcTimeoutMs: 500 });
+    // The safe direction: an unanswered settle the wallet has no record of
+    // must surface as a failure, not be quietly treated as done.
+    //
+    // reconcileTimeoutMs is short on purpose. The adapter waits that long for
+    // the socket to come back before giving up on asking, and a test that
+    // depends on the default is a test whose result depends on how busy the
+    // machine is.
+    const { adapter } = await connect({}, { rpcTimeoutMs: 500, reconcileTimeoutMs: 300 });
     await adapter.openSession("nothing", "c1");
-    // No key at all: nothing to reconcile against, so the failure stands.
     adapter.disconnect();
     await expect(adapter.settleSimple({
       sessionId: "nothing", bet: 100, betIndex: 2, priceMultiplier: 1,
       win: 0, multiplier: 0, type: "loss", roundState: "{}",
       idempotencyKey: "key-never",
-    })).rejects.toThrow();
+    })).rejects.toThrow(/not connected|disconnected|closed/i);
+    // ...and the key is released, so a real retry later is not refused by the
+    // memory of an attempt that moved no money.
+    expect((adapter as unknown as { settled: Map<string, unknown> }).settled.size).toBe(0);
   }, 15_000);
 
   test("a complex close whose reply is lost is checked the same way", async () => {
