@@ -205,6 +205,21 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             stateVersion: String(p["round_state_version"] ?? "1"),
             features: featureTypes(p["features"]),
           });
+          // An open round IS the session's last round, and it has no
+          // finished_at. Modelling that is what makes the carry-from-an-open-
+          // round bug reproducible here rather than only on the sandbox.
+          lastRounds.set(sid, {
+            round_id: roundId,
+            price_multiplier: Number(p["price_multiplier"] ?? 1),
+            bet_index: Number(p["bet_index"] ?? 0),
+            win_multiplier: 0,
+            win: 0,
+            started_at: new Date().toISOString(),
+            round_version: 0,
+            round_state_version: String(p["round_state_version"] ?? "1"),
+            round_state: String(p["round_state"] ?? ""),
+            is_platform_max_win_reached: false,
+          });
           reply("OpenRoundResponse", {
             round_version: 0, round_id: roundId, balance: major(balances.get(sid)!),
           });

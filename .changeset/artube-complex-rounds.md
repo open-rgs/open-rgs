@@ -25,6 +25,11 @@ Two fixes that were latent before complex rounds made them urgent:
   `Event` suffix; both spellings appear in Artube's docs and the suffixed ones
   were being dropped as unknown types.
 
+A carry is read only from a round that finished. `last_round` is whatever the
+session touched last; while a round is open that is the open round, and its
+`round_state` is the math's in-flight state. Handing it back as the carry
+resets the meters of any player whose pod restarted mid-round.
+
 `previous_round_id` is not sent. It chains a round to the one it continues and
 the platform validates the link, so guessing it from the last round the adapter
 closed fails every open that follows a simple settle - found against the

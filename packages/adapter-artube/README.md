@@ -77,7 +77,12 @@ opaque string. The adapter packs both:
 { "$rgs": 1, "state": { "step": 9 }, "carry": { "meterPoints": 42 } }
 ```
 
-`openSession` unpacks `carry` out of it again. A string that was never packed
+`openSession` unpacks `carry` out of it again - but only from a round that
+*finished*. `last_round` is whatever the session touched last, and while a
+round is open that is the open round, whose `round_state` is the math's
+in-flight state rather than anything to carry forward. Handing that back is
+how a pod restart mid-round silently resets a player's meters, so an
+unfinished round yields no carry at all: unknown, not empty. A string that was never packed
 (a simple round's state, or anything written before this existed) is returned
 verbatim, so no meter resets on the first read after an upgrade. Because the
 wallet only persists the state of a round that moved money, this envelope is

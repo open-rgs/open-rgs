@@ -183,6 +183,29 @@ describe("complex rounds", () => {
     expect((bal as { balance: number }).balance).toBe(fake.balanceMinor("s6"));
   });
 
+  test("an unfinished round is not read back as a carry", async () => {
+    // last_round is whatever the session touched last, and while a round is
+    // open that is the open round - whose round_state is the math's in-flight
+    // state. Handing it back as the carry resets the meters of anyone whose
+    // pod restarted mid-round.
+    const { adapter } = await connect();
+    await adapter.openSession("open-carry", "c1");
+    await adapter.settleSimple({
+      sessionId: "open-carry", bet: 100, betIndex: 2, priceMultiplier: 1,
+      win: 0, multiplier: 0, type: "loss",
+      roundState: JSON.stringify({ meterPoints: 11 }),
+    });
+    expect(JSON.parse((await adapter.openSession("open-carry", "c2")).carry!)).toEqual({ meterPoints: 11 });
+
+    await adapter.openComplex({
+      sessionId: "open-carry", bet: 100, betIndex: 2, priceMultiplier: 1,
+      initialState: JSON.stringify({ phase: "decide", pending: 2 }),
+    });
+    // Unknown, not empty, and above all not the open round's own state.
+    const during = await adapter.openSession("open-carry", "c3");
+    expect(during.carry).toBeUndefined();
+  });
+
   test("an open does not chain itself to whatever round came before", async () => {
     // previous_round_id links a round to the one it continues - a bonus to
     // the base round that triggered it. Sending the last round this adapter

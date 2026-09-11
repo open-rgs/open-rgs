@@ -1335,7 +1335,18 @@ function artubeSessionToContract(
   if (p.free_round_campaign && !p.free_round_campaign.is_complete) {
     info.promo = artubeCampaignToPromo(p.free_round_campaign, scale);
   }
-  if (p.last_round) {
+  // Only a FINISHED round carries anything forward. `last_round` is whatever
+  // round the session touched last, and while one is open that is the open
+  // round: its `round_state` is the math's in-flight state, not a carry. The
+  // RGS was being handed it anyway, so a game whose carry parser tolerates
+  // the shape read a round's innards as a carry, and one that does not read
+  // it as a brand-new player - silently resetting the meters of anyone whose
+  // pod restarted mid-round.
+  //
+  // No carry is the honest answer here: it is unknown, not empty. The
+  // orchestrator resumes from its own memory when it still has the session,
+  // and this path is what runs when it does not.
+  if (p.last_round && p.last_round.finished_at) {
     info.carry = unpackCarry(p.last_round.round_state);
     // `round_state_version` is the field the settle WRITES mathVersion into
     // (see settleSimple), so it is the field to read it back from.
