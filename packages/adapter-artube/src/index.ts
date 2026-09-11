@@ -1705,4 +1705,10 @@ function closeStatus(state: string): "completed" | "cancelled" {
 }
 
 // Demo sessions (currency: null) served from memory. See ./demo.ts.
-export { withDemoSessions, type DemoSessionsOptions } from "./demo.js";
+export {
+  withDemoSessions,
+  type DemoSessionsOptions,
+  type DemoCapableAdapter,
+  type DemoSessionView,
+  type DemoRound,
+} from "./demo.js";
