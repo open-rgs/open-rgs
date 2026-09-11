@@ -341,6 +341,20 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     return requested ?? manifest.defaultMode;
   }
 
+  /** The wallet capped this round at its own maximum win. Log it where an
+   *  operator reconciling a short payout will find it, and tell the client,
+   *  which is the only party that can explain it to the player. */
+  function notePlatformMaxWin(sessionId: string, roundId: string, receipt: { platformMaxWinReached?: boolean }): boolean {
+    if (receipt.platformMaxWinReached !== true) return false;
+    log.warn("Platform capped this round at its own maximum win", {
+      "event.category": "orchestrator",
+      "event.action":   "platform_max_win",
+      "session.id":     sessionId,
+      "round.id":       roundId,
+    });
+    return true;
+  }
+
   function buildSpinContext(
     modeId: string,
     bet: { betIndex: number; priceMultiplier: number },
@@ -473,6 +487,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         balance: s.balance,
         allowedBets: s.allowedBets,
         defaultBetIndex: s.defaultBetIndex,
+        ...(s.clientData !== undefined ? { clientData: s.clientData } : {}),
         ...(s.promo ? { promo: {
           id: s.promo.id,
           bet: s.promo.bet,
@@ -544,6 +559,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         ...(restoredCarry !== undefined ? { carry: restoredCarry } : {}),
         ...(restoredNextMode !== undefined ? { nextMode: restoredNextMode } : {}),
         ...(info.promo && info.promo.remaining > 0 ? { promo: sessions.promoFromApi(info.promo) } : {}),
+        ...(info.clientData !== undefined ? { clientData: info.clientData } : {}),
         createdAt: Date.now(),
       };
       // put() can evict idle overflow. Those sessions are gone from the cache,
@@ -571,6 +587,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       allowedBets: info.allowedBets,
       defaultBetIndex: info.defaultBetIndex,
       modes: modeCatalogForClient(),
+      ...(info.clientData !== undefined ? { clientData: info.clientData } : {}),
       ...(conn.demo ? { demo: true as const } : {}),
     };
 
@@ -750,6 +767,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       win,
       multiplier: cappedOutcome.multiplier,
       type: cappedOutcome.type,
+      ...(notePlatformMaxWin(s.sessionId, receipt.roundId, receipt) ? { platformMaxWin: true as const } : {}),
     };
 
     if (wasPromo) {
@@ -999,6 +1017,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       win,
       multiplier: cappedClose.multiplier,
       type: cappedClose.type,
+      ...(notePlatformMaxWin(s.sessionId, receipt.roundId, receipt) ? { platformMaxWin: true as const } : {}),
     };
   }
 

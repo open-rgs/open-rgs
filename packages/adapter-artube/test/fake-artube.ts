@@ -17,6 +17,8 @@ export interface FakeArtube {
   stop(): void;
   /** Push an AutocloseRequestEvent for a round the fake has open. */
   requestAutoclose(roundId: string): void;
+  /** Push a SessionClosedEvent for a session. */
+  closeSession(sessionId: string, reason?: string): void;
   /** Every frame the adapter sent, in order. */
   readonly received: WireFrame[];
   /** Frames of one type, oldest first. */
@@ -55,6 +57,17 @@ export interface FakeArtubeOptions {
   eventSuffix?: boolean;
   /** Answer Welcome with this schema. */
   welcomeSchema?: number;
+  /** Process these request types but send no response, as a wallet whose
+   *  reply is lost in the network does. The state change still happens. */
+  swallowReplyFor?: string[];
+  /** Report every settle as having hit the platform's own maximum win. */
+  maxWinReached?: boolean;
+  /** Send the session fields a client needs: gamification token, max win,
+   *  auto-spin counts, RTP display. */
+  clientExtras?: boolean;
+  /** Session ids for which the wallet returns no currency - Artube's one and
+   *  only marker for a demo session. */
+  demoSessions?: string[];
 }
 
 const MINOR = 100;
@@ -65,6 +78,8 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
   const START = opts.startMinor ?? 1_000_000;
   const sendMinimalUnit = opts.sendMinimalUnit ?? true;
   const evt = (name: string) => (opts.eventSuffix === false ? name : `${name}Event`);
+  const demoSessions = new Set(opts.demoSessions ?? []);
+  const swallow = new Set(opts.swallowReplyFor ?? []);
 
   const balances = new Map<string, number>();      // minor units
   const known = new Set<string>();
@@ -96,12 +111,16 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
         received.push({ type: msg.type, id: msg.id, schema: msg.schema, payload: msg.payload ?? {} });
         const p = msg.payload ?? {};
 
-        const reply = (type: string, payload: unknown) =>
+        const reply = (type: string, payload: unknown) => {
+          // The round happened; only the answer went missing. That is the
+          // case the RGS cannot tell from "the round never happened".
+          if (swallow.has(msg.type)) return;
           ws.send(JSON.stringify({
             proto: 1, schema: 1, chan: "rpc", type,
             id: `r-${msg.id}`, corr_id: msg.id, op_seq: 0,
             timestamp: new Date().toISOString(), payload,
           }));
+        };
         const err = (code: string, message: string) =>
           ws.send(JSON.stringify({
             proto: 1, schema: 1, chan: "rpc", type: "Error",
@@ -124,12 +143,24 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
           const last = lastRounds.get(sid);
           reply("SessionInfoResponse", {
             security_hash: "hash",
-            currency: "USD",
+            // A demo session is one with no currency. That is the whole
+            // marker: same requests, same everything else.
+            currency: demoSessions.has(sid) ? null : "USD",
             balance: major(balances.get(sid)!),
             ...(last ? { last_round: last } : {}),
+            ...(opts.clientExtras ? { gamification_token: "tok-123" } : {}),
             game_settings: {
               default_bet_index: 0,
               allowed_bets: ladderMajor,
+              ...(opts.clientExtras ? {
+                platform_max_win: {
+                  is_visible: true,
+                  base_currency: "EUR",
+                  base_currency_value: 1000,
+                  player_currency_value: 870,
+                },
+                rtp_settings: { is_visible: true, shown_rtp: 96.5 },
+              } : {}),
               ...(sendMinimalUnit ? { currency_minimal_unit: 1 / MINOR } : {}),
               available_auto_spin_counts: [10, 25, 50],
               rtp_options: [{ rtp: 0.96, game_mode: "default" }],
@@ -167,13 +198,15 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             win_multiplier: winMul,
             win: major(win),
             started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
             round_version: 0,
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),
-            is_platform_max_win_reached: false,
+            is_platform_max_win_reached: opts.maxWinReached === true,
           });
           reply("PlayRoundResponse", {
             round_id: roundId, balance: major(balances.get(sid)!), win: major(win),
+            is_platform_max_win_reached: opts.maxWinReached === true,
           });
           pushBalance(sid, "Win");
           return;
@@ -214,9 +247,9 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             win_multiplier: 0,
             win: 0,
             started_at: new Date().toISOString(),
-            // No finished_at. The real wire omits it on FINISHED rounds too,
-            // which is exactly why the adapter cannot use it to tell an open
-            // round from a closed one - so the fake must not offer it either.
+            // No finished_at: that is what an open round looks like, and it
+            // is the wire's own answer to "is this round still open". The
+            // sandbox returns exactly this shape.
             round_version: 0,
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),
@@ -263,6 +296,7 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
             win_multiplier: winMul,
             win: major(win),
             started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
             round_version: Number(p["round_version"] ?? 0),
             round_state_version: String(p["round_state_version"] ?? "1"),
             round_state: String(p["round_state"] ?? ""),
@@ -292,6 +326,14 @@ export function fakeArtube(opts: FakeArtubeOptions = {}): FakeArtube {
     openRoundIds: () => [...rounds.keys()],
     lastRoundState: (sessionId: string) =>
       lastRounds.get(sessionId)?.["round_state"] as string | undefined,
+    closeSession(sessionId: string, reason = "player left") {
+      const frame = JSON.stringify({
+        proto: 1, schema: 1, chan: "events", type: evt("SessionClosed"),
+        id: crypto.randomUUID(), op_seq: 0, timestamp: new Date().toISOString(),
+        payload: { session_id: sessionId, reason },
+      });
+      for (const ws of sockets) ws.send(frame);
+    },
     requestAutoclose(roundId: string) {
       const r = rounds.get(roundId);
       if (!r) throw new Error(`fake: no open round ${roundId}`);

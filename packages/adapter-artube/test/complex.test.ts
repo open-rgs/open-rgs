@@ -232,6 +232,85 @@ describe("complex rounds", () => {
     }
   });
 
+  test("a settle whose reply is lost is checked, not retried blind", async () => {
+    // The wire has no idempotency field, so the wallet cannot dedupe a retry
+    // and a lost RESPONSE looks exactly like a lost REQUEST. Retrying blind
+    // pays twice; failing blind pays never. The key rides in the round state,
+    // so the adapter can go and look.
+    const { fake, adapter } = await connect({ swallowReplyFor: ["PlayRoundRequest"] }, { rpcTimeoutMs: 800 });
+    await adapter.openSession("lost", "c1");
+    const receipt = await adapter.settleSimple({
+      sessionId: "lost", bet: 100, betIndex: 2, priceMultiplier: 1,
+      win: 250, multiplier: 2.5, type: "win", roundState: JSON.stringify({ meter: 1 }),
+      idempotencyKey: "key-abc",
+    });
+    // It landed - the wallet moved the money - so the receipt is the real one.
+    expect(receipt.balance).toBe(1_000_000 - 100 + 250);
+    expect(fake.balanceMinor("lost")).toBe(1_000_000 - 100 + 250);
+    // And exactly one settle was sent: no blind retry.
+    expect(fake.sent("PlayRoundRequest").length).toBe(1);
+  }, 15_000);
+
+  test("a settle that never landed still fails", async () => {
+    // The safe direction: an unanswered settle the wallet has no record of
+    // must surface as a failure, not be quietly treated as done.
+    //
+    // reconcileTimeoutMs is short on purpose. The adapter waits that long for
+    // the socket to come back before giving up on asking, and a test that
+    // depends on the default is a test whose result depends on how busy the
+    // machine is.
+    const { adapter } = await connect({}, { rpcTimeoutMs: 500, reconcileTimeoutMs: 300 });
+    await adapter.openSession("nothing", "c1");
+    adapter.disconnect();
+    await expect(adapter.settleSimple({
+      sessionId: "nothing", bet: 100, betIndex: 2, priceMultiplier: 1,
+      win: 0, multiplier: 0, type: "loss", roundState: "{}",
+      idempotencyKey: "key-never",
+    })).rejects.toThrow(/not connected|disconnected|closed/i);
+    // ...and the key is released, so a real retry later is not refused by the
+    // memory of an attempt that moved no money.
+    expect((adapter as unknown as { settled: Map<string, unknown> }).settled.size).toBe(0);
+  }, 15_000);
+
+  test("a complex close whose reply is lost is checked the same way", async () => {
+    const { fake, adapter } = await connect({ swallowReplyFor: ["CloseRoundRequest"] }, { rpcTimeoutMs: 800 });
+    await adapter.openSession("lost2", "c1");
+    const opened = await adapter.openComplex({
+      sessionId: "lost2", bet: 100, betIndex: 2, priceMultiplier: 1, initialState: "{}",
+    });
+    const closed = await adapter.closeComplex({
+      sessionId: "lost2", roundId: opened.roundId,
+      finalState: JSON.stringify({ done: true }), carry: JSON.stringify({ m: 2 }),
+      win: 300, multiplier: 3, type: "win", idempotencyKey: "key-close",
+    });
+    expect(closed.roundId).toBe(opened.roundId);
+    expect(closed.balance).toBe(1_000_000 - 100 + 300);
+    expect(fake.sent("CloseRoundRequest").length).toBe(1);
+  }, 15_000);
+
+  test("the platform's own max-win cap reaches the receipt", async () => {
+    // The RGS cannot infer it: the balance is simply smaller than the
+    // multiplier implies. It is knowable only because the wallet says so.
+    const { adapter } = await connect({ maxWinReached: true });
+    await adapter.openSession("cap", "c1");
+    const r = await adapter.settleSimple({
+      sessionId: "cap", bet: 100, betIndex: 2, priceMultiplier: 1,
+      win: 900, multiplier: 9, type: "win", roundState: "{}",
+    });
+    expect(r.platformMaxWinReached).toBe(true);
+  });
+
+  test("what the wallet says for the client is forwarded, not dropped", async () => {
+    const { adapter } = await connect({ clientExtras: true });
+    const info = await adapter.openSession("extras", "c1");
+    const cd = info.clientData!;
+    // The one their docs are explicit about: forward it unchanged.
+    expect(cd["gamificationToken"]).toBe("tok-123");
+    expect(cd["autoSpinCounts"]).toEqual([10, 25, 50]);
+    // Amounts cross the same way every other amount does.
+    expect((cd["platformMaxWin"] as { playerCurrencyValue: number }).playerCurrencyValue).toBe(87_000);
+  });
+
   test("disconnect() takes effect before the socket finishes closing", async () => {
     // Whoever asks isHealthy is deciding whether to route a round at this
     // adapter. "I told it to disconnect and it says it is fine" is wrong at

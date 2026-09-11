@@ -87,16 +87,16 @@ describe("conformance", () => {
     // on a real overspend - see the test above, which drives
     // priceMultiplier.)
     "errors.insufficient-funds",
-    // PlayRoundRequest has no idempotency field at all, so SettleSimple's
-    // idempotencyKey is dropped on the floor. A retried settle is NOT deduped
-    // by the wallet. See the README - this is the adapter's biggest known gap.
-    "idempotency.duplicate-key",
   ]);
 
   test("the suite runs, and only the checks this wire cannot express fail", async () => {
     const report = await runConformance(adapter, {
       fixture: { sessionId: "conf-run" },
       perCheckTimeoutMs: 5_000,
+      // Opt in. Parallel settles across sessions and a duplicate key fired
+      // twice at once are exactly the shapes a live pod meets and a
+      // single-threaded test never does.
+      concurrency: true,
     });
     expect(report.checks.length).toBeGreaterThan(0);
     const unexpected = report.checks
@@ -106,11 +106,32 @@ describe("conformance", () => {
     expect(unexpected).toEqual([]);
   }, 30_000);
 
+  test("the concurrency certification passes too", async () => {
+    // Opt-in, and never opted into before: parallel settles across sessions,
+    // and the same idempotency key fired twice at once - which the wallet
+    // cannot dedupe, so the adapter has to.
+    const report = await runConformance(adapter, {
+      fixture: { sessionId: "conf-conc" }, perCheckTimeoutMs: 5_000, concurrency: true,
+    });
+    const conc = report.checks.filter((c) => c.group === "concurrency");
+    const bad = conc.filter((c) => c.status === "fail").map((c) => `${c.id}: ${c.message ?? ""}`);
+    if (bad.length > 0) console.error("concurrency failures:", bad);
+    expect(bad).toEqual([]);
+    // The two that move money, by name, so a future skip cannot hide here.
+    const byId = new Map(conc.map((c) => [c.id, c.status]));
+    expect(byId.get("concurrency.parallel-distinct-settles")).toBe("ok");
+    expect(byId.get("concurrency.duplicate-key-parallel")).toBe("ok");
+    // Reversal is skipped, not failed: this wire has no game-initiated
+    // rollback message, so there is nothing for reverseRound to call.
+    expect(byId.get("concurrency.reverse-interleave")).toBe("skip");
+  }, 30_000);
+
   test("the complex-round checks are among the ones that passed", async () => {
     // The point of the change: these three used to be skips.
     const report = await runConformance(adapter, {
       fixture: { sessionId: "conf-complex" },
       perCheckTimeoutMs: 5_000,
+      concurrency: true,
     });
     const byId = new Map(report.checks.map((c) => [c.id, c.status]));
     expect(byId.get("complex.openComplex")).toBe("ok");
@@ -125,6 +146,7 @@ describe("conformance", () => {
     // suite quietly stops testing.
     const report = await runConformance(adapter, {
       fixture: { sessionId: "conf-stale" }, perCheckTimeoutMs: 5_000,
+      concurrency: true,
     });
     const failing = new Set(report.checks.filter((c) => c.status === "fail").map((c) => c.id));
     for (const id of WIRE_CANNOT) expect(failing.has(id)).toBe(true);
