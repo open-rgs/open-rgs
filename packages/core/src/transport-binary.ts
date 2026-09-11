@@ -224,9 +224,13 @@ export function binaryTransport(cfg: BinaryTransportConfig): BinaryClientTranspo
       log.info("Binary transport listening", {
         "event.category": "transport",
         "event.action": "listen",
-        "server.port": cfg.port,
+        "server.port": server.port ?? cfg.port,
       });
-      return { port: cfg.port };
+      // server.port, not cfg.port: port 0 means "bind anywhere", and the
+      // configured 0 is not a port anyone can connect to. Reporting it back
+      // made both this log line and createServer's caller wrong in the one
+      // case where the answer was not already known.
+      return { port: server.port ?? cfg.port };
     },
 
     async stop(opts: { drainMs?: number } = {}): Promise<void> {

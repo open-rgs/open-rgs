@@ -775,10 +775,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       throw new RGSError("INSUFFICIENT_BALANCE", `cost ${betInfo.effectiveCost} > balance ${s.balance}`);
     }
 
+    // Same cheat plumbing as spin(). It was passing `undefined` here, so a
+    // forced outcome worked on a simple round and silently did nothing on a
+    // complex one - which is the mode where a deterministic opening draw is
+    // most needed, because everything after it is a branch.
     const ctx = buildSpinContext(
       requestedMode,
       { betIndex: betInfo.betIndex, priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier },
-      undefined,
+      req.params?.["cheat"] as Record<string, unknown> | undefined,
       req.params,
     );
     const math = mode.math as ComplexMath;
