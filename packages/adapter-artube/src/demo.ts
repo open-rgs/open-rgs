@@ -32,11 +32,46 @@ import type {
 import { createLogger, type Logger } from "@open-rgs/log";
 import pkg from "../package.json" with { type: "json" };
 
+/** A read-only look at what this process is storing for a demo session. */
+export interface DemoSessionView {
+  balance: number;
+  rounds: number;
+  carry?: CarryState;
+  mathVersion?: string;
+  nextMode?: string;
+  openRound?: DemoRound;
+  lastRound?: DemoRound;
+}
+
+/** The adapter returned by {@link withDemoSessions}, which can also report
+ *  what it is holding for a demo session. */
+export interface DemoCapableAdapter extends PlatformAdapter {
+  demoSessionFor(sessionId: string): DemoSessionView | undefined;
+}
+
 export interface DemoSessionsOptions {
   /** Play-money balance a demo session starts with, in the currency's
    *  minimal unit. Default 1_000_000 (10,000.00 at 2 decimals). */
   startingBalance?: number;
   logger?: Logger;
+}
+
+/** What the Games API would have stored about one round. Kept here instead. */
+export interface DemoRound {
+  roundId: string;
+  betIndex: number;
+  priceMultiplier: number;
+  bet: number;
+  /** The round's state, as the wallet's `round_state` would hold it: written
+   *  at open, replaced by every update, final at close. */
+  state: string;
+  stateVersion?: string;
+  /** Round-operation counter, the demo equivalent of `round_version`. */
+  version: number;
+  winMultiplier?: number;
+  win?: number;
+  startedAt: string;
+  finishedAt?: string;
 }
 
 interface DemoSession {
@@ -46,7 +81,9 @@ interface DemoSession {
   mathVersion?: string;
   /** The open complex round, if any. Demo rounds are this process's own, so
    *  the id is generated here. */
-  open?: { roundId: string; bet: number };
+  open?: DemoRound;
+  /** The last round to finish, the demo equivalent of `last_round`. */
+  lastRound?: DemoRound;
   rounds: number;
 }
 
@@ -62,7 +99,7 @@ interface DemoSession {
  * The returned adapter is a `PlatformAdapter` like any other; nothing above
  * it needs to know which kind of session it is looking at.
  */
-export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptions = {}): PlatformAdapter {
+export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptions = {}): DemoCapableAdapter {
   const startingBalance = opts.startingBalance ?? 1_000_000;
   const log = opts.logger ?? createLogger({ service: "open-rgs-adapter-artube-demo", version: pkg.version });
   const demo = new Map<string, DemoSession>();
@@ -130,7 +167,22 @@ export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptio
       s.mathVersion = req.mathVersion;
       s.nextMode = req.nextMode;
       s.rounds += 1;
-      return receipt(s, `demo-${crypto.randomUUID()}`);
+      const roundId = `demo-${crypto.randomUUID()}`;
+      const now = new Date().toISOString();
+      s.lastRound = {
+        roundId,
+        betIndex: req.betIndex,
+        priceMultiplier: req.priceMultiplier,
+        bet: req.bet,
+        state: req.roundState,
+        ...(req.mathVersion !== undefined ? { stateVersion: req.mathVersion } : {}),
+        version: 0,
+        winMultiplier: req.multiplier,
+        win: req.win,
+        startedAt: now,
+        finishedAt: now,
+      };
+      return receipt(s, roundId);
     },
 
     async openComplex(req: OpenComplex): Promise<RoundReceipt> {
@@ -143,17 +195,33 @@ export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptio
       }
       s.balance -= req.bet;
       const roundId = `demo-${crypto.randomUUID()}`;
-      s.open = { roundId, bet: req.bet };
+      s.open = {
+        roundId,
+        betIndex: req.betIndex,
+        priceMultiplier: req.priceMultiplier,
+        bet: req.bet,
+        state: req.initialState,
+        ...(req.mathVersion !== undefined ? { stateVersion: req.mathVersion } : {}),
+        version: 0,
+        startedAt: new Date().toISOString(),
+      };
       return receipt(s, roundId);
     },
 
     async updateComplex(req: UpdateComplex): Promise<void> {
-      if (!isDemo(req.sessionId)) {
+      const s = demo.get(req.sessionId);
+      if (!s) {
         if (typeof inner.updateComplex === "function") await inner.updateComplex(req);
         return;
       }
-      // The audit checkpoint exists so a regulator can reconstruct a
-      // real-money round. There is no money here and nothing to reconstruct.
+      // No audit trail to write - there is no money here - but the state
+      // itself is kept, because that is what the wallet would be holding and
+      // the point of this wrapper is that a demo round behaves like a real
+      // one everywhere except where the money is.
+      if (s.open && s.open.roundId === req.roundId) {
+        s.open.state = req.state;
+        s.open.version += 1;
+      }
     },
 
     async closeComplex(req: CloseComplex): Promise<RoundReceipt> {
@@ -167,6 +235,14 @@ export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptio
       s.mathVersion = req.mathVersion;
       s.nextMode = req.nextMode;
       s.rounds += 1;
+      s.lastRound = {
+        ...s.open,
+        state: req.finalState,
+        ...(req.mathVersion !== undefined ? { stateVersion: req.mathVersion } : {}),
+        winMultiplier: req.multiplier,
+        win: req.win,
+        finishedAt: new Date().toISOString(),
+      };
       delete s.open;
       return receipt(s, req.roundId);
     },
@@ -191,6 +267,25 @@ export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptio
     },
   };
 
+  // Everything the Games API would be storing for this session, for the same
+  // reason the real one is worth looking at: when a demo round behaves oddly
+  // the question is what the store thinks, and there is no back office for
+  // play money.
+  (wrapped as PlatformAdapter & { demoSessionFor?: unknown }).demoSessionFor =
+    (sessionId: string): DemoSessionView | undefined => {
+      const s = demo.get(sessionId);
+      if (!s) return undefined;
+      return {
+        balance: s.balance,
+        rounds: s.rounds,
+        ...(s.carry !== undefined ? { carry: s.carry } : {}),
+        ...(s.mathVersion !== undefined ? { mathVersion: s.mathVersion } : {}),
+        ...(s.nextMode !== undefined ? { nextMode: s.nextMode } : {}),
+        ...(s.open ? { openRound: { ...s.open } } : {}),
+        ...(s.lastRound ? { lastRound: { ...s.lastRound } } : {}),
+      };
+    };
+
   if (typeof inner.reverseRound === "function") {
     wrapped.reverseRound = async (req) => {
       if (isDemo(req.sessionId)) {
@@ -201,5 +296,5 @@ export function withDemoSessions(inner: PlatformAdapter, opts: DemoSessionsOptio
     };
   }
 
-  return wrapped;
+  return wrapped as DemoCapableAdapter;
 }

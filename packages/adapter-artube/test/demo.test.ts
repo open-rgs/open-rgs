@@ -106,6 +106,50 @@ describe("demo sessions", () => {
     expect(again.mathVersion).toBe("1.0.0");
   });
 
+  test("the round state is stored too, not just the balance", async () => {
+    // The wallet would be holding round_state through the whole round: the
+    // state at open, every update, the final one at close. A demo round that
+    // kept only the money would behave differently from a real one in the
+    // one place a game actually reads.
+    const { platform } = await connect();
+    await platform.openSession(DEMO, "c1");
+    const opened = await platform.openComplex({
+      sessionId: DEMO, bet: 100, betIndex: 3, priceMultiplier: 1,
+      initialState: JSON.stringify({ step: 1 }), mathVersion: "2.0.0",
+    });
+
+    let view = platform.demoSessionFor(DEMO)!;
+    expect(view.openRound?.roundId).toBe(opened.roundId);
+    expect(JSON.parse(view.openRound!.state)).toEqual({ step: 1 });
+    expect(view.openRound?.betIndex).toBe(3);
+    expect(view.openRound?.version).toBe(0);
+
+    await platform.updateComplex!({ sessionId: DEMO, roundId: opened.roundId, state: JSON.stringify({ step: 2 }) });
+    view = platform.demoSessionFor(DEMO)!;
+    expect(JSON.parse(view.openRound!.state)).toEqual({ step: 2 });
+    expect(view.openRound?.version).toBe(1);
+
+    await platform.closeComplex({
+      sessionId: DEMO, roundId: opened.roundId,
+      finalState: JSON.stringify({ step: 3 }),
+      carry: JSON.stringify({ meter: 9 }),
+      win: 200, multiplier: 2, type: "win", mathVersion: "2.0.0",
+    });
+    view = platform.demoSessionFor(DEMO)!;
+    expect(view.openRound).toBeUndefined();
+    // And the finished round is kept the way last_round would be.
+    expect(JSON.parse(view.lastRound!.state)).toEqual({ step: 3 });
+    expect(view.lastRound?.win).toBe(200);
+    expect(view.lastRound?.finishedAt).toBeDefined();
+    expect(JSON.parse(view.carry!)).toEqual({ meter: 9 });
+  });
+
+  test("a real session has no demo store at all", async () => {
+    const { platform } = await connect();
+    await platform.openSession(REAL, "c1");
+    expect(platform.demoSessionFor(REAL)).toBeUndefined();
+  });
+
   test("a real session is untouched by any of this", async () => {
     const { fake, platform } = await connect();
     const info = await platform.openSession(REAL, "c1");

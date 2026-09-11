@@ -162,6 +162,14 @@ one passes straight through. The bet ladder still comes from the wallet — it i
 not money, and a demo player should be able to bet what a real one can — and so
 does the answer to "is this demo at all".
 
+**Everything the Games API would store is stored, not just the balance**: the
+round state at open, every update to it, the final state at close, the carry
+that threads to the next round, and the finished round the way `last_round`
+would hold it. A demo round that kept only the money would behave differently
+from a real one in the one place a game actually reads.
+`demoSessionFor(sessionId)` returns that store, because when a demo round
+behaves oddly there is no back office to go and look in.
+
 Two things it does not do, both deliberate. It **persists nothing**: a demo
 balance and its carry live as long as the process, which is the platform's own
 behaviour (a demo round is not stored, so a reconnect may not restore one), and
