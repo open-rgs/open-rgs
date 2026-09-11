@@ -25,7 +25,9 @@ class SpyPlatform implements PlatformAdapter {
   async settleSimple(): Promise<RoundReceipt> { return { roundId: "s", balance: this.balance }; }
   async openComplex(req: OpenComplex): Promise<RoundReceipt> { this.balance -= req.bet; return { roundId: `r${++this.seq}`, balance: this.balance }; }
   closeReasons: (string | undefined)[] = [];
-  async closeComplex(req: CloseComplex): Promise<RoundReceipt> { this.closeWins.push(req.win); this.closeReasons.push(req.reason); this.balance += req.win; return { roundId: req.roundId, balance: this.balance }; }
+  closeCarries: (string | undefined)[] = [];
+  closeMathVersions: (string | undefined)[] = [];
+  async closeComplex(req: CloseComplex): Promise<RoundReceipt> { this.closeWins.push(req.win); this.closeReasons.push(req.reason); this.closeCarries.push(req.carry); this.closeMathVersions.push(req.mathVersion); this.balance += req.win; return { roundId: req.roundId, balance: this.balance }; }
   onEvent(_h: (e: PlatformEvent) => void) {}
 }
 
@@ -37,7 +39,7 @@ function complexMath(withAutoclose: boolean): ComplexMath {
     step: (state) => ({ state, ops: [] }),
     isTerminal: () => false,
     close: () => ({ multiplier: 0, ops: [], type: "close" }),
-    ...(withAutoclose ? { autoclose: () => ({ multiplier: 5, ops: [], type: "autoclose-banked" }) } : {}),
+    ...(withAutoclose ? { autoclose: () => ({ multiplier: 5, ops: [], type: "autoclose-banked", carry: "carry-from-autoclose" }) } : {}),
   };
 }
 
@@ -108,5 +110,20 @@ describe("autoclose policy (H5)", () => {
     const opened = await orch.openRound({ mode: "cx" }, conn);
     await orch.autocloseRound({ sessionId: "s6", roundId: opened.roundId, reason: "session-closed: kicked" });
     expect(platform.closeReasons).toEqual(["session-closed: kicked"]);
+  });
+
+  test("autoclose writes the math's carry to the WALLET, not just to memory", async () => {
+    // The wallet is the source of truth for carry: it is what the next
+    // openSession reads. An autoclose that updated only the in-memory session
+    // looked correct for as long as that process kept the session, and reset
+    // every meter the round had advanced the moment anyone reconnected.
+    const { orch, platform, conn } = setup("math-decides", true);
+    await orch.init({ sid: "s7" }, conn);
+    const opened = await orch.openRound({ mode: "cx" }, conn);
+    await orch.autocloseRound({ sessionId: "s7", roundId: opened.roundId, reason: "idle" });
+    expect(platform.closeCarries).toEqual(["carry-from-autoclose"]);
+    // Stamped with the math that produced it, the same as a client close, so
+    // the RGS can tell a carry written by older math from one it can use.
+    expect(platform.closeMathVersions).toEqual(["1"]);
   });
 });

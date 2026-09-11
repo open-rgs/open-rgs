@@ -1110,6 +1110,15 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         win,
         multiplier: cappedClose.multiplier,
         type: cappedClose.type,
+        // Same three fields a client close sends. They were missing here, so
+        // an autoclosed round updated the RGS's in-memory carry (below) and
+        // never the wallet's: the next openSession handed back the carry from
+        // before the round, and every meter the round had advanced silently
+        // reset. The wallet is the source of truth for carry, so the write
+        // that reaches it is the one that counts.
+        ...(cappedClose.carry !== undefined ? { carry: cappedClose.carry } : {}),
+        ...(cappedClose.nextMode !== undefined ? { nextMode: cappedClose.nextMode } : {}),
+        ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
         // Same deterministic key as a client close of this round (above)  -
         // a close racing an autoclose collapses to one wallet credit.
         idempotencyKey: deriveIdempotencyKey(s.sessionId, open.roundId, "close"),
