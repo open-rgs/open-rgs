@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/selectors",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Composable position selection over a slot grid. Shared by placement directives and hold-and-win effect targeting.",
   "license": "MIT",
   "repository": {
@@ -31,7 +31,7 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0"
+    "@open-rgs/grid": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

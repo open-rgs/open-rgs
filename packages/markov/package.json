@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/markov",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Markov-chain reel generation: natural symbol stacking with one stickiness knob, while the long-run symbol frequency stays exactly where you set it.",
   "license": "MIT",
   "repository": {
@@ -32,8 +32,8 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/weights": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/weights": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/weights",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Exact weighted sampling for slot math. Readable probabilities, so a paytable is balanced by turning a dial rather than re-authoring a reel strip.",
   "license": "MIT",
   "repository": {

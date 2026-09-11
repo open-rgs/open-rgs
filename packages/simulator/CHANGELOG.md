@@ -1,5 +1,31 @@
 # @open-rgs/simulator
 
+## 1.3.0
+
+### Minor Changes
+
+- [#62](https://github.com/open-rgs/open-rgs/pull/62) [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - **Measured RTP is now the RTP the engine would pay.** `simulate()` received
+  the whole manifest and ignored `maxWinMultiplier`, while the orchestrator
+  clips every settle at it - so the certification report described a game the
+  server does not pay. A spiky math with a 5,000x cap measured 100 here and paid
+  5 live.
+
+  The cap is applied per spin before anything is measured, so the distribution,
+  the percentiles and the RTP all describe live play. `rtp.measuredUncapped`,
+  `rtp.maxWinMultiplier` and `rtp.capped` report what the cap cost, because "the
+  cap never fired" and "the cap is carrying 4% of this game" are different facts.
+  `applyCap` is exported and pinned against core's own `applyMaxWinCap`.
+
+  The RTP verdict's confidence interval assumes independent spins while the same
+  run deliberately threads carry between them. `rtp.correlatedSpins` says when
+  that happened, and the markdown report prints the caveat rather than implying a
+  precision the data does not support.
+
+### Patch Changes
+
+- Updated dependencies [[`1935286`](https://github.com/open-rgs/open-rgs/commit/1935286a1bbef1bc30a6b3a18216c0bde8962937), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928)]:
+  - @open-rgs/contract@2.0.0
+
 ## 1.2.1
 
 ### Patch Changes

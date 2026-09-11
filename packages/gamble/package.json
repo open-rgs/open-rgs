@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/gamble",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Double-or-nothing, ladders and collect-or-risk rounds, priced so the house edge is a number you chose.",
   "license": "MIT",
   "repository": {

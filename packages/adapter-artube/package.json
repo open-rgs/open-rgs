@@ -27,12 +27,12 @@
     "websocket"
   ],
   "dependencies": {
-    "@open-rgs/contract": "1.2.0",
+    "@open-rgs/contract": "2.0.0",
     "@open-rgs/log": "1.0.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@open-rgs/adapter-test-kit": "1.1.0",
+    "@open-rgs/adapter-test-kit": "1.2.0",
     "@types/ws": "^8.5.13"
   },
   "scripts": {

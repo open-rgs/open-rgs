@@ -1,5 +1,29 @@
 # @open-rgs/adapter-test-kit
 
+## 1.2.0
+
+### Minor Changes
+
+- [#62](https://github.com/open-rgs/open-rgs/pull/62) [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928) Thanks [@igaming-bulochka](https://github.com/igaming-bulochka)! - The conformance suite now covers the state an adapter is the source of truth
+  for. `state.carry.round-trip` and `state.mathVersion.round-trip` prove that a
+  carry written with a settle comes back from the next `openSession` unchanged,
+  and that the math version comes back with it - without which the RGS cannot
+  tell a carry written by older math from a current one.
+
+  They found two real bugs on their first run: `MockPlatform` stored the carry
+  but not the math version (fixed here), and a wallet adapter in this repo wrote
+  `mathVersion` into one wire field and read it back from another.
+
+  `promo.consumed` checks the free-round pool when the fixture names one, and is
+  reported as a SKIP otherwise rather than a pass. It asserts the thing that
+  matters now that the engine counts down locally: a wallet may stay silent, but
+  a wallet that reports a number must report a shrinking one.
+
+### Patch Changes
+
+- Updated dependencies [[`1935286`](https://github.com/open-rgs/open-rgs/commit/1935286a1bbef1bc30a6b3a18216c0bde8962937), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928), [`4c5ae7b`](https://github.com/open-rgs/open-rgs/commit/4c5ae7bcccb62321c66f38a40cd46ed506834928)]:
+  - @open-rgs/contract@2.0.0
+
 ## 1.1.0
 
 ### Minor Changes

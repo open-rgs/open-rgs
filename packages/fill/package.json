@@ -1,6 +1,6 @@
 {
   "name": "@open-rgs/fill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Weighted grid generation for slot math. Per-cell and per-column weighted draws, with the exact symbol distribution readable rather than encoded in a reel strip.",
   "license": "MIT",
   "repository": {
@@ -31,8 +31,8 @@
     "math"
   ],
   "dependencies": {
-    "@open-rgs/grid": "0.1.0",
-    "@open-rgs/weights": "0.1.0"
+    "@open-rgs/grid": "0.2.0",
+    "@open-rgs/weights": "0.2.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
