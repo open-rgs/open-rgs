@@ -401,6 +401,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         modeId,
         bet,
         effectiveCost: bet * mode.stakeMultiplier,
+        winBasis: mode.multiplierBasis === "bet" ? base : bet * mode.stakeMultiplier,
         state: open.state,
         ...(described.awaiting ? { awaiting: described.awaiting } : {}),
         actionLog: [],
@@ -449,13 +450,15 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     modeId: string,
     requestedBetIndex: number | undefined,
     requestedPriceMultiplier: number | undefined,
-  ): { bet: number; betIndex: number; priceMultiplier: number; effectiveCost: number; promoId?: string } {
+  ): { bet: number; baseBet: number; betIndex: number; priceMultiplier: number; effectiveCost: number; winBasis: number; promoId?: string } {
     const promoOv = promo.activeOverride(s, modeId);
     if (promoOv) {
       const idx = s.allowedBets.indexOf(promoOv.bet);
       if (idx < 0) throw new RGSError("INVALID_BET", "Promo-locked bet not in allowedBets");
       // Promo-overridden free rounds skip stake fold by definition.
-      return { bet: promoOv.bet, betIndex: idx, priceMultiplier: 1, effectiveCost: promoOv.bet, promoId: promoOv.promoId };
+      // A promo-funded round costs the player nothing, so "cost" and "bet"
+      // are the same number here and the basis cannot change what it pays.
+      return { bet: promoOv.bet, baseBet: promoOv.bet, betIndex: idx, priceMultiplier: 1, effectiveCost: promoOv.bet, winBasis: promoOv.bet, promoId: promoOv.promoId };
     }
     const betIndex = requestedBetIndex ?? s.defaultBetIndex;
     if (!Number.isInteger(betIndex) || betIndex < 0 || betIndex >= s.allowedBets.length) {
@@ -489,14 +492,22 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // win calc, and the audit log's "amount paid" field, never sent
     // on the wire as `bet`.
     const effectiveCost = bet * mode.stakeMultiplier;
-    return { bet, betIndex, priceMultiplier, effectiveCost };
+    // What a multiplier from THIS mode's math is a multiple of. Under the
+    // default it is what the round cost; under "bet" it is the rung of the
+    // ladder, and the price of the round - a feature buy's whole point - has
+    // nothing to do with what a win pays.
+    const winBasis = mode.multiplierBasis === "bet" ? baseBet : effectiveCost;
+    return { bet, baseBet, betIndex, priceMultiplier, effectiveCost, winBasis };
   }
 
   function modeCatalogForClient() {
-    const out: { id: string; label?: string; stakeMultiplier: number; declaredRtp?: number }[] = [];
+    const out: { id: string; label?: string; stakeMultiplier: number; declaredRtp?: number; multiplierBasis: "cost" | "bet" }[] = [];
     for (const [id, m] of Object.entries(manifest.modes)) {
       if (m.internal) continue;
-      out.push({ id, label: m.label, stakeMultiplier: m.stakeMultiplier, declaredRtp: m.declaredRtp ?? m.math.rtp });
+      // A client that renders "x{multiplier}" has to know what the x is of.
+      // Showing a cost-basis multiplier next to a paytable written against
+      // the bet is how a player is told they won 4.76x on a max win.
+      out.push({ id, label: m.label, stakeMultiplier: m.stakeMultiplier, declaredRtp: m.declaredRtp ?? m.math.rtp, multiplierBasis: m.multiplierBasis ?? "cost" });
     }
     return out;
   }
@@ -775,15 +786,17 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // client can render a CONGRATULATIONS-YOU-MAXED-OUT screen.
     const cappedOutcome = applyMaxWinCap(
       outcome,
-      betInfo.effectiveCost,
+      betInfo.winBasis,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    // Win = multiplier x what was actually paid. For ante/buy modes
-    // that's the fractional effectiveCost; settleAmount rounds the
-    // product half-to-even at this one boundary (ADR-002) so the win
-    // crossing the wallet is integer minor units.
-    const win = settleAmount(cappedOutcome.multiplier, betInfo.effectiveCost);
-    assertFundedWin(betInfo.effectiveCost, cappedOutcome.multiplier);
+    // Win = multiplier x whatever this mode's multiplier is a multiple OF.
+    // Under the default that is what was actually paid - for ante/buy modes
+    // the fractional effectiveCost. Under multiplierBasis "bet" it is the
+    // ladder's rung, and a feature buy's price does not scale its wins.
+    // settleAmount rounds the product half-to-even at this one boundary
+    // (ADR-002) so the win crossing the wallet is integer minor units.
+    const win = settleAmount(cappedOutcome.multiplier, betInfo.winBasis);
+    assertFundedWin(betInfo.winBasis, cappedOutcome.multiplier);
 
     let receipt;
     try {
@@ -942,6 +955,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       modeId: requestedMode,
       bet: betInfo.bet,
       effectiveCost: betInfo.effectiveCost,
+      winBasis: betInfo.winBasis,
       state: open.state,
       ...(open.awaiting ? { awaiting: open.awaiting } : {}),
       actionLog: [],
@@ -1050,11 +1064,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
 
     const cappedClose = applyMaxWinCapClose(
       closeResult,
-      open.effectiveCost,
+      open.winBasis,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = settleAmount(cappedClose.multiplier, open.effectiveCost);
-    assertFundedWin(open.effectiveCost, cappedClose.multiplier);
+    // The basis was resolved when the round OPENED and stored with it. Re-reading
+    // the mode here would settle a round under a basis it was not opened under,
+    // which is the one way a config change could repay a round already in flight.
+    const win = settleAmount(cappedClose.multiplier, open.winBasis);
+    assertFundedWin(open.winBasis, cappedClose.multiplier);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -1215,11 +1232,14 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // from math.autoclose() (or a cap-exceeding one) would settle unguarded.
     const cappedClose = applyMaxWinCapClose(
       closeResult,
-      open.effectiveCost,
+      open.winBasis,
       mode.maxWinMultiplier ?? manifest.maxWinMultiplier,
     );
-    const win = settleAmount(cappedClose.multiplier, open.effectiveCost);
-    assertFundedWin(open.effectiveCost, cappedClose.multiplier);
+    // The basis was resolved when the round OPENED and stored with it. Re-reading
+    // the mode here would settle a round under a basis it was not opened under,
+    // which is the one way a config change could repay a round already in flight.
+    const win = settleAmount(cappedClose.multiplier, open.winBasis);
+    assertFundedWin(open.winBasis, cappedClose.multiplier);
     let receipt;
     try {
       receipt = await timedPlatformCall(metrics, "closeComplex", () => platform.closeComplex({
@@ -1360,8 +1380,9 @@ function sessionOrThrow(id: string | null | undefined): sessions.LocalSession {
   return s;
 }
 
-/** A 0 effective bet (e.g. a `stakeMultiplier: 0` free-round mode) with a
- *  winning multiplier would settle `win = multiplier x 0 = 0`, silently
+/** A 0 basis (e.g. a `stakeMultiplier: 0` free-round mode, or a 0 rung under
+ *  multiplierBasis "bet") with a winning multiplier would settle
+ *  `win = multiplier x 0 = 0`, silently
  *  losing the player's payout. Forbid it: free rounds must be funded so the
  *  win is non-zero: either by a promo pool (which locks a non-zero bet) or by
  *  accumulating the feature's winnings into the parent round's carry and
