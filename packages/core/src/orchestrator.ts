@@ -46,7 +46,7 @@ import { isAwaitingEndRound } from "./deferred-close.js";
  *  every transport and client says the same thing. */
 export const UNFINISHED_ROUND_MESSAGE = "Unfinished round \u2014 watching replay";
 import type { RgsMetrics } from "./metrics-rgs.js";
-import type { IdempotencyConfig, ConcurrencyPolicy } from "@open-rgs/contract";
+import type { IdempotencyConfig, ConcurrencyPolicy, AwaitingHint, Op, WalletOpenRound } from "@open-rgs/contract";
 
 export interface OrchestratorConfig {
   manifest: GameManifest;
@@ -341,6 +341,78 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     return requested ?? manifest.defaultMode;
   }
 
+  /**
+   * Rebuild an in-memory round from what the wallet stored.
+   *
+   * Everything except the state is arithmetic: the bet comes from the index
+   * and the ladder, the cost from the mode's stake. The state is the math's,
+   * and only the math that wrote it can say what the player is being asked -
+   * which is what `ComplexMath.resume` is for.
+   *
+   * Refuses, rather than guesses, in three cases, because each one would mean
+   * settling a round under rules it was not played by: a mode that is gone, a
+   * math version that no longer matches, and a math with no `resume`. The
+   * round stays open on the wallet and is still recoverable by hand.
+   */
+  function resumeWalletRound(open: WalletOpenRound | undefined, allowedBets: readonly number[]): sessions.OpenRound | undefined {
+    if (!open) return undefined;
+
+    const candidates: [string, GameMode][] = open.modeId
+      ? (manifest.modes[open.modeId] ? [[open.modeId, manifest.modes[open.modeId]!]] : [])
+      // The mode was not recorded (an older round, another implementation):
+      // ask each complex math whether the state is one of its own. `resume`
+      // is required to throw when it is not, which is what makes this a
+      // question rather than a guess.
+      : Object.entries(manifest.modes).filter(([, m]) => m.math.kind === "complex");
+
+    for (const [modeId, mode] of candidates) {
+      const math = mode.math;
+      if (math.kind !== "complex" || typeof math.resume !== "function") continue;
+      if (open.mathVersion !== undefined && math.version !== open.mathVersion) {
+        log.warn("Not resuming a round written by math that is no longer loaded", {
+          "event.category": "orchestrator",
+          "event.action":   "wallet_round_version_mismatch",
+          "round.id":       open.roundId,
+          "math.version.round":   open.mathVersion,
+          "math.version.current": math.version,
+        });
+        continue;
+      }
+      let described: { awaiting?: AwaitingHint; ops?: Op[] };
+      try {
+        described = math.resume(open.state);
+      } catch {
+        continue;   // not this math's round
+      }
+      const base = allowedBets[open.betIndex];
+      if (base === undefined) {
+        log.warn("Not resuming a round whose bet index is off this session's ladder", {
+          "event.category": "orchestrator",
+          "event.action":   "wallet_round_bet_unknown",
+          "round.id":       open.roundId,
+          "round.bet_index": open.betIndex,
+          "ladder.length":  allowedBets.length,
+        });
+        continue;
+      }
+      const bet = base * open.priceMultiplier;
+      return {
+        roundId: open.roundId,
+        modeId,
+        bet,
+        effectiveCost: bet * mode.stakeMultiplier,
+        state: open.state,
+        ...(described.awaiting ? { awaiting: described.awaiting } : {}),
+        actionLog: [],
+        // Whatever the math could reconstruct. The actions that led here are
+        // gone - they were only ever in the memory of a process that died.
+        opsLog: described.ops ? [...described.ops] : [],
+        openedAt: Date.now(),
+      };
+    }
+    return undefined;
+  }
+
   /** The wallet capped this round at its own maximum win. Log it where an
    *  operator reconciling a short payout will find it, and tell the client,
    *  which is the only party that can explain it to the player. */
@@ -471,6 +543,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
     // connection exactly what happened and what's next.
     let s = sessions.get(req.sid);
     let info: import("@open-rgs/contract").SessionInfo;
+    let walletResume: sessions.OpenRound | undefined;
 
     if (s?.openRound) {
       // Don't re-call openSession on the platform, we still own this
@@ -524,6 +597,22 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       conn.sessionId = req.sid;
       conn.demo = !info.currency;
 
+      // A round the WALLET has open and this process never opened: the RGS
+      // was restarted, or the player came back on another instance. Put them
+      // back in it. The alternative is to forfeit a round they paid for or
+      // to settle it behind their back, and both are worse than finishing it.
+      const resumed = resumeWalletRound(info.walletOpenRound, info.allowedBets);
+      if (resumed) {
+        walletResume = resumed;
+        log.warn("Resuming a round the wallet had open", {
+          "event.category": "orchestrator",
+          "event.action":   "wallet_round_resumed",
+          "session.id":     req.sid,
+          "round.id":       resumed.roundId,
+          "mode.id":        resumed.modeId,
+        });
+      }
+
       // Math-version migration: if the platform returns a carry but
       // its mathVersion doesn't match what's currently loaded, we
       // discard the carry. Manifest.recovery policy could in future
@@ -551,6 +640,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
       s = {
         sessionId: req.sid,
         connectionId: conn.connectionId,
+        ...(walletResume ? { openRound: walletResume } : {}),
         balance: info.balance,
         currency: info.currency,
         currencyDecimals: info.currencyDecimals,
@@ -825,6 +915,7 @@ export function createOrchestrator(cfg: OrchestratorConfig): OrchestratorAPI {
         betIndex: betInfo.betIndex,
         priceMultiplier: betInfo.priceMultiplier * mode.stakeMultiplier,
         initialState: open.state,
+        modeId: requestedMode,
         ...(mode.math.version ? { mathVersion: mode.math.version } : {}),
         idempotencyKey: initiatingIdemKey(s.sessionId, "open", req.idempotencyKey),
         ...(betInfo.promoId ? { promoId: betInfo.promoId } : {}),

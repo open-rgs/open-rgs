@@ -281,6 +281,24 @@ export interface ComplexMath {
 
   /** Optional autoclose resolver: produce a close outcome from current state. */
   autoclose?(state: RoundState): CloseOutcome | Promise<CloseOutcome>;
+
+  /**
+   * Describe a round that is already in flight, from its state alone.
+   *
+   * For the round nobody in this process opened: the wallet still has it, the
+   * RGS was restarted or the player moved to another instance, and the only
+   * thing left of the round is the state the wallet stored. Without this the
+   * choice is to forfeit it or to settle it behind the player's back; with
+   * it the player is put back where they were and finishes the round.
+   *
+   * MUST throw if `state` is not one of this math's own - the resolver uses
+   * that to tell whose round it is when the mode was not recorded.
+   *
+   * `ops` is what the client needs to redraw; a math that cannot reconstruct
+   * the visuals may return none, and the client shows the decision without
+   * the history that led to it.
+   */
+  resume?(state: RoundState): { awaiting?: AwaitingHint; ops?: Op[] };
 }
 
 export type MathModule = SimpleMath | ComplexMath;
@@ -388,6 +406,26 @@ export function defineGame(m: GameManifest): GameManifest {
 // is a single connected adapter with a healthy/unhealthy status, a fixed
 // RPC surface, and an event stream.
 
+/** A round the WALLET says is still open, with enough to resume it.
+ *
+ *  Distinct from {@link OpenRoundResume}, which is this RGS replaying a round
+ *  it still holds in memory. This one comes from the wallet, which knows the
+ *  round exists and stored its state but has no idea what any of it means. */
+export interface WalletOpenRound {
+  roundId: string;
+  /** The math's own state, as the wallet stored it. */
+  state: RoundState;
+  betIndex: number;
+  priceMultiplier: number;
+  /** Mode it was opened in, when the adapter recorded one. Without it the
+   *  orchestrator finds the owning math by asking each complex mode to
+   *  resume the state, and takes the first that accepts it. */
+  modeId?: string;
+  /** Math version that wrote the state. A round written by math that is no
+   *  longer loaded is not resumed: its rules are gone. */
+  mathVersion?: string;
+}
+
 export interface SessionInfo {
   sessionId: string;
   /** Empty string = demo session (no real wallet). */
@@ -414,6 +452,10 @@ export interface SessionInfo {
   promo?: PromoFreeRounds;
   /** Open round to resume on reconnect, if any. */
   openRound?: OpenRoundResume;
+  /** A round the wallet has open that this process did not open. Set by an
+   *  adapter whose wire can report one; the orchestrator resumes it at INIT
+   *  so the player finishes the round rather than losing it. */
+  walletOpenRound?: WalletOpenRound;
   /**
    * Platform data that belongs to the CLIENT, forwarded verbatim.
    *
@@ -549,6 +591,10 @@ export interface OpenComplex {
   betIndex: number;
   priceMultiplier: number;
   initialState: RoundState;
+  /** Mode this round is being played in. An adapter that can store it should:
+   *  it is what lets the round be resumed later by a process that did not
+   *  open it, without guessing which math owns the state. */
+  modeId?: string;
   mathVersion?: string;
   /** Promo pool id this round was consumed from, if any. */
   promoId?: string;
