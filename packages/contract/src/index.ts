@@ -318,6 +318,27 @@ export interface GameMode {
   internal?: boolean;
   /** Per-mode RTP for the mode catalog and certification. Defaults to math.rtp. */
   declaredRtp?: number;
+  /**
+   * What the math's multiplier is a multiple OF.
+   *
+   * `"cost"` (default) - a multiple of what the round cost, i.e.
+   * `bet x stakeMultiplier`. A 10x win on a 100x buy pays 1000 bets. This is
+   * the convention where a buy's price scales its wins with it.
+   *
+   * `"bet"` - a multiple of the BET the ladder names at `bet_index`, with the
+   * price of the round playing no part. A 10x win on a 100x buy pays 10 bets.
+   * This is the convention most published paytables are written in: "max win
+   * 10000x" means 10000 times the bet, whatever the feature cost to enter,
+   * and the price is a separate number the wallet is told about.
+   *
+   * The choice is not cosmetic and it is not recoverable after the fact: the
+   * multiplier the platform records is the math's own, so a game that means
+   * "10000x the bet" and declares `"cost"` both overpays AND writes a
+   * multiplier into round history that the paytable screen contradicts.
+   *
+   * Defaults to `"cost"` so existing games are untouched.
+   */
+  multiplierBasis?: "cost" | "bet";
   /** Per-mode max-win cap as a multiple of `bet` (post-stakeMultiplier).
    *  e.g. maxWinMultiplier=10000 means the orchestrator will cap any
    *  single round's win at 10,000 x bet. Most jurisdictions require this.

@@ -37,6 +37,10 @@ export interface OpenRound {
    *  1-unit base = 1.25). Used for balance check, max-win cap, win
    *  calculation, and the audit log's "amount paid" field. */
   effectiveCost: number;
+  /** What this round's closing multiplier is a multiple of - the mode's
+   *  `multiplierBasis` resolved to a number at OPEN time. Stored rather than
+   *  recomputed because a round outlives the config read that opened it. */
+  winBasis: number;
   state: RoundState;
   awaiting?: AwaitingHint;
   /** Action log for replay-on-reconnect. */
