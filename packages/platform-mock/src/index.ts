@@ -63,7 +63,21 @@ interface MockState {
   allowedBets: number[];
   defaultBetIndex: number;
   promo?: PromoFreeRounds;
-  openRound?: { roundId: string; bet: number; finalState?: string; balanceBefore: number; carryBefore: CarryState | undefined };
+  openRound?: {
+    roundId: string;
+    bet: number;
+    finalState?: string;
+    balanceBefore: number;
+    carryBefore: CarryState | undefined;
+    /** Enough to hand the round back on the next openSession, the way a real
+     *  wallet does: it stored the state and the price, and knows nothing
+     *  about what any of it means. */
+    state?: string;
+    betIndex?: number;
+    priceMultiplier?: number;
+    modeId?: string;
+    mathVersion?: string;
+  };
   /** Math version that produced `carry`. Stored with it and handed back on the
    *  next openSession, so the RGS can tell a carry written by older math from
    *  one written by the math it is currently running - it discards the former
@@ -147,6 +161,19 @@ export class MockPlatform implements PlatformAdapter {
       allowedBets: s.allowedBets,
       defaultBetIndex: s.defaultBetIndex,
       promo: s.promo,
+      // A round left open is the wallet's to report: it is what lets an RGS
+      // that has forgotten the round (a restart, another instance) put the
+      // player back into it instead of stranding a round they paid for.
+      ...(s.openRound && s.openRound.state !== undefined ? {
+        walletOpenRound: {
+          roundId: s.openRound.roundId,
+          state: s.openRound.state,
+          betIndex: s.openRound.betIndex ?? 0,
+          priceMultiplier: s.openRound.priceMultiplier ?? 1,
+          ...(s.openRound.modeId !== undefined ? { modeId: s.openRound.modeId } : {}),
+          ...(s.openRound.mathVersion !== undefined ? { mathVersion: s.openRound.mathVersion } : {}),
+        },
+      } : {}),
       // The wallet is the source of truth for carry; hand back what we stored,
       // with the math version that wrote it.
       ...(s.carry !== undefined ? { carry: s.carry } : {}),
@@ -223,7 +250,14 @@ export class MockPlatform implements PlatformAdapter {
     const roundId = this.nextRoundId();
     // Capture pre-round state at OPEN: a complex round's money spans open->close,
     // so reversing it must restore the balance/carry from before the debit.
-    s.openRound = { roundId, bet: req.bet, balanceBefore, carryBefore };
+    s.openRound = {
+      roundId, bet: req.bet, balanceBefore, carryBefore,
+      state: req.initialState,
+      betIndex: req.betIndex,
+      priceMultiplier: req.priceMultiplier,
+      ...(req.modeId !== undefined ? { modeId: req.modeId } : {}),
+      ...(req.mathVersion !== undefined ? { mathVersion: req.mathVersion } : {}),
+    };
 
     const receipt: RoundReceipt = { roundId, balance: s.balance };
     if (isPromo) receipt.promo = this.consumePromo(s);
@@ -231,8 +265,15 @@ export class MockPlatform implements PlatformAdapter {
     return this.remember(req.idempotencyKey, receipt);
   }
 
-  async updateComplex(_req: UpdateComplex): Promise<void> {
-    /* audit-only no-op for the mock */
+  async updateComplex(req: UpdateComplex): Promise<void> {
+    // Audit-only for money, but the state itself is kept: it is what the
+    // wallet would be holding, and what a resume of this round reads. A mock
+    // that dropped it would report the round as it was at OPEN and quietly
+    // rewind the player's progress.
+    const s = this.state.get(req.sessionId);
+    if (s?.openRound && s.openRound.roundId === req.roundId) {
+      s.openRound.state = req.state;
+    }
   }
 
   async closeComplex(req: CloseComplex): Promise<RoundReceipt> {

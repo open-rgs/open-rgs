@@ -94,6 +94,8 @@ export const ARTUBE_ADAPTER_VERSION: string = pkg.version;
  *  value the state. */
 export interface ArtubeOpenRound {
   roundId: string;
+  /** Mode the round was opened in, if the state recorded one. */
+  modeId?: string;
   /** The round's state as the wallet last stored it. `ComplexMath.autoclose`
    *  takes exactly this. */
   state: string;
@@ -392,6 +394,8 @@ interface PendingRpc {
 /** What the adapter remembers about a round the wallet has open. */
 interface OpenRoundBook {
   sessionId: string;
+  /** Mode the round is being played in, when the RGS told us. */
+  modeId?: string;
   /** Latest round_version the wallet handed back. */
   version: number;
   /** round_state_version stamped at open; reused when a later request has
@@ -743,6 +747,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       state: unwrapState(last.round_state),
       betIndex: last.bet_index,
       priceMultiplier: last.price_multiplier,
+      ...(modeOf(last.round_state) !== undefined ? { modeId: modeOf(last.round_state)! } : {}),
       ...(last.round_state_version ? { mathVersion: last.round_state_version } : {}),
       ...(last.started_at ? { startedAt: last.started_at } : {}),
     };
@@ -750,6 +755,7 @@ export class ArtubeAdapter implements PlatformAdapter {
     if (!this.rounds.has(orphan.roundId)) {
       this.rounds.set(orphan.roundId, {
         sessionId,
+        ...(orphan.modeId !== undefined ? { modeId: orphan.modeId } : {}),
         version: last.round_version,
         stateVersion: last.round_state_version,
         features: new Set(),
@@ -886,7 +892,7 @@ export class ArtubeAdapter implements PlatformAdapter {
       ...(req.promoId  ? { free_round_campaign_id: req.promoId } : {}),
       ...(features.length > 0 ? { features: features.map((type) => ({ type })) } : {}),
       round_state_version: stateVersion,
-      round_state:         packOpenState(req.initialState),
+      round_state:         packOpenState(req.initialState, req.modeId),
     };
 
     const env = await this.rpc<OpenRoundRequestPayload, OpenRoundResponsePayload>(
@@ -896,6 +902,7 @@ export class ArtubeAdapter implements PlatformAdapter {
 
     this.rounds.set(env.payload.round_id, {
       sessionId:    req.sessionId,
+      ...(req.modeId !== undefined ? { modeId: req.modeId } : {}),
       version:      env.payload.round_version,
       stateVersion,
       features:     new Set(features),
@@ -933,7 +940,7 @@ export class ArtubeAdapter implements PlatformAdapter {
           round_id:            req.roundId,
           round_version:       book.version,
           round_state_version: book.stateVersion,
-          round_state:         packOpenState(req.state),
+          round_state:         packOpenState(req.state, book.modeId),
         },
       );
       for (const f of extractFeatures(req.state)) book.features.add(f);
@@ -1768,6 +1775,19 @@ function artubeSessionToContract(
   // No carry is the honest answer for an open round: unknown, not empty. The
   // orchestrator resumes from its own memory when it still has the session,
   // and this path is what runs when it does not.
+  if (p.last_round && isRoundOpen(p.last_round)) {
+    // The round the wallet still has and this process does not. Handed to the
+    // orchestrator so the player is put back INTO it, rather than losing a
+    // round they already paid for.
+    info.walletOpenRound = {
+      roundId: p.last_round.round_id,
+      state: unwrapState(p.last_round.round_state),
+      betIndex: p.last_round.bet_index,
+      priceMultiplier: p.last_round.price_multiplier,
+      ...(modeOf(p.last_round.round_state) !== undefined ? { modeId: modeOf(p.last_round.round_state)! } : {}),
+      ...(p.last_round.round_state_version ? { mathVersion: p.last_round.round_state_version } : {}),
+    };
+  }
   if (p.last_round && !isRoundOpen(p.last_round)) {
     const carry = unpackCarry(p.last_round.round_state);
     if (carry !== "") info.carry = carry;
@@ -1823,6 +1843,9 @@ interface RoundStateEnvelope {
    *  carry look absent - the player's meters reset - while a genuinely open
    *  round stays invisible. */
   open?: true;
+  /** Mode the round is being played in, stored so a process that did not open
+   *  it knows which math owns the state. */
+  mode?: string;
   /**
    * The RGS's idempotency key for the settle that wrote this state.
    *
@@ -1880,10 +1903,11 @@ function mayHaveLanded(e: unknown): boolean {
 }
 
 /** The state of a round that is still in flight, marked as such. */
-function packOpenState(state: string): string {
+function packOpenState(state: string, mode?: string): string {
   const env: RoundStateEnvelope = {
     [RGS_ENVELOPE_MARK]: 1,
     open: true,
+    ...(mode !== undefined ? { mode } : {}),
     state: asJsonOrString(state),
   };
   return JSON.stringify(env);
@@ -1902,6 +1926,11 @@ function parseEnvelope(roundState: string): RoundStateEnvelope | undefined {
  *  when it was written. */
 function isOpenState(roundState: string): boolean {
   return parseEnvelope(roundState)?.open === true;
+}
+
+/** The mode an in-flight round was opened in, if it was recorded. */
+function modeOf(roundState: string): string | undefined {
+  return parseEnvelope(roundState)?.mode;
 }
 
 /**
